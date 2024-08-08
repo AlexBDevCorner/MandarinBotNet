@@ -1,0 +1,84 @@
+# Ignore build outputs
+bin/
+obj/
+
+# User-specific files
+*.user
+*.userosscache
+*.suo
+*.sln.docstates
+
+# Mono auto generated files
+mono_crash.*
+
+# Windows image file caches
+Thumbs.db
+ehthumbs.db
+
+# Folder config file
+Desktop.ini
+
+# Recycle Bin used on file shares
+$RECYCLE.BIN/
+
+# OSX files
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# JetBrains Rider
+.idea/
+
+# Visual Studio Code
+.vscode/
+
+# Log files
+*.log
+
+# npm packages
+node_modules/
+
+# Environment variables
+.env
+
+# Azure Functions local settings file
+local.settings.json
+
+# Backup files
+*.bak
+*.swp
+
+# IIS files
+logs/
+*.pid
+
+# Resharper
+_ReSharper*/
+*.[Rr]e[Ss]harper
+
+# StyleCop
+StyleCopCache/
+
+# Coverage files
+coverage/
+*.coverage
+*.coveragexml
+
+# Publish Web Output
+*.Publish.xml
+
+# Auto-generated files from VSCode extension
+.vs/
+.vscode/
+
+# Rider project specific files
+.idea/
+
+# Crashlytics, Fabric
+crashlytics-build.properties
+
+# dotnet user secrets
+**/secrets.json
+
+# dotnet build optimization
+*.rsp
