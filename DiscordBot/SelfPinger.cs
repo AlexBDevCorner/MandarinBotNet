@@ -7,7 +7,7 @@ namespace DiscordBot
         public async Task Execute(IJobExecutionContext context)
         {
             var client = httpClientFactory.CreateClient();
-            client.BaseAddress = new Uri("https://localhost:7041");
+            client.BaseAddress = new Uri("http://localhost:8080");
             var response = await client.GetAsync("/api/SelfPing");
             Console.WriteLine($"SelfPinger: {response.StatusCode}");
         }
