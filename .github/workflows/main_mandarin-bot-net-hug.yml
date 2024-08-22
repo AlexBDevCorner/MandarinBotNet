@@ -48,4 +48,4 @@ jobs:
         app-name: 'mandarin-bot-net-hug'
         slot-name: 'production'
         publish-profile: ${{ secrets.AzureAppService_PublishProfile_324360f1ad0b41e88e9d4dcea0740f8e }}
-        images: 'index.docker.io/${{ secrets.AzureAppService_ContainerUsername_18be84a961ad4cdda2a66b75f2cf8049 }}/aleksbobdocker/mandarinbot:${{ github.sha }}'
+        images: 'index.docker.io/${{ secrets.DOCKER_USERNAME }}/mandarinbot:${{ github.sha }}'
