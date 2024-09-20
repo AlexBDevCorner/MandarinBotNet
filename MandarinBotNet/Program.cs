@@ -20,6 +20,7 @@ builder.Services.AddQuartz(q =>
         .WithSimpleSchedule(s => s.WithIntervalInMinutes(5).RepeatForever()));
 })
 .AddQuartzHostedService(q => q.WaitForJobsToComplete = true);
+builder.Services.AddHostedService<DiscordBotHostedService>();
 
 var app = builder.Build();
 
