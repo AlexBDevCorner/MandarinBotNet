@@ -28,7 +28,9 @@ namespace DiscordBot.Jobs
                     }  
                 }
             }
-            
+
+            logger.LogInformation($"Guild amount: {discordClient.Guilds.Count}");
+
             var generalChannel = discordClient.GetChannel(517977921680441364L) as IMessageChannel;
 
             logger.LogInformation($"Is channel available: {generalChannel is null}");
