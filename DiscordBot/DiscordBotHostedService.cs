@@ -6,13 +6,9 @@ using Microsoft.Extensions.Hosting;
 
 namespace DiscordBot
 {
-    public class DiscordBotHostedService(IConfiguration configuration) : IHostedService
+    public class DiscordBotHostedService(IConfiguration configuration, DiscordSocketClient client) : IHostedService
     {
-        private readonly DiscordSocketClient _client = new(new DiscordSocketConfig
-        {
-            GatewayIntents = GatewayIntents.AllUnprivileged
-        });
-        private Dictionary<string, Func<SocketSlashCommand, Task>> _commandHandlers; 
+        private Dictionary<string, Func<SocketSlashCommand, Task>> _commandHandlers = []; 
 
         public async Task StartAsync(CancellationToken cancellationToken)
         {
@@ -21,21 +17,21 @@ namespace DiscordBot
                 { "hugme", HandleHugMeCommand }
             };
 
-            _client.Log += LogAsync;
-            _client.Ready += ReadyAsync;
-            _client.GuildAvailable += GuildAvailableAsync;  // Triggered when a guild becomes available
-            _client.SlashCommandExecuted += SlashCommandHandler;
+            client.Log += LogAsync;
+            client.Ready += ReadyAsync;
+            client.GuildAvailable += GuildAvailableAsync;  // Triggered when a guild becomes available
+            client.SlashCommandExecuted += SlashCommandHandler;
 
             var token = configuration["BOT_TOKEN"];
 
             // Log in and start bot
-            await _client.LoginAsync(TokenType.Bot, token);
-            await _client.StartAsync();
+            await client.LoginAsync(TokenType.Bot, token);
+            await client.StartAsync();
         }
 
         public async Task StopAsync(CancellationToken cancellationToken)
         {
-            await _client.StopAsync();
+            await client.StopAsync();
         }
 
         private Task LogAsync(LogMessage log)

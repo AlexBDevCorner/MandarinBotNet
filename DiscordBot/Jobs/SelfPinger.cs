@@ -1,6 +1,6 @@
 ﻿using Quartz;
 
-namespace DiscordBot
+namespace DiscordBot.Jobs
 {
     public class SelfPinger(IHttpClientFactory httpClientFactory) : IJob
     {
