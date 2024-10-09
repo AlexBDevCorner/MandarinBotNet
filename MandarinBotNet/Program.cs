@@ -18,6 +18,11 @@ builder.Logging.ClearProviders();
 builder.Logging.AddConsole();
 builder.Logging.AddDebug();
 
+builder.Services.AddSingleton(new DiscordSocketClient(new DiscordSocketConfig
+{
+    GatewayIntents = GatewayIntents.AllUnprivileged
+}));
+
 builder.Services.AddQuartz(q =>
 {
     var selfPingerJobKey = new JobKey("SelfPinger");
@@ -36,10 +41,7 @@ builder.Services.AddQuartz(q =>
         .WithSimpleSchedule(s => s.WithRepeatCount(0)));
 })
 .AddQuartzHostedService(q => q.WaitForJobsToComplete = true);
-builder.Services.AddSingleton(new DiscordSocketClient(new DiscordSocketConfig
-{
-    GatewayIntents = GatewayIntents.AllUnprivileged
-}));
+
 
 builder.Services.AddHostedService<DiscordBotHostedService>();
 
