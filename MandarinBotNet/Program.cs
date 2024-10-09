@@ -23,6 +23,9 @@ builder.Services.AddSingleton(new DiscordSocketClient(new DiscordSocketConfig
     GatewayIntents = GatewayIntents.AllUnprivileged
 }));
 
+
+builder.Services.AddHostedService<DiscordBotHostedService>();
+
 builder.Services.AddQuartz(q =>
 {
     var selfPingerJobKey = new JobKey("SelfPinger");
@@ -41,9 +44,6 @@ builder.Services.AddQuartz(q =>
         .WithSimpleSchedule(s => s.WithRepeatCount(0)));
 })
 .AddQuartzHostedService(q => q.WaitForJobsToComplete = true);
-
-
-builder.Services.AddHostedService<DiscordBotHostedService>();
 
 var app = builder.Build();
 
