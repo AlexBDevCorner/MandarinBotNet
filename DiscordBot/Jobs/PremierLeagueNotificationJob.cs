@@ -1,11 +1,12 @@
 ﻿using Discord;
 using Discord.WebSocket;
+using Microsoft.Extensions.Logging;
 using Quartz;
 using System.Text.Json;
 
 namespace DiscordBot.Jobs
 {
-    public class PremierLeagueNotificationJob(DiscordSocketClient discordClient, IHttpClientFactory httpClientFactory) : IJob
+    public class PremierLeagueNotificationJob(DiscordSocketClient discordClient, IHttpClientFactory httpClientFactory, ILogger<PremierLeagueNotificationJob> logger) : IJob
     {
         public async Task Execute(IJobExecutionContext context)
         {
@@ -27,7 +28,7 @@ namespace DiscordBot.Jobs
                     }  
                 }
             }
-
+            logger.LogInformation($"Guild amount: {discordClient.Guilds.Count}");
             foreach (var guild in discordClient.Guilds)
             {
                 var generalChannel = guild.TextChannels.FirstOrDefault(channel => channel.Name.Equals("general", StringComparison.OrdinalIgnoreCase));

@@ -3,15 +3,17 @@ using Discord.Net;
 using Discord.WebSocket;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
 namespace DiscordBot
 {
-    public class DiscordBotHostedService(IConfiguration configuration, DiscordSocketClient client) : IHostedService
+    public class DiscordBotHostedService(IConfiguration configuration, DiscordSocketClient client, ILogger<DiscordBotHostedService> logger) : IHostedService
     {
         private Dictionary<string, Func<SocketSlashCommand, Task>> _commandHandlers = []; 
 
         public async Task StartAsync(CancellationToken cancellationToken)
         {
+            logger.LogInformation("Starting!");
             _commandHandlers = new()
             {
                 { "hugme", HandleHugMeCommand }
