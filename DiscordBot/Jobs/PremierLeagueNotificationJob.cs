@@ -29,22 +29,21 @@ namespace DiscordBot.Jobs
                 }
             }
             logger.LogInformation($"Guild amount: {discordClient.Guilds.Count}");
-            foreach (var guild in discordClient.Guilds)
-            {
-                var generalChannel = discordClient.GetChannel(517977921680441364) as IMessageChannel;
+            
+            var generalChannel = discordClient.GetChannel(517977921680441364L) as IMessageChannel;
 
-                if (generalChannel is not null)
+            if (generalChannel is not null)
+            {
+                try
                 {
-                    try
-                    {
-                        await generalChannel.SendMessageAsync("Тестовое сообщение, всех люблю и обнимаю :people_hugging:");
-                    }
-                    catch(Exception ex)
-                    {
-                        Console.WriteLine($"Failed to send message to guild {guild.Name} ({guild.Id}): {ex.Message}");
-                    }
+                    await generalChannel.SendMessageAsync("Тестовое сообщение, всех люблю и обнимаю :people_hugging:");
+                }
+                catch(Exception ex)
+                {
+                    Console.WriteLine($"Failed to send message");
                 }
             }
+            
         }
     }
 }
