@@ -31,7 +31,7 @@ namespace DiscordBot.Jobs
             logger.LogInformation($"Guild amount: {discordClient.Guilds.Count}");
             foreach (var guild in discordClient.Guilds)
             {
-                var generalChannel = guild.TextChannels.FirstOrDefault(channel => channel.Name.Equals("general", StringComparison.OrdinalIgnoreCase));
+                var generalChannel = discordClient.GetChannel(517977921680441364) as IMessageChannel;
 
                 if (generalChannel is not null)
                 {
