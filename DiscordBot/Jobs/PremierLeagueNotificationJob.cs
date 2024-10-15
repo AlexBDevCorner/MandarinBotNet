@@ -65,45 +65,37 @@ namespace DiscordBot.Jobs
 
         private static string GenerateRemainingDaysMessageInRussian(TimeSpan difference)
         {
-            var days = "дней";
-            var hours = "часов";
-            var minutes = "минут";
-            
-            var daysLastOrLastTwoNumbers = difference.Days % 100;
-            var hoursLastOrLastTwoNumbers = difference.Hours % 100;
-            var minutesLastOrLastTwoNumbers = difference.Minutes % 100;
+            string[] dayWordForms = ["дней", "день", "дня"];
+            string[] hoursWordForms = ["часов", "час", "часа"];
+            string[] minutesWordForms = ["минут", "минута", "минуты"];
 
-            if (daysLastOrLastTwoNumbers == 1)
-            {
-                days = "день";
-            } 
-            
-            if (daysLastOrLastTwoNumbers > 1 && daysLastOrLastTwoNumbers < 5)
-            {
-                days = "дня";
-            }
-
-            if (hoursLastOrLastTwoNumbers == 1)
-            {
-                hours = "час";
-            }
-
-            if (hoursLastOrLastTwoNumbers > 1 && hoursLastOrLastTwoNumbers < 5)
-            {
-                hours = "часа";
-            }
-
-            if (minutesLastOrLastTwoNumbers == 1)
-            {
-                minutes = "минута";
-            }
-
-            if (minutesLastOrLastTwoNumbers > 1 && minutesLastOrLastTwoNumbers < 5)
-            {
-                minutes = "минуты";
-            }
+            var days = dayWordForms[GetWordForm(difference.Days)];
+            var hours = hoursWordForms[GetWordForm(difference.Hours)];
+            var minutes = minutesWordForms[GetWordForm(difference.Minutes)];
 
             return $"{difference.Days} {days}, {difference.Hours} {hours}, {difference.Minutes} {minutes}";
+        }
+
+        private static int GetWordForm(int number)
+        {
+            if (number % 100 >= 11 && number % 100 <= 19)
+            {
+                return 0;
+            }
+
+            int lastDigit = number % 10;
+
+            switch (lastDigit)
+            {
+                case 1:
+                    return 1;
+                case 2:
+                case 3:
+                case 4:
+                    return 2;
+                default:
+                    return 0;
+            }
         }
     }
 }
