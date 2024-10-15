@@ -40,7 +40,7 @@ builder.Services.AddQuartz(q =>
     q.AddTrigger(t => t
         .ForJob(PremierLeagueNotificationJobKey)
         .WithIdentity("PremierLeagueNotificationTrigger")
-        .WithSimpleSchedule(s => s.WithIntervalInMinutes(3).WithRepeatCount(1)));
+        .WithSimpleSchedule(s => s.WithIntervalInSeconds(40).WithRepeatCount(1)));
 })
 .AddQuartzHostedService(q => q.WaitForJobsToComplete = true);
 
