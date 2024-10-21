@@ -35,12 +35,19 @@ builder.Services.AddQuartz(q =>
         .WithIdentity("SelfPingerTrigger")
         .WithSimpleSchedule(s => s.WithIntervalInMinutes(5).RepeatForever()));
 
-    var PremierLeagueNotificationJobKey = new JobKey("PremierLeagueNotification");
-    q.AddJob<PremierLeagueNotificationJob>(j => j.WithIdentity(PremierLeagueNotificationJobKey));
-    q.AddTrigger(t => t
-        .ForJob(PremierLeagueNotificationJobKey)
-        .WithIdentity("PremierLeagueNotificationTrigger")
-        .WithSimpleSchedule(s => s.WithIntervalInSeconds(40).WithRepeatCount(1)));
+    //var PremierLeagueNotificationJobKey = new JobKey("PremierLeagueNotification");
+    //q.AddJob<PremierLeagueNotificationJob>(j => j.WithIdentity(PremierLeagueNotificationJobKey));
+    //q.AddTrigger(t => t
+    //    .ForJob(PremierLeagueNotificationJobKey)
+    //    .WithIdentity("PremierLeagueNotificationTrigger")
+    //    .WithSimpleSchedule(s => s.WithIntervalInSeconds(40).WithRepeatCount(1)));
+
+    //var PremierLeagueClassicStandingsInformationJobKey = new JobKey("PremierLeagueClassicStandingsInformation");
+    //q.AddJob<PremierLeagueClassicStandingsInformationJob>(j => j.WithIdentity(PremierLeagueClassicStandingsInformationJobKey));
+    //q.AddTrigger(t => t
+    //    .ForJob(PremierLeagueClassicStandingsInformationJobKey)
+    //    .WithIdentity("PremierLeagueClassicStandingsInformationTrigger")
+    //    .WithSimpleSchedule(s => s.WithIntervalInSeconds(20).WithRepeatCount(3)));
 })
 .AddQuartzHostedService(q => q.WaitForJobsToComplete = true);
 
