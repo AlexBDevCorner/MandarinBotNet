@@ -2,6 +2,7 @@
 using Quartz;
 using System.Globalization;
 using System.Text.Json;
+using TimeZoneConverter;
 
 namespace DiscordBot.Jobs
 {
@@ -14,6 +15,8 @@ namespace DiscordBot.Jobs
             var response = await client.GetStreamAsync("/api/bootstrap-static");
             using JsonDocument jsonDoc = await JsonDocument.ParseAsync(response);
             DateTime? deadline = null;
+
+            var rigaTimeZone = TZConvert.GetTimeZoneInfo("Europe/Riga");
 
             if (jsonDoc.RootElement.TryGetProperty("events", out JsonElement dataArrayElement))
             {
@@ -28,36 +31,47 @@ namespace DiscordBot.Jobs
                         var epochTime = itemElement.GetProperty("deadline_time_epoch").GetInt64();
                         var dateTimeUtc = DateTimeOffset.FromUnixTimeSeconds(epochTime).UtcDateTime;
 
-                        deadline = TimeZoneInfo.ConvertTimeFromUtc(dateTimeUtc, DateTimeUtility.GmtPlus3Zone);
+                        deadline = TimeZoneInfo.ConvertTimeFromUtc(dateTimeUtc, rigaTimeZone);
                     }
                 }
             }
 
             if (deadline is null) return;
-            
-            foreach (var guild in discordClient.Guilds)
+
+            var utcNow = DateTime.UtcNow;
+
+            var currentRigaTime = TimeZoneInfo.ConvertTimeFromUtc(utcNow, rigaTimeZone);
+
+            var beforeTime = deadline.Value.AddHours(-24).AddMinutes(-58);
+            var afterTime = deadline.Value.AddHours(-23).AddMinutes(-2);
+            var hourBefore = deadline.Value.AddMinutes(-70);
+
+            if ((currentRigaTime > beforeTime && currentRigaTime < afterTime) || (currentRigaTime > hourBefore && currentRigaTime > deadline))
             {
-                var generalChannel = guild.TextChannels
-                    .FirstOrDefault(c => c.Name.Equals("general", StringComparison.OrdinalIgnoreCase)
-                        || c.Name.Equals("announcement-bot", StringComparison.OrdinalIgnoreCase));
-
-                if (generalChannel is null) continue;
-
-                try
+                foreach (var guild in discordClient.Guilds)
                 {
-                    var castedDeadline = (DateTime)deadline;
-                    var now = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, DateTimeUtility.GmtPlus3Zone);
-                    var difference = castedDeadline.Subtract(now);
+                    var generalChannel = guild.TextChannels
+                        .FirstOrDefault(c => c.Name.Equals("general", StringComparison.OrdinalIgnoreCase)
+                            || c.Name.Equals("announcement-bot", StringComparison.OrdinalIgnoreCase));
 
-                    var russianCulture = new CultureInfo("ru-RU");
-                    
-                    await generalChannel.SendMessageAsync($"@everyone Привет мои любители АПЛ и обнимашек! :people_hugging: Следующий тур уже скоро -" +
-                        $" {castedDeadline.ToString("dd MMMM yyyy, HH:mm", russianCulture)}, это {castedDeadline.ToString("dddd", russianCulture)}" +
-                        $". До этого момента осталось всего {DateTimeUtility.GenerateRemainingDaysMessageInRussian(difference)}.");
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Failed to send message");
+                    if (generalChannel is null) continue;
+
+                    try
+                    {
+                        var castedDeadline = (DateTime)deadline;
+                        var now = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, rigaTimeZone);
+                        var difference = castedDeadline.Subtract(now);
+
+                        var russianCulture = new CultureInfo("ru-RU");
+
+                        await generalChannel.SendMessageAsync($"@everyone Привет мои любители АПЛ и обнимашек! :people_hugging: Следующий тур уже скоро -" +
+                            $" {castedDeadline.ToString("dd MMMM yyyy, HH:mm", russianCulture)}, это {castedDeadline.ToString("dddd", russianCulture)}" +
+                            $". До этого момента осталось всего {DateTimeUtility.GenerateRemainingDaysMessageInRussian(difference)}.");
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine("Failed to send message");
+                    }
                 }
             }
         }

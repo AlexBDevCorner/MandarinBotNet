@@ -1,8 +1,8 @@
-﻿using Discord;
-using Discord.WebSocket;
+﻿using Discord.WebSocket;
 using DiscordBot.Responses;
 using Quartz;
 using System.Text.Json;
+using TimeZoneConverter;
 
 namespace DiscordBot.Jobs
 {
@@ -19,7 +19,18 @@ namespace DiscordBot.Jobs
             
             var standings = JsonSerializer.Deserialize<StandingsResponse>(jsonResponse);
 
-            if (standings == null || standings.Standings == null || standings.Standings.Results == null) return;
+            var rigaTimeZone = TZConvert.GetTimeZoneInfo("Europe/Riga");
+
+            var utcNow = DateTime.UtcNow;
+
+            var yesterdayRigaMidnight = TimeZoneInfo.ConvertTimeFromUtc(utcNow, rigaTimeZone)
+                .Date
+                .AddDays(-1);
+
+            if (standings == null || 
+                standings.Standings == null || 
+                standings.Standings.Results == null ||
+                standings.LastUpdatedData < yesterdayRigaMidnight) return;
 
             foreach (var guild in discordClient.Guilds)
             {
