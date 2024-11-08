@@ -42,7 +42,7 @@ builder.Services.AddQuartz(q =>
         DateTime.Today.Year,
         DateTime.Today.Month,
         DateTime.Today.Day,
-        20, 0, 0,
+        13, 0, 0,
         rigaTimeZone.BaseUtcOffset
     );
 

@@ -46,6 +46,12 @@ namespace DiscordBot.Jobs
             var afterTime = deadline.Value.AddHours(-23).AddMinutes(-2);
             var hourBefore = deadline.Value.AddMinutes(-70);
 
+            Console.WriteLine($"Before - {beforeTime}");
+            Console.WriteLine($"After - {afterTime}");
+            Console.WriteLine($"Hour before - {hourBefore}");
+            Console.WriteLine($"Deadline - {deadline}");
+            Console.WriteLine($"Current Riga Time - {currentRigaTime}");
+
             if ((currentRigaTime > beforeTime && currentRigaTime < afterTime) || (currentRigaTime > hourBefore && currentRigaTime < deadline))
             {
                 foreach (var guild in discordClient.Guilds)

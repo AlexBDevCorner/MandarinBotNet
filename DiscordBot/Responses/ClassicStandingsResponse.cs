@@ -2,15 +2,15 @@
 
 namespace DiscordBot.Responses
 {
-    public class StandingsResponse
+    public class ClassicStandingsResponse
     {
         [JsonPropertyName("standings")]
-        public Standings Standings { get; set; } = default!;
+        public ClassicStandings Standings { get; set; } = default!;
         [JsonPropertyName("last_updated_data")]
         public DateTime LastUpdatedData { get; set; }
     }
 
-    public class Standings
+    public class ClassicStandings
     {
         [JsonPropertyName("results")]
         public List<ClassicStanding> Results { get; set; } = [];

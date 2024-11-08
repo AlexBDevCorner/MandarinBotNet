@@ -17,7 +17,7 @@ namespace DiscordBot.Jobs
 
             if (string.IsNullOrEmpty(jsonResponse)) return;
             
-            var standings = JsonSerializer.Deserialize<StandingsResponse>(jsonResponse);
+            var standings = JsonSerializer.Deserialize<ClassicStandingsResponse>(jsonResponse);
 
             var rigaTimeZone = TZConvert.GetTimeZoneInfo("Europe/Riga");
 
@@ -77,14 +77,14 @@ namespace DiscordBot.Jobs
 
             foreach (var result in results) 
             { 
-                if (result.Rank > result.LastRank)
+                if (result.Rank < result.LastRank)
                 {
                     summary += $"\nКоманда {result.EntryName} смогла взобраться на {result.LastRank - result.Rank} позиции вверх :arrow_up:, поздравительные обнимашки! :people_hugging: Так держать!";
                 }
 
-                if(result.Rank < result.LastRank)
+                if(result.Rank > result.LastRank)
                 {
-                    summary += $"\nКоманда {result.EntryName} упала на {result.LastRank - result.Rank} позиции вниз :arrow_down:, обнимашки поддержки! :people_hugging: Всё наладится!";
+                    summary += $"\nКоманда {result.EntryName} упала на {result.Rank - result.LastRank} позиции вниз :arrow_down:, обнимашки поддержки! :people_hugging: Всё наладится!";
                 }
             }
 
