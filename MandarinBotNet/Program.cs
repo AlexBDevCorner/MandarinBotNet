@@ -4,6 +4,7 @@ using DiscordBot;
 using DiscordBot.Jobs;
 using Quartz;
 using TimeZoneConverter;
+using DiscordBot.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -24,17 +25,31 @@ builder.Services.AddSingleton(new DiscordSocketClient(new DiscordSocketConfig
     GatewayIntents = GatewayIntents.AllUnprivileged
 }));
 
+builder.Services.AddSingleton(new H2hMatchesPlayedService { MatchesPlayed = 0 });
+
 
 builder.Services.AddHostedService<DiscordBotHostedService>();
 
 builder.Services.AddQuartz(q =>
 {
-    var selfPingerJobKey = new JobKey("SelfPinger");
-    q.AddJob<SelfPinger>(j => j.WithIdentity(selfPingerJobKey));
-    q.AddTrigger(t => t
-        .ForJob(selfPingerJobKey)
-        .WithIdentity("SelfPingerTrigger")
-        .WithSimpleSchedule(s => s.WithIntervalInMinutes(5).RepeatForever()));
+    var jobs = new List<(string JobName, bool IsEnabled)>
+    {
+        new (Jobs.SelfPingerJob, false),
+        new (Jobs.PremierLeagueNotificationJob, false),
+        new (Jobs.PremierLeagueClassicStandingsInformationJob, false),
+        new (Jobs.PremierLeagueH2hStandingsInformationJob, true)
+    };
+
+    if (jobs.Any(j => j.JobName == Jobs.SelfPingerJob && j.IsEnabled))
+    {
+        var selfPingerJobKey = new JobKey("SelfPinger");
+        q.AddJob<SelfPinger>(j => j.WithIdentity(selfPingerJobKey));
+        q.AddTrigger(t => t
+            .ForJob(selfPingerJobKey)
+            .WithIdentity("SelfPingerTrigger")
+            .WithSimpleSchedule(s => s.WithIntervalInMinutes(5).RepeatForever()));
+    }
+    
 
     var rigaTimeZone = TZConvert.GetTimeZoneInfo("Europe/Riga");
 
@@ -46,21 +61,38 @@ builder.Services.AddQuartz(q =>
         rigaTimeZone.BaseUtcOffset
     );
 
-    var PremierLeagueNotificationJobKey = new JobKey("PremierLeagueNotification");
-    q.AddJob<PremierLeagueNotificationJob>(j => j.WithIdentity(PremierLeagueNotificationJobKey));
-    q.AddTrigger(t => t
-        .ForJob(PremierLeagueNotificationJobKey)
-        .WithIdentity("PremierLeagueNotificationTrigger")
-        .StartAt(targetTime)
-        .WithSimpleSchedule(s => s.WithIntervalInHours(1).RepeatForever()));
+    if (jobs.Any(j => j.JobName == Jobs.PremierLeagueNotificationJob && j.IsEnabled))
+    {
+        var PremierLeagueNotificationJobKey = new JobKey("PremierLeagueNotification");
+        q.AddJob<PremierLeagueNotificationJob>(j => j.WithIdentity(PremierLeagueNotificationJobKey));
+        q.AddTrigger(t => t
+            .ForJob(PremierLeagueNotificationJobKey)
+            .WithIdentity("PremierLeagueNotificationTrigger")
+            .StartAt(targetTime)
+            .WithSimpleSchedule(s => s.WithIntervalInHours(1).RepeatForever()));
+    }
 
-    var PremierLeagueClassicStandingsInformationJobKey = new JobKey("PremierLeagueClassicStandingsInformation");
-    q.AddJob<PremierLeagueClassicStandingsInformationJob>(j => j.WithIdentity(PremierLeagueClassicStandingsInformationJobKey));
-    q.AddTrigger(t => t
-        .ForJob(PremierLeagueClassicStandingsInformationJobKey)
-        .WithIdentity("PremierLeagueClassicStandingsInformationTrigger")
-        .StartAt(targetTime)
-        .WithSimpleSchedule(s => s.WithIntervalInHours(24).RepeatForever()));
+    if (jobs.Any(j => j.JobName == Jobs.PremierLeagueClassicStandingsInformationJob && j.IsEnabled))
+    {
+        var PremierLeagueClassicStandingsInformationJobKey = new JobKey("PremierLeagueClassicStandingsInformation");
+        q.AddJob<PremierLeagueClassicStandingsInformationJob>(j => j.WithIdentity(PremierLeagueClassicStandingsInformationJobKey));
+        q.AddTrigger(t => t
+            .ForJob(PremierLeagueClassicStandingsInformationJobKey)
+            .WithIdentity("PremierLeagueClassicStandingsInformationTrigger")
+            .StartAt(targetTime)
+            .WithSimpleSchedule(s => s.WithIntervalInHours(24).RepeatForever()));
+    }
+
+    if (jobs.Any(j => j.JobName == Jobs.PremierLeagueH2hStandingsInformationJob && j.IsEnabled))
+    {
+        var PremierLeagueH2hStandingsInformationJobKey = new JobKey("PremierLeagueH2hStandingsInformation");
+        q.AddJob<PremierLeagueH2hStandingsInformationJob>(j => j.WithIdentity(PremierLeagueH2hStandingsInformationJobKey));
+        q.AddTrigger(t => t
+            .ForJob(PremierLeagueH2hStandingsInformationJobKey)
+            .WithIdentity("PremierLeagueH2hStandingsInformationTrigger")
+            .StartAt(targetTime)
+            .WithSimpleSchedule(s => s.WithIntervalInHours(24).RepeatForever()));
+    }
 })
 .AddQuartzHostedService(q => q.WaitForJobsToComplete = true);
 

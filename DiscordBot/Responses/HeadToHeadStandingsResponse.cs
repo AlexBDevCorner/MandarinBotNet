@@ -24,5 +24,7 @@ namespace DiscordBot.Responses
         public int Total { get; set; }
         [JsonPropertyName("entry_name")]
         public string EntryName { get; set; } = string.Empty;
+        [JsonPropertyName("matches_played")]
+        public int MatchesPlayed { get; set; }
     }
 }

@@ -52,7 +52,7 @@ namespace DiscordBot.Jobs
 
         }
 
-        private string GetRankEmoji(int rank) => rank switch
+        private static string GetRankEmoji(int rank) => rank switch
         {
             1 => ":one:",
             2 => ":two:",
