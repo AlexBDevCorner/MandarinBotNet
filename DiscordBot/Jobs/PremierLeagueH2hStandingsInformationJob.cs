@@ -59,7 +59,7 @@ namespace DiscordBot.Jobs
 
         private static string GetEventSummary(List<HeadToHeadStanding> results)
         {
-            var summary = $"@everyone Лига Пельменных Обнимашек:";
+            var summary = $"@everyone Лига Пельменных Обнимашек-К-Обнимашкам:";
 
             foreach (var result in results)
             {
