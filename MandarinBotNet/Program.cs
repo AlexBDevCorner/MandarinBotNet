@@ -34,9 +34,9 @@ builder.Services.AddQuartz(q =>
 {
     var jobs = new List<(string JobName, bool IsEnabled)>
     {
-        new (Jobs.SelfPingerJob, false),
-        new (Jobs.PremierLeagueNotificationJob, false),
-        new (Jobs.PremierLeagueClassicStandingsInformationJob, false),
+        new (Jobs.SelfPingerJob, true),
+        new (Jobs.PremierLeagueNotificationJob, true),
+        new (Jobs.PremierLeagueClassicStandingsInformationJob, true),
         new (Jobs.PremierLeagueH2hStandingsInformationJob, true)
     };
 
@@ -57,7 +57,7 @@ builder.Services.AddQuartz(q =>
         DateTime.Today.Year,
         DateTime.Today.Month,
         DateTime.Today.Day,
-        14, 0, 0,
+        17, 0, 0,
         rigaTimeZone.BaseUtcOffset
     );
 
