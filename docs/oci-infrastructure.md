@@ -8,9 +8,9 @@ these files.
 
 The stack in [`infra/terraform`](../infra/terraform) provisions:
 
-- an Always Free-eligible `VM.Standard.A1.Flex` VM in `eu-frankfurt-1`;
-- 1 OCPU, 2 GB RAM, and a 50 GB boot volume;
-- Ubuntu 24.04 AArch64 and Docker;
+- an Always Free-eligible `VM.Standard.E2.1.Micro` VM in `eu-frankfurt-1`;
+- 1 GB RAM and a 50 GB boot volume;
+- Ubuntu 24.04 x86_64 and Docker;
 - a dedicated VCN and public subnet;
 - outbound internet access, with all inbound access closed by default.
 
@@ -52,7 +52,7 @@ resource is marked Always Free-eligible in the OCI Console.
    | --- | --- |
    | `tenancy_ocid` | Tenancy OCID |
    | `compartment_ocid` | Dedicated bot compartment OCID |
-   | `availability_domain_number` | `1` initially; try `2` or `3` on an A1 capacity error |
+   | `availability_domain_number` | `3`; the E2.1.Micro shape is offered only in Frankfurt AD 3 |
    | `ssh_authorized_keys` | One or more OpenSSH public keys |
    | `ssh_ingress_cidr` | Leave unset for closed inbound access, or set one trusted `/32` |
    | `instance_display_name` | Optional; defaults to `mandarin-bot` |
@@ -111,14 +111,15 @@ intentionally and validate a plan before applying.
 
 ## Database later
 
-The VM leaves ample room within the A1 Always Free allocation to run a small
-PostgreSQL container alongside the bot. That is the easiest first step, but it
-shares the VM's failure domain and requires separate backups.
+The E2.1.Micro VM has only 1 GB RAM. A small SQLite database stored on the
+persistent host-mounted data directory is suitable for the bot, but a
+PostgreSQL container on the same VM is not recommended.
 
-When the data becomes important, prefer adding either:
+When the workload outgrows SQLite or the data needs independent availability,
+prefer adding either:
 
 - OCI Autonomous Database Always Free, accessed over TLS; or
-- a second VM with PostgreSQL on a private subnet.
+- a separate database host or service on a private network.
 
 Add database infrastructure in a separate Terraform module/state before
 production data exists. Store credentials outside Terraform state and back up

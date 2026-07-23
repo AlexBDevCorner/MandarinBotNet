@@ -24,13 +24,13 @@ variable "compartment_ocid" {
 }
 
 variable "availability_domain_number" {
-  description = "Frankfurt availability-domain number. Change this when A1 capacity is unavailable."
+  description = "Frankfurt availability-domain number. VM.Standard.E2.1.Micro is offered in AD 3."
   type        = number
-  default     = 1
+  default     = 3
 
   validation {
-    condition     = contains([1, 2, 3], var.availability_domain_number)
-    error_message = "availability_domain_number must be 1, 2, or 3."
+    condition     = var.availability_domain_number == 3
+    error_message = "availability_domain_number must be 3 for VM.Standard.E2.1.Micro in Frankfurt."
   }
 }
 
