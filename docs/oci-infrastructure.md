@@ -93,7 +93,96 @@ reviewers. Keep the API signing key as a repository secret because the plan job
 runs before the protected environment; the apply job cannot start until the
 environment is approved.
 
-## Running the workflow
+## One-time application deployment setup
+
+Application deployment uses two runners:
+
+- a GitHub-hosted runner builds the image and publishes it to this private
+  repository's GitHub Container Registry package;
+- a repository-scoped self-hosted runner on the VM pulls and starts that image.
+
+The self-hosted runner connects outbound to GitHub, so the network security
+group can keep all inbound ports closed. The 1 GB VM never compiles the
+application.
+
+Register the runner as follows:
+
+1. Temporarily enable SSH only from your trusted `/32`, or use an OCI console
+   connection. Do not open SSH to `0.0.0.0/0`.
+2. Create a dedicated service account and grant it Docker access:
+
+   ```bash
+   sudo useradd --create-home --shell /bin/bash github-runner
+   sudo usermod --append --groups docker github-runner
+   ```
+
+   Membership in the `docker` group is root-equivalent. Keep this runner scoped
+   only to this private repository and do not add pull-request triggers to the
+   deployment workflow.
+3. In **Repository settings → Actions → Runners**, choose **New self-hosted
+   runner**, then select Linux and x64. Run GitHub's displayed download commands
+   under the `github-runner` account. Configure it with the additional label
+   `mandarinbot-production`; the registration token is short-lived and must not
+   be saved in the repository:
+
+   ```bash
+   ./config.sh \
+     --url https://github.com/AlexBDevCorner/MandarinBotNet \
+     --token <SHORT-LIVED-REGISTRATION-TOKEN> \
+     --name mandarinbot-production \
+     --labels mandarinbot-production \
+     --unattended
+   sudo ./svc.sh install github-runner
+   sudo ./svc.sh start
+   sudo ./svc.sh status
+   ```
+
+4. Store the Discord token only on the VM. The deployment script reads it but
+   never copies it into an image or GitHub Actions:
+
+   ```bash
+   sudo install -d -m 0750 -o ubuntu -g docker /opt/mandarinbot/data
+   sudo install -m 0640 -o root -g docker /dev/null /opt/mandarinbot/mandarinbot.env
+   sudoedit /opt/mandarinbot/mandarinbot.env
+   ```
+
+   The file must contain:
+
+   ```dotenv
+   BOT_TOKEN=<DISCORD-BOT-TOKEN>
+   ```
+
+5. Confirm the runner appears online, then remove temporary SSH ingress if it
+   is no longer needed.
+
+Do not reuse the OCI Resource Manager API key as a runner or application
+credential.
+
+## Deploying the application
+
+1. Open **Actions → Build and deploy MandarinBot to OCI VM → Run workflow**.
+2. Select the default branch and enter `DEPLOY`.
+3. Approve the `oci-production` environment.
+
+The workflow publishes an immutable commit-SHA image to GHCR. On the VM it
+stops and retains the previous container, starts the new one with
+`--restart unless-stopped`, and waits for the Discord client readiness message.
+If startup fails, the previous container is restored automatically. Deployments
+are serialized.
+
+Useful VM checks are:
+
+```bash
+docker ps --filter name=mandarinbot
+docker logs --tail 100 mandarinbot
+sudo systemctl status actions.runner.*
+```
+
+After the first successful OCI deployment, remove the obsolete Azure App
+Service publish-profile secret and the old Docker Hub credentials from the
+repository if no other workflow uses them.
+
+## Running the infrastructure workflow
 
 1. Open **Actions → Provision OCI infrastructure → Run workflow**.
 2. Select the default branch.
