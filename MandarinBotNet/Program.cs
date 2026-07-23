@@ -2,18 +2,15 @@ using Discord.WebSocket;
 using Discord;
 using DiscordBot;
 using DiscordBot.Jobs;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Quartz;
 using TimeZoneConverter;
 using DiscordBot.Services;
 
-var builder = WebApplication.CreateBuilder(args);
+var builder = Host.CreateApplicationBuilder(args);
 
-// Add services to the container.
-
-builder.Services.AddControllers();
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
 builder.Services.AddHttpClient();
 
 builder.Logging.ClearProviders();
@@ -34,22 +31,10 @@ builder.Services.AddQuartz(q =>
 {
     var jobs = new List<(string JobName, bool IsEnabled)>
     {
-        new (Jobs.SelfPingerJob, true),
         new (Jobs.PremierLeagueNotificationJob, true),
         new (Jobs.PremierLeagueClassicStandingsInformationJob, true),
         new (Jobs.PremierLeagueH2hStandingsInformationJob, true)
     };
-
-    if (jobs.Any(j => j.JobName == Jobs.SelfPingerJob && j.IsEnabled))
-    {
-        var selfPingerJobKey = new JobKey("SelfPinger");
-        q.AddJob<SelfPinger>(j => j.WithIdentity(selfPingerJobKey));
-        q.AddTrigger(t => t
-            .ForJob(selfPingerJobKey)
-            .WithIdentity("SelfPingerTrigger")
-            .WithSimpleSchedule(s => s.WithIntervalInMinutes(5).RepeatForever()));
-    }
-    
 
     var rigaTimeZone = TZConvert.GetTimeZoneInfo("Europe/Riga");
 
@@ -96,19 +81,5 @@ builder.Services.AddQuartz(q =>
 })
 .AddQuartzHostedService(q => q.WaitForJobsToComplete = true);
 
-var app = builder.Build();
-
-// Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
-
-//app.UseHttpsRedirection();
-
-app.UseAuthorization();
-
-app.MapControllers();
-
-app.Run();
+var host = builder.Build();
+await host.RunAsync();

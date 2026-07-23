@@ -1,0 +1,49 @@
+# Repository-scoped Codex tooling. This file contains no credentials.
+# Codex loads it only after the repository has been trusted.
+
+[mcp_servers.context7]
+command = "npx"
+args = ["-y", "@upstash/context7-mcp"]
+env_vars = ["CONTEXT7_API_KEY"]
+enabled = true
+required = false
+startup_timeout_sec = 60
+tool_timeout_sec = 120
+default_tools_approval_mode = "auto"
+
+# GitHub's default toolset: repository, issue, pull-request, and user operations.
+[mcp_servers.github]
+url = "https://api.githubcopilot.com/mcp/"
+bearer_token_env_var = "GITHUB_PAT_TOKEN"
+enabled = true
+required = false
+tool_timeout_sec = 120
+default_tools_approval_mode = "writes"
+
+# GitHub Actions is a separate hosted toolset.
+[mcp_servers.github_actions]
+url = "https://api.githubcopilot.com/mcp/x/actions"
+bearer_token_env_var = "GITHUB_PAT_TOKEN"
+enabled = true
+required = false
+tool_timeout_sec = 120
+default_tools_approval_mode = "writes"
+
+# Oracle's official general-purpose OCI MCP server, launched through a local
+# Windows compatibility shim that redirects its hardcoded /tmp/audit.log path.
+# The server reads the normal OCI CLI profile from %USERPROFILE%/.oci/config.
+[mcp_servers.oracle_oci]
+command = "cmd.exe"
+args = ["/d", "/q", "/c", ".tools\\oracle-mcp\\Scripts\\python.exe", "scripts\\oracle_oci_mcp_windows.py"]
+env_vars = ["OCI_CONFIG_FILE"]
+enabled = true
+required = false
+startup_timeout_sec = 60
+tool_timeout_sec = 180
+# invoke_oci_api can perform both reads and writes, so prompt for every call.
+default_tools_approval_mode = "prompt"
+
+[mcp_servers.oracle_oci.env]
+# Keep uv's downloaded MCP package/cache under the ignored repository tools dir.
+UV_CACHE_DIR = ".tools/uv-cache"
+OCI_CONFIG_PROFILE = "mandarinbot-agent"

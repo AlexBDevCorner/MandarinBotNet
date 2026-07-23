@@ -1,0 +1,25 @@
+#cloud-config
+package_update: true
+
+packages:
+  - docker.io
+
+write_files:
+  - path: /etc/docker/daemon.json
+    owner: root:root
+    permissions: "0644"
+    content: |
+      {
+        "log-driver": "json-file",
+        "log-opts": {
+          "max-size": "10m",
+          "max-file": "3"
+        }
+      }
+
+runcmd:
+  - [systemctl, enable, --now, docker]
+  - [systemctl, restart, docker]
+  - [usermod, -aG, docker, ubuntu]
+  - [install, -d, -m, "0750", -o, ubuntu, -g, docker, /opt/mandarinbot]
+  - [install, -d, -m, "0750", -o, ubuntu, -g, docker, /opt/mandarinbot/data]

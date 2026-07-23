@@ -1,6 +1,0 @@
-@MandarinBotNet_HostAddress = http://localhost:5113
-
-GET {{MandarinBotNet_HostAddress}}/weatherforecast/
-Accept: application/json
-
-###

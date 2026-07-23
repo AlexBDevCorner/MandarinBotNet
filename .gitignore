@@ -40,6 +40,26 @@ node_modules/
 
 # Environment variables
 .env
+.env.tools
+
+# Repository-local tool installations
+.tools/
+
+# Terraform local state and provider cache
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Keep repository-scoped Codex configuration tracked even when a developer's
+# global Git excludes all .codex directories.
+!.codex/
+!.codex/config.toml
 
 # Azure Functions local settings file
 local.settings.json

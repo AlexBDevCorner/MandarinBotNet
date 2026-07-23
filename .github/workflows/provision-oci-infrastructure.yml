@@ -1,0 +1,193 @@
+name: Provision OCI infrastructure
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: Type PROVISION to create or update the OCI infrastructure
+        required: true
+        type: string
+
+permissions: {}
+
+concurrency:
+  group: oci-production-infrastructure
+  cancel-in-progress: false
+
+env:
+  OCI_CLI_VERSION: "3.89.3"
+  OCI_TENANCY_OCID: ${{ vars.OCI_TENANCY_OCID }}
+  OCI_USER_OCID: ${{ vars.OCI_RESOURCE_MANAGER_USER_OCID }}
+  OCI_FINGERPRINT: ${{ vars.OCI_RESOURCE_MANAGER_FINGERPRINT }}
+  OCI_REGION: ${{ vars.OCI_REGION }}
+  OCI_STACK_ID: ${{ vars.OCI_RESOURCE_MANAGER_STACK_ID }}
+  OCI_PRIVATE_KEY_B64: ${{ secrets.OCI_RESOURCE_MANAGER_PRIVATE_KEY_B64 }}
+
+jobs:
+  plan:
+    name: Plan in OCI Resource Manager
+    runs-on: ubuntu-latest
+    outputs:
+      plan_job_id: ${{ steps.plan.outputs.plan_job_id }}
+
+    steps:
+      - name: Verify request and configuration
+        shell: bash
+        env:
+          CONFIRMATION: ${{ inputs.confirmation }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+
+          if [[ "$CONFIRMATION" != "PROVISION" ]]; then
+            echo "::error::Confirmation must be exactly PROVISION."
+            exit 1
+          fi
+
+          if [[ "$GITHUB_REF" != "refs/heads/$DEFAULT_BRANCH" ]]; then
+            echo "::error::Run this workflow from the default branch ($DEFAULT_BRANCH)."
+            exit 1
+          fi
+
+          required_variables=(
+            OCI_TENANCY_OCID
+            OCI_USER_OCID
+            OCI_FINGERPRINT
+            OCI_REGION
+            OCI_STACK_ID
+            OCI_PRIVATE_KEY_B64
+          )
+
+          for variable_name in "${required_variables[@]}"; do
+            if [[ -z "${!variable_name:-}" ]]; then
+              echo "::error::$variable_name is not configured."
+              exit 1
+            fi
+          done
+
+      - name: Install and configure OCI CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python3 -m venv "$RUNNER_TEMP/oci-cli"
+          "$RUNNER_TEMP/oci-cli/bin/python" -m pip install \
+            --disable-pip-version-check \
+            --quiet \
+            "oci-cli==$OCI_CLI_VERSION"
+
+          install -d -m 0700 "$RUNNER_TEMP/oci"
+          printf '%s' "$OCI_PRIVATE_KEY_B64" | base64 --decode > "$RUNNER_TEMP/oci/key.pem"
+          chmod 0600 "$RUNNER_TEMP/oci/key.pem"
+
+          {
+            printf '[DEFAULT]\n'
+            printf 'user=%s\n' "$OCI_USER_OCID"
+            printf 'fingerprint=%s\n' "$OCI_FINGERPRINT"
+            printf 'tenancy=%s\n' "$OCI_TENANCY_OCID"
+            printf 'region=%s\n' "$OCI_REGION"
+            printf 'key_file=%s\n' "$RUNNER_TEMP/oci/key.pem"
+          } > "$RUNNER_TEMP/oci/config"
+          chmod 0600 "$RUNNER_TEMP/oci/config"
+
+      - name: Create plan
+        id: plan
+        shell: bash
+        env:
+          OCI_CLI_CONFIG_FILE: ${{ runner.temp }}/oci/config
+          OCI_CLI_SUPPRESS_FILE_PERMISSIONS_WARNING: "True"
+        run: |
+          set -euo pipefail
+          oci="$RUNNER_TEMP/oci-cli/bin/oci"
+
+          response="$("$oci" resource-manager job create-plan-job \
+            --stack-id "$OCI_STACK_ID" \
+            --display-name "github-plan-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" \
+            --job-operation-details-is-provider-upgrade-required false \
+            --wait-for-state SUCCEEDED \
+            --wait-for-state FAILED \
+            --wait-for-state CANCELED \
+            --max-wait-seconds 1800)"
+
+          plan_job_id="$(jq -r '.data.id' <<< "$response")"
+          lifecycle_state="$(jq -r '.data["lifecycle-state"]' <<< "$response")"
+
+          if [[ -z "$plan_job_id" || "$plan_job_id" == "null" ]]; then
+            echo "::error::OCI did not return a plan job ID."
+            exit 1
+          fi
+
+          printf 'plan_job_id=%s\n' "$plan_job_id" >> "$GITHUB_OUTPUT"
+          "$oci" resource-manager job get-job-logs-content --job-id "$plan_job_id"
+
+          if [[ "$lifecycle_state" != "SUCCEEDED" ]]; then
+            echo "::error::Resource Manager plan ended in state $lifecycle_state."
+            exit 1
+          fi
+
+  apply:
+    name: Approve and apply exact plan
+    needs: plan
+    runs-on: ubuntu-latest
+    environment: oci-production
+
+    steps:
+      - name: Install and configure OCI CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python3 -m venv "$RUNNER_TEMP/oci-cli"
+          "$RUNNER_TEMP/oci-cli/bin/python" -m pip install \
+            --disable-pip-version-check \
+            --quiet \
+            "oci-cli==$OCI_CLI_VERSION"
+
+          install -d -m 0700 "$RUNNER_TEMP/oci"
+          printf '%s' "$OCI_PRIVATE_KEY_B64" | base64 --decode > "$RUNNER_TEMP/oci/key.pem"
+          chmod 0600 "$RUNNER_TEMP/oci/key.pem"
+
+          {
+            printf '[DEFAULT]\n'
+            printf 'user=%s\n' "$OCI_USER_OCID"
+            printf 'fingerprint=%s\n' "$OCI_FINGERPRINT"
+            printf 'tenancy=%s\n' "$OCI_TENANCY_OCID"
+            printf 'region=%s\n' "$OCI_REGION"
+            printf 'key_file=%s\n' "$RUNNER_TEMP/oci/key.pem"
+          } > "$RUNNER_TEMP/oci/config"
+          chmod 0600 "$RUNNER_TEMP/oci/config"
+
+      - name: Apply approved plan
+        shell: bash
+        env:
+          OCI_CLI_CONFIG_FILE: ${{ runner.temp }}/oci/config
+          OCI_CLI_SUPPRESS_FILE_PERMISSIONS_WARNING: "True"
+          PLAN_JOB_ID: ${{ needs.plan.outputs.plan_job_id }}
+        run: |
+          set -euo pipefail
+          oci="$RUNNER_TEMP/oci-cli/bin/oci"
+
+          response="$("$oci" resource-manager job create-apply-job \
+            --stack-id "$OCI_STACK_ID" \
+            --execution-plan-strategy FROM_PLAN_JOB_ID \
+            --execution-plan-job-id "$PLAN_JOB_ID" \
+            --display-name "github-apply-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" \
+            --wait-for-state SUCCEEDED \
+            --wait-for-state FAILED \
+            --wait-for-state CANCELED \
+            --max-wait-seconds 1800)"
+
+          apply_job_id="$(jq -r '.data.id' <<< "$response")"
+          lifecycle_state="$(jq -r '.data["lifecycle-state"]' <<< "$response")"
+
+          if [[ -z "$apply_job_id" || "$apply_job_id" == "null" ]]; then
+            echo "::error::OCI did not return an apply job ID."
+            exit 1
+          fi
+
+          "$oci" resource-manager job get-job-logs-content --job-id "$apply_job_id"
+
+          if [[ "$lifecycle_state" != "SUCCEEDED" ]]; then
+            echo "::error::Resource Manager apply ended in state $lifecycle_state."
+            exit 1
+          fi
