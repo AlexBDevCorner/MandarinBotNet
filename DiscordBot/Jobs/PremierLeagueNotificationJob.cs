@@ -1,4 +1,5 @@
 ﻿using Discord.WebSocket;
+using DiscordBot.Notifications;
 using Quartz;
 using System.Globalization;
 using System.Text.Json;
@@ -6,7 +7,10 @@ using TimeZoneConverter;
 
 namespace DiscordBot.Jobs
 {
-    public class PremierLeagueNotificationJob(DiscordSocketClient discordClient, IHttpClientFactory httpClientFactory) : IJob
+    public class PremierLeagueNotificationJob(
+        DiscordSocketClient discordClient,
+        IHttpClientFactory httpClientFactory,
+        NotificationDeliveryCoordinator deliveryCoordinator) : IJob
     {
         public async Task Execute(IJobExecutionContext context)
         {
@@ -15,6 +19,7 @@ namespace DiscordBot.Jobs
             var response = await client.GetStreamAsync("/api/bootstrap-static");
             using JsonDocument jsonDoc = await JsonDocument.ParseAsync(response);
             DateTime? deadline = null;
+            int? eventId = null;
 
             var rigaTimeZone = TZConvert.GetTimeZoneInfo("Europe/Riga");
 
@@ -28,6 +33,7 @@ namespace DiscordBot.Jobs
 
                     if (isNext.ToString() == "True")
                     {
+                        eventId = itemElement.GetProperty("id").GetInt32();
                         var epochTime = itemElement.GetProperty("deadline_time_epoch").GetInt64();
                         var dateTimeUtc = DateTimeOffset.FromUnixTimeSeconds(epochTime).UtcDateTime;
 
@@ -36,7 +42,7 @@ namespace DiscordBot.Jobs
                 }
             }
 
-            if (deadline is null) return;
+            if (deadline is null || eventId is null) return;
 
             var utcNow = DateTime.UtcNow;
 
@@ -52,7 +58,14 @@ namespace DiscordBot.Jobs
             Console.WriteLine($"Deadline - {deadline}");
             Console.WriteLine($"Current Riga Time - {currentRigaTime}");
 
-            if ((currentRigaTime > beforeTime && currentRigaTime < afterTime) || (currentRigaTime > hourBefore && currentRigaTime < deadline))
+            var notificationType =
+                currentRigaTime > beforeTime && currentRigaTime < afterTime
+                    ? NotificationTypes.Deadline24Hours
+                    : currentRigaTime > hourBefore && currentRigaTime < deadline
+                        ? NotificationTypes.Deadline1Hour
+                        : null;
+
+            if (notificationType is not null)
             {
                 foreach (var guild in discordClient.Guilds)
                 {
@@ -70,11 +83,21 @@ namespace DiscordBot.Jobs
 
                         var russianCulture = new CultureInfo("ru-RU");
 
-                        await generalChannel.SendMessageAsync($"@everyone Привет мои любители АПЛ и обнимашек! :people_hugging: Следующий тур уже скоро -" +
-                            $" {castedDeadline.ToString("dd MMMM yyyy, HH:mm", russianCulture)}, это {castedDeadline.ToString("dddd", russianCulture)}" +
-                            $". До этого момента осталось всего {DateTimeUtility.GenerateRemainingDaysMessageInRussian(difference)}.");
+                        var checkpoint = new NotificationCheckpoint(
+                            guild.Id,
+                            generalChannel.Id,
+                            eventId.Value.ToString(CultureInfo.InvariantCulture),
+                            notificationType);
+
+                        await deliveryCoordinator.SendOnceAsync(
+                            checkpoint,
+                            () => generalChannel.SendMessageAsync(
+                                $"@everyone Привет мои любители АПЛ и обнимашек! :people_hugging: Следующий тур уже скоро -" +
+                                $" {castedDeadline.ToString("dd MMMM yyyy, HH:mm", russianCulture)}, это {castedDeadline.ToString("dddd", russianCulture)}" +
+                                $". До этого момента осталось всего {DateTimeUtility.GenerateRemainingDaysMessageInRussian(difference)}."),
+                            context.CancellationToken);
                     }
-                    catch (Exception ex)
+                    catch (Exception)
                     {
                         Console.WriteLine("Failed to send message");
                     }

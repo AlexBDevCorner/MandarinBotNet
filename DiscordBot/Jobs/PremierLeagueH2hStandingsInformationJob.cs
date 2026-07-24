@@ -1,14 +1,16 @@
 ﻿using Discord.WebSocket;
+using DiscordBot.Notifications;
 using DiscordBot.Responses;
-using DiscordBot.Services;
 using Quartz;
+using System.Globalization;
 using System.Text.Json;
 
 namespace DiscordBot.Jobs
 {
-    public class PremierLeagueH2hStandingsInformationJob(DiscordSocketClient discordClient, 
-        IHttpClientFactory httpClientFactory, 
-        H2hMatchesPlayedService h2HMatchesPlayedService) : IJob
+    public class PremierLeagueH2hStandingsInformationJob(
+        DiscordSocketClient discordClient,
+        IHttpClientFactory httpClientFactory,
+        NotificationDeliveryCoordinator deliveryCoordinator) : IJob
     {
         public async Task Execute(IJobExecutionContext context)
         {
@@ -26,8 +28,6 @@ namespace DiscordBot.Jobs
                 standings.HeadToHeadStandings.Results == null ||
                 standings.HeadToHeadStandings.Results.Count == 0) return;
 
-            if (standings.HeadToHeadStandings.Results[0].MatchesPlayed == h2HMatchesPlayedService.MatchesPlayed) return;
-
             foreach (var guild in discordClient.Guilds)
             {
                 var generalChannel = guild.TextChannels
@@ -38,15 +38,22 @@ namespace DiscordBot.Jobs
 
                 try
                 {
-                    await generalChannel.SendMessageAsync(GetEventSummary(standings.HeadToHeadStandings.Results));
+                    var checkpoint = new NotificationCheckpoint(
+                        guild.Id,
+                        generalChannel.Id,
+                        standings.HeadToHeadStandings.Results[0].MatchesPlayed.ToString(CultureInfo.InvariantCulture),
+                        NotificationTypes.HeadToHeadStandings);
+
+                    await deliveryCoordinator.SendOnceAsync(
+                        checkpoint,
+                        () => generalChannel.SendMessageAsync(GetEventSummary(standings.HeadToHeadStandings.Results)),
+                        context.CancellationToken);
                 }
-                catch (Exception ex)
+                catch (Exception)
                 {
                     Console.WriteLine($"Failed to send message");
                 }
             }
-
-            h2HMatchesPlayedService.MatchesPlayed = standings.HeadToHeadStandings.Results[0].MatchesPlayed;
         }
 
         private static string GetRankEmoji(int rank) => rank switch
