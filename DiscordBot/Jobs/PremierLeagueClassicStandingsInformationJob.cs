@@ -1,4 +1,5 @@
 ﻿using Discord.WebSocket;
+using DiscordBot.Notifications;
 using DiscordBot.Responses;
 using Quartz;
 using System.Text.Json;
@@ -6,7 +7,10 @@ using TimeZoneConverter;
 
 namespace DiscordBot.Jobs
 {
-    public class PremierLeagueClassicStandingsInformationJob(DiscordSocketClient discordClient, IHttpClientFactory httpClientFactory) : IJob
+    public class PremierLeagueClassicStandingsInformationJob(
+        DiscordSocketClient discordClient,
+        IHttpClientFactory httpClientFactory,
+        NotificationDeliveryCoordinator deliveryCoordinator) : IJob
     {
         public async Task Execute(IJobExecutionContext context)
         {
@@ -42,9 +46,18 @@ namespace DiscordBot.Jobs
 
                 try
                 {
-                    await generalChannel.SendMessageAsync(GetEventSummary(standings.Standings.Results));
+                    var checkpoint = new NotificationCheckpoint(
+                        guild.Id,
+                        generalChannel.Id,
+                        standings.LastUpdatedData.ToUniversalTime().ToString("O"),
+                        NotificationTypes.ClassicStandings);
+
+                    await deliveryCoordinator.SendOnceAsync(
+                        checkpoint,
+                        () => generalChannel.SendMessageAsync(GetEventSummary(standings.Standings.Results)),
+                        context.CancellationToken);
                 }
-                catch (Exception ex)
+                catch (Exception)
                 {
                     Console.WriteLine($"Failed to send message");
                 }

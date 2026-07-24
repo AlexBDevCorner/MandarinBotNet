@@ -2,12 +2,12 @@ using Discord.WebSocket;
 using Discord;
 using DiscordBot;
 using DiscordBot.Jobs;
+using DiscordBot.Notifications;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Quartz;
 using TimeZoneConverter;
-using DiscordBot.Services;
 
 var builder = Host.CreateApplicationBuilder(args);
 
@@ -22,7 +22,13 @@ builder.Services.AddSingleton(new DiscordSocketClient(new DiscordSocketConfig
     GatewayIntents = GatewayIntents.AllUnprivileged
 }));
 
-builder.Services.AddSingleton(new H2hMatchesPlayedService { MatchesPlayed = 0 });
+var notificationDatabasePath = Path.Combine(
+    AppContext.BaseDirectory,
+    "data",
+    "notification-state.db");
+builder.Services.AddSingleton<INotificationCheckpointStore>(
+    new SqliteNotificationCheckpointStore(notificationDatabasePath));
+builder.Services.AddSingleton<NotificationDeliveryCoordinator>();
 
 
 builder.Services.AddHostedService<DiscordBotHostedService>();
