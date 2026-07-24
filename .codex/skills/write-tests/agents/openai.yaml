@@ -1,0 +1,4 @@
+interface:
+  display_name: "Write Tests"
+  short_description: "Add repo-aligned tests for changed code"
+  default_prompt: "Use $write-tests to cover recent code changes with focused tests that follow the repo's conventions."
