@@ -160,9 +160,15 @@ credential.
 
 ## Deploying the application
 
+Every push to the `main` branch automatically builds and deploys that commit.
+Deployments are serialized, so concurrent pushes cannot run overlapping
+container rollouts.
+
+For a manual redeployment:
+
 1. Open **Actions → Build and deploy MandarinBot to OCI VM → Run workflow**.
 2. Select the default branch and enter `DEPLOY`.
-3. Approve the `oci-production` environment.
+3. Approve the `oci-production` environment if protection rules are configured.
 
 The workflow publishes an immutable commit-SHA image to GHCR. On the VM it
 stops and retains the previous container, starts the new one with
