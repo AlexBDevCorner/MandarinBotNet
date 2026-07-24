@@ -47,3 +47,34 @@ default_tools_approval_mode = "prompt"
 # Keep uv's downloaded MCP package/cache under the ignored repository tools dir.
 UV_CACHE_DIR = ".tools/uv-cache"
 OCI_CONFIG_PROFILE = "mandarinbot-agent"
+
+[mcp_servers.atlassian]
+command = "uvx"
+args = ["mcp-atlassian"]
+env_vars = ["JIRA_API_TOKEN", "JIRA_URL", "JIRA_USERNAME"]
+enabled = true
+required = false
+startup_timeout_sec = 30.0
+tool_timeout_sec = 120.0
+# The server exposes Jira write operations, so require approval for writes.
+default_tools_approval_mode = "writes"
+
+[mcp_servers.atlassian.env]
+READ_ONLY_MODE = "false"
+
+[mcp_servers.ado]
+command = "powershell"
+args = ["-NoProfile", "-NonInteractive", "-Command", "$env:PERSONAL_ACCESS_TOKEN = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(\"codex:$env:PERSONAL_ADO_PAT\")); & npx.cmd -y @azure-devops/mcp $env:ADO_ORGANIZATION --authentication pat -d core work work-items repositories pipelines wiki; exit $LASTEXITCODE"]
+env_vars = ["ADO_ORGANIZATION", "PERSONAL_ADO_PAT"]
+startup_timeout_sec = 30.0
+tool_timeout_sec = 120.0
+enabled = true
+required = false
+# The selected domains include work-item, repository, pipeline, and wiki writes.
+default_tools_approval_mode = "writes"
+
+[mcp_servers.ado.tools.repo_list_pull_request_thread_comments]
+approval_mode = "approve"
+
+[mcp_servers.ado.tools.repo_list_pull_request_threads]
+approval_mode = "approve"
