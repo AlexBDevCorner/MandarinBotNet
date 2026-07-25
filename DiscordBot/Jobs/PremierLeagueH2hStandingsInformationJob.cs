@@ -7,6 +7,7 @@ using System.Text.Json;
 
 namespace DiscordBot.Jobs
 {
+    [DisallowConcurrentExecution]
     public class PremierLeagueH2hStandingsInformationJob(
         DiscordSocketClient discordClient,
         IHttpClientFactory httpClientFactory,
