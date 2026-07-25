@@ -1,0 +1,10 @@
+interface:
+  display_name: "Manage Jira Ticket"
+  short_description: "Keep MHB Jira tickets in the correct status"
+  default_prompt: "Use $manage-jira-ticket to implement MHB-2 and keep its Jira status synchronized through development and review."
+
+dependencies:
+  tools:
+    - type: "mcp"
+      value: "atlassian"
+      description: "Read and transition MHB Jira tickets"
