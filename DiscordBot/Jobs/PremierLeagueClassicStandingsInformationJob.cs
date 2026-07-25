@@ -7,6 +7,7 @@ using TimeZoneConverter;
 
 namespace DiscordBot.Jobs
 {
+    [DisallowConcurrentExecution]
     public class PremierLeagueClassicStandingsInformationJob(
         DiscordSocketClient discordClient,
         IHttpClientFactory httpClientFactory,
