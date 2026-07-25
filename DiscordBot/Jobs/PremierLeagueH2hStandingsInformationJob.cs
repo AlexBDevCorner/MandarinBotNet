@@ -10,15 +10,20 @@ namespace DiscordBot.Jobs
     [DisallowConcurrentExecution]
     public class PremierLeagueH2hStandingsInformationJob(
         DiscordSocketClient discordClient,
+        IDiscordConnectionReadiness discordReadiness,
         IHttpClientFactory httpClientFactory,
         NotificationDeliveryCoordinator deliveryCoordinator) : IJob
     {
         public async Task Execute(IJobExecutionContext context)
         {
+            await discordReadiness.WaitUntilReadyAsync(context.CancellationToken);
+
             var client = httpClientFactory.CreateClient();
             client.BaseAddress = new Uri("https://fantasy.premierleague.com");
-            var response = await client.GetAsync("/api/leagues-h2h/1671824/standings/");
-            var jsonResponse = await response.Content.ReadAsStringAsync();
+            var response = await client.GetAsync(
+                "/api/leagues-h2h/1671824/standings/",
+                context.CancellationToken);
+            var jsonResponse = await response.Content.ReadAsStringAsync(context.CancellationToken);
 
             if (string.IsNullOrEmpty(jsonResponse)) return;
 
@@ -49,6 +54,10 @@ namespace DiscordBot.Jobs
                         checkpoint,
                         () => generalChannel.SendMessageAsync(GetEventSummary(standings.HeadToHeadStandings.Results)),
                         context.CancellationToken);
+                }
+                catch (OperationCanceledException) when (context.CancellationToken.IsCancellationRequested)
+                {
+                    throw;
                 }
                 catch (Exception)
                 {

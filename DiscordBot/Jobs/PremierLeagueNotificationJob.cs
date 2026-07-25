@@ -10,15 +10,22 @@ namespace DiscordBot.Jobs
     [DisallowConcurrentExecution]
     public class PremierLeagueNotificationJob(
         DiscordSocketClient discordClient,
+        IDiscordConnectionReadiness discordReadiness,
         IHttpClientFactory httpClientFactory,
         NotificationDeliveryCoordinator deliveryCoordinator) : IJob
     {
         public async Task Execute(IJobExecutionContext context)
         {
+            await discordReadiness.WaitUntilReadyAsync(context.CancellationToken);
+
             var client = httpClientFactory.CreateClient();
             client.BaseAddress = new Uri("https://fantasy.premierleague.com");
-            var response = await client.GetStreamAsync("/api/bootstrap-static");
-            using JsonDocument jsonDoc = await JsonDocument.ParseAsync(response);
+            var response = await client.GetStreamAsync(
+                "/api/bootstrap-static",
+                context.CancellationToken);
+            using JsonDocument jsonDoc = await JsonDocument.ParseAsync(
+                response,
+                cancellationToken: context.CancellationToken);
             DateTime? deadline = null;
             int? eventId = null;
 
@@ -97,6 +104,10 @@ namespace DiscordBot.Jobs
                                 $" {castedDeadline.ToString("dd MMMM yyyy, HH:mm", russianCulture)}, это {castedDeadline.ToString("dddd", russianCulture)}" +
                                 $". До этого момента осталось всего {DateTimeUtility.GenerateRemainingDaysMessageInRussian(difference)}."),
                             context.CancellationToken);
+                    }
+                    catch (OperationCanceledException) when (context.CancellationToken.IsCancellationRequested)
+                    {
+                        throw;
                     }
                     catch (Exception)
                     {
