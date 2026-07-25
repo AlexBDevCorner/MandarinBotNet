@@ -16,10 +16,25 @@ builder.Logging.ClearProviders();
 builder.Logging.AddConsole();
 builder.Logging.AddDebug();
 
-builder.Services.AddSingleton(new DiscordSocketClient(new DiscordSocketConfig
+var discordClient = new DiscordSocketClient(new DiscordSocketConfig
 {
     GatewayIntents = GatewayIntents.AllUnprivileged
-}));
+});
+builder.Services.AddSingleton(discordClient);
+
+var readinessTimeout = int.TryParse(
+    builder.Configuration["DISCORD_READINESS_TIMEOUT_SECONDS"],
+    out var readinessTimeoutSeconds)
+    ? TimeSpan.FromSeconds(readinessTimeoutSeconds)
+    : TimeSpan.FromSeconds(30);
+var discordSettings = new DiscordBotSettings(
+    builder.Configuration["BOT_TOKEN"],
+    readinessTimeout);
+builder.Services.AddSingleton(discordSettings);
+builder.Services.AddSingleton<DiscordConnectionReadiness>();
+builder.Services.AddSingleton<IDiscordConnectionReadiness>(
+    services => services.GetRequiredService<DiscordConnectionReadiness>());
+builder.Services.AddSingleton<IDiscordGatewayConnection, DiscordGatewayConnection>();
 
 var notificationDatabasePath = Path.Combine(
     AppContext.BaseDirectory,

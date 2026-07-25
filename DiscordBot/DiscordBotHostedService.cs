@@ -1,39 +1,68 @@
 ﻿using Discord;
 using Discord.Net;
 using Discord.WebSocket;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 namespace DiscordBot
 {
-    public class DiscordBotHostedService(IConfiguration configuration, DiscordSocketClient client, ILogger<DiscordBotHostedService> logger) : IHostedService
+    public class DiscordBotHostedService(
+        DiscordBotSettings settings,
+        DiscordSocketClient client,
+        IDiscordGatewayConnection gatewayConnection,
+        DiscordConnectionReadiness readiness,
+        ILogger<DiscordBotHostedService> logger) : IHostedService
     {
         private Dictionary<string, Func<SocketSlashCommand, Task>> _commandHandlers = []; 
 
         public async Task StartAsync(CancellationToken cancellationToken)
         {
-            logger.LogInformation("Starting!");
+            logger.LogInformation("Starting Discord bot.");
+
+            if (string.IsNullOrWhiteSpace(settings.Token))
+            {
+                throw new InvalidOperationException("BOT_TOKEN must be configured.");
+            }
+
             _commandHandlers = new()
             {
                 { "hugme", HandleHugMeCommand }
             };
 
             client.Log += LogAsync;
-            client.Ready += ReadyAsync;
+            gatewayConnection.Ready += ReadyAsync;
+            gatewayConnection.Disconnected += DisconnectedAsync;
             client.GuildAvailable += GuildAvailableAsync;  // Triggered when a guild becomes available
             client.SlashCommandExecuted += SlashCommandHandler;
 
-            var token = configuration["BOT_TOKEN"];
+            try
+            {
+                await gatewayConnection.LoginAsync(settings.Token).WaitAsync(cancellationToken);
+                await gatewayConnection.StartAsync().WaitAsync(cancellationToken);
+                await readiness.WaitUntilReadyAsync(cancellationToken);
+            }
+            catch
+            {
+                readiness.MarkDisconnected();
+                DetachEventHandlers();
+                throw;
+            }
 
-            // Log in and start bot
-            await client.LoginAsync(TokenType.Bot, token);
-            await client.StartAsync();
+            logger.LogInformation("Discord bot startup completed after gateway readiness.");
         }
 
         public async Task StopAsync(CancellationToken cancellationToken)
         {
-            await client.StopAsync();
+            readiness.MarkDisconnected();
+
+            try
+            {
+                await gatewayConnection.StopAsync().WaitAsync(cancellationToken);
+            }
+            finally
+            {
+                DetachEventHandlers();
+            }
         }
 
         private Task LogAsync(LogMessage log)
@@ -42,9 +71,27 @@ namespace DiscordBot
             return Task.CompletedTask;
         }
 
-        private async Task ReadyAsync()
+        private Task ReadyAsync()
         {
-            Console.WriteLine("Bot is connected and ready.");
+            readiness.MarkReady();
+            logger.LogInformation("Discord gateway is ready.");
+            return Task.CompletedTask;
+        }
+
+        private Task DisconnectedAsync(Exception exception)
+        {
+            readiness.MarkDisconnected();
+            logger.LogWarning(exception, "Discord gateway disconnected; scheduled jobs will wait for readiness.");
+            return Task.CompletedTask;
+        }
+
+        private void DetachEventHandlers()
+        {
+            client.Log -= LogAsync;
+            gatewayConnection.Ready -= ReadyAsync;
+            gatewayConnection.Disconnected -= DisconnectedAsync;
+            client.GuildAvailable -= GuildAvailableAsync;
+            client.SlashCommandExecuted -= SlashCommandHandler;
         }
 
         // This method is called every time a guild becomes available to the bot (including when it joins new ones)
