@@ -1,5 +1,6 @@
 using AwesomeAssertions;
 using Discord.WebSocket;
+using DiscordBot.Commands;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -20,6 +21,7 @@ public sealed class DiscordBotHostedServiceIntegrationTests
             ReadinessTimeout: TimeSpan.FromSeconds(5));
         var readiness = new DiscordConnectionReadiness(settings);
         var gateway = new TestDiscordGatewayConnection();
+        var commandSynchronizer = new TestCommandSynchronizer();
         using var client = new DiscordSocketClient();
         var scheduledWork = new StartTrackingHostedService();
         var logMessages = new ConcurrentQueue<string>();
@@ -30,6 +32,8 @@ public sealed class DiscordBotHostedServiceIntegrationTests
         builder.Services.AddSingleton(client);
         builder.Services.AddSingleton(readiness);
         builder.Services.AddSingleton<IDiscordGatewayConnection>(gateway);
+        builder.Services.AddSingleton<IDiscordCommandSynchronizer>(commandSynchronizer);
+        builder.Services.AddSingleton<DiscordCommandRegistrationCoordinator>();
         builder.Services.AddHostedService<DiscordBotHostedService>();
         builder.Services.AddSingleton<IHostedService>(scheduledWork);
         using var host = builder.Build();
@@ -49,6 +53,7 @@ public sealed class DiscordBotHostedServiceIntegrationTests
         scheduledWork.Started.Task.IsCompletedSuccessfully.Should().BeTrue();
         readiness.IsReady.Should().BeTrue();
         logMessages.Should().Contain("Bot is connected and ready.");
+        commandSynchronizer.CallCount.Should().Be(1);
 
         await gateway.RaiseDisconnectedAsync();
         readiness.IsReady.Should().BeFalse();
@@ -58,6 +63,7 @@ public sealed class DiscordBotHostedServiceIntegrationTests
         await gateway.RaiseReadyAsync();
         await reconnectWait;
         readiness.IsReady.Should().BeTrue();
+        commandSynchronizer.CallCount.Should().Be(1);
 
         await host.StopAsync();
         readiness.IsReady.Should().BeFalse();
@@ -156,6 +162,17 @@ public sealed class DiscordBotHostedServiceIntegrationTests
         {
             return Disconnected?.Invoke(new InvalidOperationException("Gateway disconnected."))
                 ?? Task.CompletedTask;
+        }
+    }
+
+    private sealed class TestCommandSynchronizer : IDiscordCommandSynchronizer
+    {
+        public int CallCount { get; private set; }
+
+        public Task SynchronizeAsync(CancellationToken cancellationToken)
+        {
+            CallCount++;
+            return Task.CompletedTask;
         }
     }
 }

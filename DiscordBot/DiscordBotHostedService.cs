@@ -1,6 +1,6 @@
 ﻿using Discord;
-using Discord.Net;
 using Discord.WebSocket;
+using DiscordBot.Commands;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
@@ -11,6 +11,7 @@ namespace DiscordBot
         DiscordSocketClient client,
         IDiscordGatewayConnection gatewayConnection,
         DiscordConnectionReadiness readiness,
+        DiscordCommandRegistrationCoordinator commandRegistration,
         ILogger<DiscordBotHostedService> logger) : IHostedService
     {
         private const string DeploymentReadyMessage = "Bot is connected and ready.";
@@ -27,13 +28,12 @@ namespace DiscordBot
 
             _commandHandlers = new()
             {
-                { "hugme", HandleHugMeCommand }
+                { DiscordApplicationCommands.HugMeName, HandleHugMeCommand }
             };
 
             client.Log += LogAsync;
             gatewayConnection.Ready += ReadyAsync;
             gatewayConnection.Disconnected += DisconnectedAsync;
-            client.GuildAvailable += GuildAvailableAsync;  // Triggered when a guild becomes available
             client.SlashCommandExecuted += SlashCommandHandler;
 
             try
@@ -72,11 +72,11 @@ namespace DiscordBot
             return Task.CompletedTask;
         }
 
-        private Task ReadyAsync()
+        private async Task ReadyAsync()
         {
+            await commandRegistration.SynchronizeOnceAsync(CancellationToken.None);
             readiness.MarkReady();
             logger.LogInformation("{DeploymentReadyMessage}", DeploymentReadyMessage);
-            return Task.CompletedTask;
         }
 
         private Task DisconnectedAsync(Exception exception)
@@ -91,36 +91,7 @@ namespace DiscordBot
             client.Log -= LogAsync;
             gatewayConnection.Ready -= ReadyAsync;
             gatewayConnection.Disconnected -= DisconnectedAsync;
-            client.GuildAvailable -= GuildAvailableAsync;
             client.SlashCommandExecuted -= SlashCommandHandler;
-        }
-
-        // This method is called every time a guild becomes available to the bot (including when it joins new ones)
-        private async Task GuildAvailableAsync(SocketGuild guild)
-        {
-            Console.WriteLine($"Bot is available in guild: {guild.Name} (ID: {guild.Id})");
-
-            // Register commands for this guild
-            var commands = new List<SlashCommandBuilder>
-        {
-            new SlashCommandBuilder().WithName("hugme").WithDescription("Hugs you!"),
-        };
-
-            await guild.DeleteApplicationCommandsAsync();
-
-            foreach (var command in commands)
-            {
-                try
-                {
-                    await guild.CreateApplicationCommandAsync(command.Build());
-                    Console.WriteLine($"Registered command: {command.Name} in guild {guild.Name}");
-                }
-                catch (HttpException e)
-                {
-                    var json = System.Text.Json.JsonSerializer.Serialize(e.Errors, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
-                    Console.WriteLine(json);
-                }
-            }
         }
 
         private async Task SlashCommandHandler(SocketSlashCommand command)
