@@ -60,6 +60,10 @@ tool_timeout_sec = 120.0
 default_tools_approval_mode = "writes"
 
 [mcp_servers.atlassian.env]
+# Keep uv's MCP package, tool environment, and Python interpreter inside the repo sandbox.
+UV_CACHE_DIR = ".tools/uv-cache"
+UV_TOOL_DIR = ".tools/uv-tools"
+UV_PYTHON = ".tools/uv-python/cpython-3.13.13-windows-x86_64-none/python.exe"
 READ_ONLY_MODE = "false"
 
 [mcp_servers.ado]
