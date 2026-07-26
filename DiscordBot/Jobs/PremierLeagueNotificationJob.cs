@@ -1,8 +1,8 @@
 ﻿using Discord.WebSocket;
+using DiscordBot.FantasyPremierLeague;
 using DiscordBot.Notifications;
 using Quartz;
 using System.Globalization;
-using System.Text.Json;
 using TimeZoneConverter;
 
 namespace DiscordBot.Jobs
@@ -11,54 +11,31 @@ namespace DiscordBot.Jobs
     public class PremierLeagueNotificationJob(
         DiscordSocketClient discordClient,
         IDiscordConnectionReadiness discordReadiness,
-        IHttpClientFactory httpClientFactory,
+        IFantasyPremierLeagueClient premierLeagueClient,
         NotificationDeliveryCoordinator deliveryCoordinator) : IJob
     {
         public async Task Execute(IJobExecutionContext context)
         {
             await discordReadiness.WaitUntilReadyAsync(context.CancellationToken);
 
-            var client = httpClientFactory.CreateClient();
-            client.BaseAddress = new Uri("https://fantasy.premierleague.com");
-            var response = await client.GetStreamAsync(
-                "/api/bootstrap-static",
+            var bootstrap = await premierLeagueClient.GetBootstrapStaticAsync(
                 context.CancellationToken);
-            using JsonDocument jsonDoc = await JsonDocument.ParseAsync(
-                response,
-                cancellationToken: context.CancellationToken);
-            DateTime? deadline = null;
-            int? eventId = null;
-
             var rigaTimeZone = TZConvert.GetTimeZoneInfo("Europe/Riga");
+            var nextEvent = bootstrap.Events.FirstOrDefault(item => item.IsNext);
+            if (nextEvent is null) return;
 
-            if (jsonDoc.RootElement.TryGetProperty("events", out JsonElement dataArrayElement))
-            {
-                foreach (JsonElement itemElement in dataArrayElement.EnumerateArray())
-                {
-                    var isNext = itemElement.GetProperty("is_next").ToString();
-
-                    if (isNext is null) continue;
-
-                    if (isNext.ToString() == "True")
-                    {
-                        eventId = itemElement.GetProperty("id").GetInt32();
-                        var epochTime = itemElement.GetProperty("deadline_time_epoch").GetInt64();
-                        var dateTimeUtc = DateTimeOffset.FromUnixTimeSeconds(epochTime).UtcDateTime;
-
-                        deadline = TimeZoneInfo.ConvertTimeFromUtc(dateTimeUtc, rigaTimeZone);
-                    }
-                }
-            }
-
-            if (deadline is null || eventId is null) return;
+            var dateTimeUtc = DateTimeOffset
+                .FromUnixTimeSeconds(nextEvent.DeadlineTimeEpoch)
+                .UtcDateTime;
+            var deadline = TimeZoneInfo.ConvertTimeFromUtc(dateTimeUtc, rigaTimeZone);
 
             var utcNow = DateTime.UtcNow;
 
             var currentRigaTime = TimeZoneInfo.ConvertTimeFromUtc(utcNow, rigaTimeZone);
 
-            var beforeTime = deadline.Value.AddHours(-24).AddMinutes(-58);
-            var afterTime = deadline.Value.AddHours(-23).AddMinutes(-2);
-            var hourBefore = deadline.Value.AddMinutes(-70);
+            var beforeTime = deadline.AddHours(-24).AddMinutes(-58);
+            var afterTime = deadline.AddHours(-23).AddMinutes(-2);
+            var hourBefore = deadline.AddMinutes(-70);
 
             Console.WriteLine($"Before - {beforeTime}");
             Console.WriteLine($"After - {afterTime}");
@@ -85,7 +62,7 @@ namespace DiscordBot.Jobs
 
                     try
                     {
-                        var castedDeadline = (DateTime)deadline;
+                        var castedDeadline = deadline;
                         var now = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, rigaTimeZone);
                         var difference = castedDeadline.Subtract(now);
 
@@ -94,7 +71,7 @@ namespace DiscordBot.Jobs
                         var checkpoint = new NotificationCheckpoint(
                             guild.Id,
                             generalChannel.Id,
-                            eventId.Value.ToString(CultureInfo.InvariantCulture),
+                            nextEvent.Id.ToString(CultureInfo.InvariantCulture),
                             notificationType);
 
                         await deliveryCoordinator.SendOnceAsync(

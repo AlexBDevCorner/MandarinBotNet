@@ -1,8 +1,8 @@
 ﻿using Discord.WebSocket;
+using DiscordBot.FantasyPremierLeague;
 using DiscordBot.Notifications;
 using DiscordBot.Responses;
 using Quartz;
-using System.Text.Json;
 using TimeZoneConverter;
 
 namespace DiscordBot.Jobs
@@ -11,23 +11,16 @@ namespace DiscordBot.Jobs
     public class PremierLeagueClassicStandingsInformationJob(
         DiscordSocketClient discordClient,
         IDiscordConnectionReadiness discordReadiness,
-        IHttpClientFactory httpClientFactory,
+        IFantasyPremierLeagueClient premierLeagueClient,
         NotificationDeliveryCoordinator deliveryCoordinator) : IJob
     {
         public async Task Execute(IJobExecutionContext context)
         {
             await discordReadiness.WaitUntilReadyAsync(context.CancellationToken);
 
-            var client = httpClientFactory.CreateClient();
-            client.BaseAddress = new Uri("https://fantasy.premierleague.com");
-            var response = await client.GetAsync(
-                "/api/leagues-classic/1671531/standings/",
+            var standings = await premierLeagueClient.GetClassicStandingsAsync(
+                1671531,
                 context.CancellationToken);
-            var jsonResponse = await response.Content.ReadAsStringAsync(context.CancellationToken);
-
-            if (string.IsNullOrEmpty(jsonResponse)) return;
-            
-            var standings = JsonSerializer.Deserialize<ClassicStandingsResponse>(jsonResponse);
 
             var rigaTimeZone = TZConvert.GetTimeZoneInfo("Europe/Riga");
 
@@ -37,10 +30,7 @@ namespace DiscordBot.Jobs
                 .Date
                 .AddDays(-1);
 
-            if (standings == null || 
-                standings.Standings == null || 
-                standings.Standings.Results == null ||
-                standings.LastUpdatedData < yesterdayRigaMidnight) return;
+            if (standings.LastUpdatedData < yesterdayRigaMidnight) return;
 
             foreach (var guild in discordClient.Guilds)
             {
