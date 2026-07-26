@@ -1,6 +1,7 @@
 using Discord.WebSocket;
 using Discord;
 using DiscordBot;
+using DiscordBot.Commands;
 using DiscordBot.Jobs;
 using DiscordBot.Notifications;
 using Microsoft.Extensions.DependencyInjection;
@@ -35,6 +36,13 @@ builder.Services.AddSingleton<DiscordConnectionReadiness>();
 builder.Services.AddSingleton<IDiscordConnectionReadiness>(
     services => services.GetRequiredService<DiscordConnectionReadiness>());
 builder.Services.AddSingleton<IDiscordGatewayConnection, DiscordGatewayConnection>();
+builder.Services.AddSingleton(
+    DiscordCommandRegistrationOptions.FromConfiguration(builder.Configuration));
+builder.Services.AddSingleton<
+    IDiscordApplicationCommandClient,
+    DiscordApplicationCommandClient>();
+builder.Services.AddSingleton<IDiscordCommandSynchronizer, DiscordCommandSynchronizer>();
+builder.Services.AddSingleton<DiscordCommandRegistrationCoordinator>();
 
 var notificationDatabasePath = Path.Combine(
     AppContext.BaseDirectory,
