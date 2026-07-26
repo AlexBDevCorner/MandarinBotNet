@@ -2,6 +2,7 @@ using Discord.WebSocket;
 using Discord;
 using DiscordBot;
 using DiscordBot.Commands;
+using DiscordBot.FantasyPremierLeague;
 using DiscordBot.Jobs;
 using DiscordBot.Notifications;
 using Microsoft.Extensions.DependencyInjection;
@@ -11,7 +12,7 @@ using Quartz;
 
 var builder = Host.CreateApplicationBuilder(args);
 
-builder.Services.AddHttpClient();
+builder.Services.AddFantasyPremierLeagueClient();
 
 builder.Logging.ClearProviders();
 builder.Logging.AddConsole();

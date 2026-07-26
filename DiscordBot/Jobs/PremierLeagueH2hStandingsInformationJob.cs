@@ -1,9 +1,9 @@
 ﻿using Discord.WebSocket;
+using DiscordBot.FantasyPremierLeague;
 using DiscordBot.Notifications;
 using DiscordBot.Responses;
 using Quartz;
 using System.Globalization;
-using System.Text.Json;
 
 namespace DiscordBot.Jobs
 {
@@ -11,28 +11,18 @@ namespace DiscordBot.Jobs
     public class PremierLeagueH2hStandingsInformationJob(
         DiscordSocketClient discordClient,
         IDiscordConnectionReadiness discordReadiness,
-        IHttpClientFactory httpClientFactory,
+        IFantasyPremierLeagueClient premierLeagueClient,
         NotificationDeliveryCoordinator deliveryCoordinator) : IJob
     {
         public async Task Execute(IJobExecutionContext context)
         {
             await discordReadiness.WaitUntilReadyAsync(context.CancellationToken);
 
-            var client = httpClientFactory.CreateClient();
-            client.BaseAddress = new Uri("https://fantasy.premierleague.com");
-            var response = await client.GetAsync(
-                "/api/leagues-h2h/1671824/standings/",
+            var standings = await premierLeagueClient.GetHeadToHeadStandingsAsync(
+                1671824,
                 context.CancellationToken);
-            var jsonResponse = await response.Content.ReadAsStringAsync(context.CancellationToken);
 
-            if (string.IsNullOrEmpty(jsonResponse)) return;
-
-            var standings = JsonSerializer.Deserialize<HeadToHeadStandingsResponse>(jsonResponse);
-
-            if (standings == null ||
-                standings.HeadToHeadStandings == null ||
-                standings.HeadToHeadStandings.Results == null ||
-                standings.HeadToHeadStandings.Results.Count == 0) return;
+            if (standings.HeadToHeadStandings.Results.Count == 0) return;
 
             foreach (var guild in discordClient.Guilds)
             {
