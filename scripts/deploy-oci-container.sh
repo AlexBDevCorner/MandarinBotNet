@@ -2,6 +2,7 @@
 
 set -Eeuo pipefail
 
+# Keep this marker aligned with DiscordBotHostedService; its integration test pins the contract.
 readonly ready_message="Bot is connected and ready."
 readonly env_file="${DEPLOY_DIRECTORY:-}/mandarinbot.env"
 readonly data_directory="${DEPLOY_DIRECTORY:-}/data"

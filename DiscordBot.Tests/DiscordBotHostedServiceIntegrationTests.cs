@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using NUnit.Framework;
+using System.Collections.Concurrent;
 
 namespace DiscordBot.Tests;
 
@@ -21,8 +22,10 @@ public sealed class DiscordBotHostedServiceIntegrationTests
         var gateway = new TestDiscordGatewayConnection();
         using var client = new DiscordSocketClient();
         var scheduledWork = new StartTrackingHostedService();
+        var logMessages = new ConcurrentQueue<string>();
         var builder = Host.CreateApplicationBuilder();
         builder.Logging.ClearProviders();
+        builder.Logging.AddProvider(new CollectingLoggerProvider(logMessages));
         builder.Services.AddSingleton(settings);
         builder.Services.AddSingleton(client);
         builder.Services.AddSingleton(readiness);
@@ -45,6 +48,7 @@ public sealed class DiscordBotHostedServiceIntegrationTests
         await startTask;
         scheduledWork.Started.Task.IsCompletedSuccessfully.Should().BeTrue();
         readiness.IsReady.Should().BeTrue();
+        logMessages.Should().Contain("Bot is connected and ready.");
 
         await gateway.RaiseDisconnectedAsync();
         readiness.IsReady.Should().BeFalse();
@@ -58,6 +62,42 @@ public sealed class DiscordBotHostedServiceIntegrationTests
         await host.StopAsync();
         readiness.IsReady.Should().BeFalse();
         gateway.Operations.Should().Equal("Login", "Start", "Stop");
+    }
+
+    private sealed class CollectingLoggerProvider(ConcurrentQueue<string> messages) : ILoggerProvider
+    {
+        public ILogger CreateLogger(string categoryName)
+        {
+            return new CollectingLogger(messages);
+        }
+
+        public void Dispose()
+        {
+        }
+    }
+
+    private sealed class CollectingLogger(ConcurrentQueue<string> messages) : ILogger
+    {
+        public IDisposable? BeginScope<TState>(TState state)
+            where TState : notnull
+        {
+            return null;
+        }
+
+        public bool IsEnabled(LogLevel logLevel)
+        {
+            return true;
+        }
+
+        public void Log<TState>(
+            LogLevel logLevel,
+            EventId eventId,
+            TState state,
+            Exception? exception,
+            Func<TState, Exception?, string> formatter)
+        {
+            messages.Enqueue(formatter(state, exception));
+        }
     }
 
     private sealed class StartTrackingHostedService : IHostedService

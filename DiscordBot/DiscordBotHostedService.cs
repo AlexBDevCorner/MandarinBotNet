@@ -13,6 +13,7 @@ namespace DiscordBot
         DiscordConnectionReadiness readiness,
         ILogger<DiscordBotHostedService> logger) : IHostedService
     {
+        private const string DeploymentReadyMessage = "Bot is connected and ready.";
         private Dictionary<string, Func<SocketSlashCommand, Task>> _commandHandlers = []; 
 
         public async Task StartAsync(CancellationToken cancellationToken)
@@ -74,7 +75,7 @@ namespace DiscordBot
         private Task ReadyAsync()
         {
             readiness.MarkReady();
-            logger.LogInformation("Discord gateway is ready.");
+            logger.LogInformation("{DeploymentReadyMessage}", DeploymentReadyMessage);
             return Task.CompletedTask;
         }
 
