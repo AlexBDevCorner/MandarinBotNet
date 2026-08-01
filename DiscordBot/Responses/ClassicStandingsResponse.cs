@@ -7,7 +7,7 @@ namespace DiscordBot.Responses
         [JsonPropertyName("standings")]
         public ClassicStandings Standings { get; set; } = default!;
         [JsonPropertyName("last_updated_data")]
-        public DateTime LastUpdatedData { get; set; }
+        public DateTimeOffset LastUpdatedData { get; set; }
     }
 
     public class ClassicStandings

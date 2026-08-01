@@ -1,79 +1,71 @@
-﻿using Discord.WebSocket;
+using System.Globalization;
+using Discord.WebSocket;
 using DiscordBot.FantasyPremierLeague;
 using DiscordBot.Notifications;
-using DiscordBot.Responses;
+using DiscordBot.PremierLeague;
 using Quartz;
-using System.Globalization;
 
-namespace DiscordBot.Jobs
+namespace DiscordBot.Jobs;
+
+[DisallowConcurrentExecution]
+public sealed class PremierLeagueH2hStandingsInformationJob(
+    DiscordSocketClient discordClient,
+    IDiscordConnectionReadiness discordReadiness,
+    IFantasyPremierLeagueClient premierLeagueClient,
+    NotificationDeliveryCoordinator deliveryCoordinator,
+    PremierLeagueMessageCompositionService messageComposer) : IJob
 {
-    [DisallowConcurrentExecution]
-    public class PremierLeagueH2hStandingsInformationJob(
-        DiscordSocketClient discordClient,
-        IDiscordConnectionReadiness discordReadiness,
-        IFantasyPremierLeagueClient premierLeagueClient,
-        NotificationDeliveryCoordinator deliveryCoordinator) : IJob
+    public async Task Execute(IJobExecutionContext context)
     {
-        public async Task Execute(IJobExecutionContext context)
+        await discordReadiness.WaitUntilReadyAsync(context.CancellationToken);
+
+        var standings = await premierLeagueClient.GetHeadToHeadStandingsAsync(
+            1671824,
+            context.CancellationToken);
+        var results = standings.HeadToHeadStandings.Results;
+        if (results.Count == 0)
         {
-            await discordReadiness.WaitUntilReadyAsync(context.CancellationToken);
-
-            var standings = await premierLeagueClient.GetHeadToHeadStandingsAsync(
-                1671824,
-                context.CancellationToken);
-
-            if (standings.HeadToHeadStandings.Results.Count == 0) return;
-
-            foreach (var guild in discordClient.Guilds)
-            {
-                var generalChannel = guild.TextChannels
-                    .FirstOrDefault(c => (c.Name.Equals("general", StringComparison.OrdinalIgnoreCase)
-                        || c.Name.Equals("announcement-bot", StringComparison.OrdinalIgnoreCase)));
-
-                if (generalChannel is null) continue;
-
-                try
-                {
-                    var checkpoint = new NotificationCheckpoint(
-                        guild.Id,
-                        generalChannel.Id,
-                        standings.HeadToHeadStandings.Results[0].MatchesPlayed.ToString(CultureInfo.InvariantCulture),
-                        NotificationTypes.HeadToHeadStandings);
-
-                    await deliveryCoordinator.SendOnceAsync(
-                        checkpoint,
-                        () => generalChannel.SendMessageAsync(GetEventSummary(standings.HeadToHeadStandings.Results)),
-                        context.CancellationToken);
-                }
-                catch (OperationCanceledException) when (context.CancellationToken.IsCancellationRequested)
-                {
-                    throw;
-                }
-                catch (Exception)
-                {
-                    Console.WriteLine($"Failed to send message");
-                }
-            }
+            return;
         }
 
-        private static string GetRankEmoji(int rank) => rank switch
-        {
-            1 => ":one:",
-            2 => ":two:",
-            3 => ":three:",
-            _ => ":four:"
-        };
+        var message = messageComposer.ComposeHeadToHeadStandings(results);
 
-        private static string GetEventSummary(List<HeadToHeadStanding> results)
+        foreach (var guild in discordClient.Guilds)
         {
-            var summary = $"@everyone Лига Пельменных Обнимашек-К-Обнимашкам:";
+            var generalChannel = guild.TextChannels.FirstOrDefault(
+                channel => channel.Name.Equals(
+                        "general",
+                        StringComparison.OrdinalIgnoreCase)
+                    || channel.Name.Equals(
+                        "announcement-bot",
+                        StringComparison.OrdinalIgnoreCase));
 
-            foreach (var result in results)
+            if (generalChannel is null)
             {
-                summary += $"\n{GetRankEmoji(result.Rank)} {result.EntryName} {result.Total}";
+                continue;
             }
 
-            return summary;
+            try
+            {
+                var checkpoint = new NotificationCheckpoint(
+                    guild.Id,
+                    generalChannel.Id,
+                    results[0].MatchesPlayed.ToString(CultureInfo.InvariantCulture),
+                    NotificationTypes.HeadToHeadStandings);
+
+                await deliveryCoordinator.SendOnceAsync(
+                    checkpoint,
+                    () => generalChannel.SendMessageAsync(message),
+                    context.CancellationToken);
+            }
+            catch (OperationCanceledException) when (context.CancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception)
+            {
+                Console.WriteLine("Failed to send message");
+            }
         }
     }
 }

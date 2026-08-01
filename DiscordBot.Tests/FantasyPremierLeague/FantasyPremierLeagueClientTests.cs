@@ -44,6 +44,31 @@ public sealed class FantasyPremierLeagueClientTests
     }
 
     [Test]
+    public async Task GetClassicStandingsAsync_UtcLastUpdated_DeserializesAsDateTimeOffset()
+    {
+        // Arrange
+        var handler = new StubHttpMessageHandler((_, _) =>
+            Task.FromResult(CreateJsonResponse(
+                """
+                {
+                  "standings": { "results": [] },
+                  "last_updated_data": "2027-02-02T12:00:00+00:00"
+                }
+                """)));
+        using var provider = CreateProvider(handler);
+        var client = provider.GetRequiredService<IFantasyPremierLeagueClient>();
+
+        // Act
+        var result = await client.GetClassicStandingsAsync(
+            1671531,
+            CancellationToken.None);
+
+        // Assert
+        result.LastUpdatedData.Should().Be(
+            new DateTimeOffset(2027, 2, 2, 12, 0, 0, TimeSpan.Zero));
+    }
+
+    [Test]
     public async Task GetBootstrapStaticAsync_ServerErrorsExhausted_ClassifiesTransientFailure()
     {
         // Arrange
