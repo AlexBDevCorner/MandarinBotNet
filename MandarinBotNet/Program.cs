@@ -5,6 +5,7 @@ using DiscordBot.Commands;
 using DiscordBot.FantasyPremierLeague;
 using DiscordBot.Jobs;
 using DiscordBot.Notifications;
+using DiscordBot.PremierLeague;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -17,6 +18,14 @@ builder.Services.AddMandarinBotConfiguration(
     builder.Configuration,
     builder.Environment);
 builder.Services.AddFantasyPremierLeagueClient();
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddSingleton<ConfiguredTimeZone>();
+builder.Services.AddSingleton<DeadlineSelectionService>();
+builder.Services.AddSingleton<ReminderEligibilityService>();
+builder.Services.AddSingleton<StandingsPublicationEligibilityService>();
+builder.Services.AddSingleton<StandingsChangeService>();
+builder.Services.AddSingleton<WinnerSelectionService>();
+builder.Services.AddSingleton<PremierLeagueMessageCompositionService>();
 
 builder.Logging.ClearProviders();
 builder.Logging.AddConsole();

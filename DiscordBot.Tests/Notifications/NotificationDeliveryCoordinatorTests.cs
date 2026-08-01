@@ -180,6 +180,32 @@ namespace DiscordBot.Tests.Notifications
         }
 
         [Test]
+        public async Task SendOnceAsync_Success_RecordsInjectedUtcTime()
+        {
+            // Arrange
+            var utcNow = new DateTimeOffset(
+                2027,
+                2,
+                2,
+                12,
+                0,
+                0,
+                TimeSpan.Zero);
+            var store = new RecordingCheckpointStore();
+            var coordinator = new NotificationDeliveryCoordinator(
+                store,
+                new FixedTimeProvider(utcNow));
+
+            // Act
+            await coordinator.SendOnceAsync(
+                CreateCheckpoint(),
+                () => Task.CompletedTask);
+
+            // Assert
+            store.DeliveredAtUtc.Should().Be(utcNow);
+        }
+
+        [Test]
         public void RecordDelivered_DifferentCompositeKeyParts_RemainUndelivered()
         {
             // Arrange
@@ -199,7 +225,8 @@ namespace DiscordBot.Tests.Notifications
         private NotificationDeliveryCoordinator CreateCoordinator()
         {
             return new NotificationDeliveryCoordinator(
-                new SqliteNotificationCheckpointStore(_databasePath));
+                new SqliteNotificationCheckpointStore(_databasePath),
+                TimeProvider.System);
         }
 
         private static NotificationCheckpoint CreateCheckpoint(ulong channelId = 100)
@@ -209,6 +236,25 @@ namespace DiscordBot.Tests.Notifications
                 ChannelId: channelId,
                 SourceIdentifier: "event-42",
                 NotificationType: NotificationTypes.Deadline24Hours);
+        }
+
+        private sealed class FixedTimeProvider(DateTimeOffset utcNow) : TimeProvider
+        {
+            public override DateTimeOffset GetUtcNow() => utcNow;
+        }
+
+        private sealed class RecordingCheckpointStore : INotificationCheckpointStore
+        {
+            public DateTimeOffset? DeliveredAtUtc { get; private set; }
+
+            public bool IsDelivered(NotificationCheckpoint checkpoint) => false;
+
+            public void RecordDelivered(
+                NotificationCheckpoint checkpoint,
+                DateTimeOffset deliveredAtUtc)
+            {
+                DeliveredAtUtc = deliveredAtUtc;
+            }
         }
     }
 }

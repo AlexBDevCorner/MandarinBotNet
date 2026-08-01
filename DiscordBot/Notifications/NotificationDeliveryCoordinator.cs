@@ -3,7 +3,8 @@ using System.Collections.Concurrent;
 namespace DiscordBot.Notifications
 {
     public sealed class NotificationDeliveryCoordinator(
-        INotificationCheckpointStore checkpointStore)
+        INotificationCheckpointStore checkpointStore,
+        TimeProvider timeProvider)
     {
         private readonly ConcurrentDictionary<NotificationCheckpoint, SemaphoreSlim> _deliveryLocks = new();
 
@@ -27,7 +28,7 @@ namespace DiscordBot.Notifications
 
                 cancellationToken.ThrowIfCancellationRequested();
                 await sendAsync();
-                checkpointStore.RecordDelivered(checkpoint, DateTimeOffset.UtcNow);
+                checkpointStore.RecordDelivered(checkpoint, timeProvider.GetUtcNow());
                 return true;
             }
             finally
