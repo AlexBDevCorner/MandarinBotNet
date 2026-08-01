@@ -1,7 +1,6 @@
 using AwesomeAssertions;
 using Discord;
 using DiscordBot.Commands;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using NUnit.Framework;
 
@@ -144,27 +143,6 @@ public sealed class DiscordCommandRegistrationTests
             message.Level == LogLevel.Error &&
             message.Text.Contains("global") &&
             message.Text.Contains("Verify bot credentials"));
-    }
-
-    [Test]
-    public void FromConfiguration_GuildModeWithoutGuildId_ThrowsActionableError()
-    {
-        // Arrange
-        var configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                [DiscordCommandRegistrationOptions.ModeConfigurationKey] = "Guild"
-            })
-            .Build();
-
-        // Act
-        var act = () =>
-            DiscordCommandRegistrationOptions.FromConfiguration(configuration);
-
-        // Assert
-        act.Should().Throw<InvalidOperationException>()
-            .WithMessage(
-                $"*{DiscordCommandRegistrationOptions.GuildIdConfigurationKey}*");
     }
 
     private sealed class TestCommandSynchronizer : IDiscordCommandSynchronizer

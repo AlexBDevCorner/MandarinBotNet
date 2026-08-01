@@ -2,64 +2,68 @@
 using DiscordBot.FantasyPremierLeague;
 using DiscordBot.Notifications;
 using DiscordBot.Responses;
+using Microsoft.Extensions.Logging;
 using Quartz;
-using TimeZoneConverter;
 
 namespace DiscordBot.Jobs
 {
     [DisallowConcurrentExecution]
     public class PremierLeagueClassicStandingsInformationJob(
-        DiscordSocketClient discordClient,
         IDiscordConnectionReadiness discordReadiness,
         IFantasyPremierLeagueClient premierLeagueClient,
-        NotificationDeliveryCoordinator deliveryCoordinator) : IJob
+        IDiscordNotificationPublisher notificationPublisher,
+        FantasyPremierLeagueOptions leagueOptions,
+        JobSchedulesOptions scheduleOptions,
+        NotificationOptions notificationOptions,
+        ILogger<PremierLeagueClassicStandingsInformationJob> logger) : IJob
     {
         public async Task Execute(IJobExecutionContext context)
         {
             await discordReadiness.WaitUntilReadyAsync(context.CancellationToken);
 
             var standings = await premierLeagueClient.GetClassicStandingsAsync(
-                1671531,
+                leagueOptions.ClassicLeagueId,
                 context.CancellationToken);
 
-            var rigaTimeZone = TZConvert.GetTimeZoneInfo("Europe/Riga");
+            var configuredTimeZone = JobSchedules.GetTimeZone(scheduleOptions);
 
             var utcNow = DateTime.UtcNow;
 
-            var yesterdayRigaMidnight = TimeZoneInfo.ConvertTimeFromUtc(utcNow, rigaTimeZone)
+            var yesterdayLocalMidnight = TimeZoneInfo.ConvertTimeFromUtc(
+                    utcNow,
+                    configuredTimeZone)
                 .Date
                 .AddDays(-1);
 
-            if (standings.LastUpdatedData < yesterdayRigaMidnight) return;
+            if (standings.LastUpdatedData < yesterdayLocalMidnight) return;
 
-            foreach (var guild in discordClient.Guilds)
+            var message = GetEventSummary(standings.Standings.Results);
+            var sourceIdentifier = standings.LastUpdatedData
+                .ToUniversalTime()
+                .ToString("O");
+
+            foreach (var target in notificationOptions.Targets)
             {
-                var generalChannel = guild.TextChannels
-                    .FirstOrDefault(c => (c.Name.Equals("general", StringComparison.OrdinalIgnoreCase)
-                        || c.Name.Equals("announcement-bot", StringComparison.OrdinalIgnoreCase)));
-
-                if (generalChannel is null) continue;
-
                 try
                 {
-                    var checkpoint = new NotificationCheckpoint(
-                        guild.Id,
-                        generalChannel.Id,
-                        standings.LastUpdatedData.ToUniversalTime().ToString("O"),
-                        NotificationTypes.ClassicStandings);
-
-                    await deliveryCoordinator.SendOnceAsync(
-                        checkpoint,
-                        () => generalChannel.SendMessageAsync(GetEventSummary(standings.Standings.Results)),
+                    await notificationPublisher.PublishOnceAsync(
+                        target,
+                        sourceIdentifier,
+                        NotificationTypes.ClassicStandings,
+                        message,
                         context.CancellationToken);
                 }
                 catch (OperationCanceledException) when (context.CancellationToken.IsCancellationRequested)
                 {
                     throw;
                 }
-                catch (Exception)
+                catch (Exception exception)
                 {
-                    Console.WriteLine($"Failed to send message");
+                    logger.LogError(
+                        exception,
+                        "Failed to publish classic standings to Discord guild {GuildId}, channel {ChannelId}.",
+                        target.GuildId,
+                        target.ChannelId);
                 }
             }
 
@@ -75,7 +79,7 @@ namespace DiscordBot.Jobs
 
         private string GetEventSummary(List<ClassicStanding> results)
         {
-            var summary = $"@everyone Лига Пельменных Обнимашек:";
+            var summary = "Лига Пельменных Обнимашек:";
 
             foreach (var result in results)
             {
@@ -88,14 +92,14 @@ namespace DiscordBot.Jobs
 
             summary += PickCongratsMessage(eventWinner);
 
-            foreach (var result in results) 
-            { 
+            foreach (var result in results)
+            {
                 if (result.Rank < result.LastRank)
                 {
                     summary += $"\nКоманда {result.EntryName} смогла взобраться на {result.LastRank - result.Rank} позиции вверх :arrow_up:, поздравительные обнимашки! :people_hugging: Так держать!";
                 }
 
-                if(result.Rank > result.LastRank)
+                if (result.Rank > result.LastRank)
                 {
                     summary += $"\nКоманда {result.EntryName} упала на {result.Rank - result.LastRank} позиции вниз :arrow_down:, обнимашки поддержки! :people_hugging: Всё наладится!";
                 }
@@ -109,7 +113,7 @@ namespace DiscordBot.Jobs
             var time = DateTime.Now;
             var random = new Random();
 
-            var messages = new List<string> 
+            var messages = new List<string>
             {
                 $"\n\nВ последнем туре больше всех баллов набрала команда {eventWinner.EntryName} - {eventWinner.EventTotal}, это заслуживает обнимашек! :people_hugging:",
                 $"\n\nКоманда {eventWinner.EntryName} набрала больше всех баллов в последнем туре - {eventWinner.EventTotal}! Заслуженные обнимашки летят к вам! :people_hugging:",
@@ -146,6 +150,6 @@ namespace DiscordBot.Jobs
 
             int randomIndex = random.Next(messages.Count);
             return messages[randomIndex];
-        } 
+        }
     }
 }

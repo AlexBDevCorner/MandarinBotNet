@@ -15,9 +15,11 @@ Production uses this configuration:
 
 ```json
 {
-  "Discord": {
-    "Commands": {
-      "RegistrationMode": "Global"
+  "Bot": {
+    "Discord": {
+      "Commands": {
+        "RegistrationMode": "Global"
+      }
     }
   }
 }
@@ -29,11 +31,11 @@ guild-scoped propagation, provide these environment variables for a development
 bot application and test guild:
 
 ```dotenv
-Discord__Commands__RegistrationMode=Guild
-Discord__Commands__GuildId=<TEST-GUILD-ID>
+Bot__Discord__Commands__RegistrationMode=Guild
+Bot__Discord__Commands__GuildId=<TEST-GUILD-ID>
 ```
 
-Use a separate development bot token as `BOT_TOKEN`; do not point guild-scoped
-development registration at the production application. `RegistrationMode`
-also accepts `Disabled` when a process should handle commands without changing
-their registration.
+Use a separate development bot token as `Bot__Discord__Token`; do not point
+guild-scoped development registration at the production application.
+`RegistrationMode` also accepts `Disabled` when a process should handle
+commands without changing their registration.
