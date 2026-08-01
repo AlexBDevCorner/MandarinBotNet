@@ -172,7 +172,7 @@ public sealed class StandingsChangeServiceTests
 public sealed class WinnerSelectionServiceTests
 {
     [Test]
-    public void SelectEventWinner_MultipleTeams_ReturnsHighestEventTotal()
+    public void SelectEventWinners_MultipleTeams_ReturnsHighestEventTotal()
     {
         // Arrange
         var standings = new[]
@@ -183,23 +183,61 @@ public sealed class WinnerSelectionServiceTests
         };
 
         // Act
-        var result = new WinnerSelectionService().SelectEventWinner(standings);
+        var result = new WinnerSelectionService().SelectEventWinners(standings);
 
         // Assert
-        result.Should().BeSameAs(standings[1]);
+        result.Should().ContainSingle().Which.Should().BeSameAs(standings[1]);
     }
 
     [Test]
-    public void SelectEventWinner_NoTeams_ReturnsNull()
+    public void SelectEventWinners_TiedTeams_ReturnsEveryWinnerDeterministically()
+    {
+        // Arrange
+        var standings = new[]
+        {
+            new ClassicStanding
+            {
+                Entry = 30,
+                EntryName = "Zulu",
+                Rank = 3,
+                EventTotal = 72
+            },
+            new ClassicStanding
+            {
+                Entry = 20,
+                EntryName = "Beta",
+                Rank = 2,
+                EventTotal = 72
+            },
+            new ClassicStanding
+            {
+                Entry = 10,
+                EntryName = "Alpha",
+                Rank = 2,
+                EventTotal = 72
+            }
+        };
+
+        // Act
+        var result = new WinnerSelectionService().SelectEventWinners(standings);
+
+        // Assert
+        result.Select(winner => winner.EntryName).Should().BeEquivalentTo(
+            ["Alpha", "Beta", "Zulu"],
+            options => options.WithStrictOrdering());
+    }
+
+    [Test]
+    public void SelectEventWinners_NoTeams_ReturnsEmptyCollection()
     {
         // Arrange
         var standings = Array.Empty<ClassicStanding>();
 
         // Act
-        var result = new WinnerSelectionService().SelectEventWinner(standings);
+        var result = new WinnerSelectionService().SelectEventWinners(standings);
 
         // Assert
-        result.Should().BeNull();
+        result.Should().BeEmpty();
     }
 }
 
@@ -268,13 +306,13 @@ public sealed class PremierLeagueMessageCompositionServiceTests
         // Act
         var result = _service.ComposeClassicStandings(
             standings,
-            winner,
+            [winner],
             changes,
             congratulationsVariant: 0);
 
         // Assert
         result.Should().StartWith(
-            "Лига Пельменных Обнимашек:\n:one: Пельмени 100\n:four: Обнимашки 80");
+            "Лига Пельменных Обнимашек:\n:one: Пельмени 100\n4. Обнимашки 80");
         result.Should().Contain(
             "В последнем туре больше всех баллов набрала команда Пельмени - 72");
         result.Should().Contain(
@@ -290,7 +328,7 @@ public sealed class PremierLeagueMessageCompositionServiceTests
         var standings = new[]
         {
             new HeadToHeadStanding { Rank = 1, EntryName = "A", Total = 9 },
-            new HeadToHeadStanding { Rank = 2, EntryName = "B", Total = 6 }
+            new HeadToHeadStanding { Rank = 12, EntryName = "B", Total = 6 }
         };
 
         // Act
@@ -298,7 +336,53 @@ public sealed class PremierLeagueMessageCompositionServiceTests
 
         // Assert
         result.Should().Be(
-            "Лига Пельменных Обнимашек-К-Обнимашкам:\n:one: A 9\n:two: B 6");
+            "Лига Пельменных Обнимашек-К-Обнимашкам:\n:one: A 9\n12. B 6");
+    }
+
+    [Test]
+    public void ComposeClassicStandings_TiedWinners_NamesEveryWinnerInOrder()
+    {
+        // Arrange
+        var winners = new[]
+        {
+            new ClassicStanding { EntryName = "Alpha", Rank = 1, EventTotal = 70 },
+            new ClassicStanding { EntryName = "Beta", Rank = 2, EventTotal = 70 }
+        };
+
+        // Act
+        var result = _service.ComposeClassicStandings(
+            winners,
+            winners,
+            [],
+            congratulationsVariant: 0);
+
+        // Assert
+        result.Should().Contain(
+            "максимум очков (70) разделили команды: Alpha, Beta");
+    }
+
+    [Test]
+    public void ComposeClassicStandings_ExternalMentionAndLineBreak_SanitizesEveryName()
+    {
+        // Arrange
+        var standing = new ClassicStanding
+        {
+            EntryName = "@everyone\nInjected",
+            Rank = 1,
+            LastRank = 2,
+            EventTotal = 70
+        };
+
+        // Act
+        var result = _service.ComposeClassicStandings(
+            [standing],
+            [standing],
+            new StandingsChangeService().GetChanges([standing]),
+            congratulationsVariant: 30);
+
+        // Assert
+        result.Should().NotContain("@everyone");
+        result.Should().Contain("@\u200Beveryone Injected");
     }
 }
 

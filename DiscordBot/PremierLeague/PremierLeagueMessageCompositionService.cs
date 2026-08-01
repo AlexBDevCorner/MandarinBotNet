@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using DiscordBot.Notifications;
 using DiscordBot.Responses;
 
 namespace DiscordBot.PremierLeague;
@@ -25,24 +26,42 @@ public sealed class PremierLeagueMessageCompositionService(
 
     public string ComposeClassicStandings(
         IEnumerable<ClassicStanding> standings,
-        ClassicStanding? eventWinner,
+        IEnumerable<ClassicStanding> eventWinners,
         IEnumerable<StandingsChange> changes,
         int congratulationsVariant)
     {
         ArgumentNullException.ThrowIfNull(standings);
+        ArgumentNullException.ThrowIfNull(eventWinners);
         ArgumentNullException.ThrowIfNull(changes);
 
+        var winners = eventWinners.ToArray();
         var summary = new StringBuilder("Лига Пельменных Обнимашек:");
 
         foreach (var result in standings)
         {
             summary.Append('\n');
-            summary.Append($"{GetRankEmoji(result.Rank)} {result.EntryName} {result.Total}");
+            summary.Append($"{GetRankLabel(result.Rank)} {DiscordTextSafety.SanitizeExternalName(result.EntryName)} {result.Total}");
         }
 
-        if (eventWinner is not null)
+        if (winners.Length == 1)
         {
-            summary.Append(GetCongratulationsMessages(eventWinner)[congratulationsVariant]);
+            var eventWinner = winners[0];
+            var safeEventWinner = new ClassicStanding
+            {
+                EntryName = DiscordTextSafety.SanitizeExternalName(
+                    eventWinner.EntryName),
+                EventTotal = eventWinner.EventTotal
+            };
+            summary.Append(GetCongratulationsMessages(safeEventWinner)[congratulationsVariant]);
+        }
+        else if (winners.Length > 1)
+        {
+            var winnerNames = string.Join(
+                ", ",
+                winners.Select(winner =>
+                    DiscordTextSafety.SanitizeExternalName(winner.EntryName)));
+            summary.Append(
+                $"\n\nВ этом туре максимум очков ({winners[0].EventTotal}) разделили команды: {winnerNames}. Обнимашки всем победителям! :people_hugging:");
         }
 
         foreach (var change in changes)
@@ -51,11 +70,11 @@ public sealed class PremierLeagueMessageCompositionService(
 
             if (change.Direction == StandingsChangeDirection.Up)
             {
-                summary.Append($"Команда {change.EntryName} смогла взобраться на {change.PositionCount} позиции вверх :arrow_up:, поздравительные обнимашки! :people_hugging: Так держать!");
+                summary.Append($"Команда {DiscordTextSafety.SanitizeExternalName(change.EntryName)} смогла взобраться на {change.PositionCount} позиции вверх :arrow_up:, поздравительные обнимашки! :people_hugging: Так держать!");
             }
             else
             {
-                summary.Append($"Команда {change.EntryName} упала на {change.PositionCount} позиции вниз :arrow_down:, обнимашки поддержки! :people_hugging: Всё наладится!");
+                summary.Append($"Команда {DiscordTextSafety.SanitizeExternalName(change.EntryName)} упала на {change.PositionCount} позиции вниз :arrow_down:, обнимашки поддержки! :people_hugging: Всё наладится!");
             }
         }
 
@@ -73,26 +92,29 @@ public sealed class PremierLeagueMessageCompositionService(
         foreach (var result in standings)
         {
             summary.Append('\n');
-            summary.Append($"{GetRankEmoji(result.Rank)} {result.EntryName} {result.Total}");
+            summary.Append($"{GetRankLabel(result.Rank)} {DiscordTextSafety.SanitizeExternalName(result.EntryName)} {result.Total}");
         }
 
         return summary.ToString();
     }
 
-    private static string GetRankEmoji(int rank) => rank switch
+    private static string GetRankLabel(int rank) => rank switch
     {
         1 => ":one:",
         2 => ":two:",
         3 => ":three:",
-        _ => ":four:"
+        _ => $"{rank.ToString(CultureInfo.InvariantCulture)}."
     };
 
     private static IReadOnlyList<string> GetCongratulationsMessages(
         ClassicStanding eventWinner)
     {
+        var entryName = DiscordTextSafety.SanitizeExternalName(
+            eventWinner.EntryName);
+
         return
         [
-            $"\n\nВ последнем туре больше всех баллов набрала команда {eventWinner.EntryName} - {eventWinner.EventTotal}, это заслуживает обнимашек! :people_hugging:",
+            $"\n\nВ последнем туре больше всех баллов набрала команда {entryName} - {eventWinner.EventTotal}, это заслуживает обнимашек! :people_hugging:",
             $"\n\nКоманда {eventWinner.EntryName} набрала больше всех баллов в последнем туре - {eventWinner.EventTotal}! Заслуженные обнимашки летят к вам! :people_hugging:",
             $"\n\nБольше всех баллов в этом туре({eventWinner.EventTotal}) заработала команда {eventWinner.EntryName}. Ваши обнимашки уже в пути! :people_hugging:",
             $"\n\nВ последнем раунде команда {eventWinner.EntryName} взяла больше всех баллов - {eventWinner.EventTotal}! Обнимашки для вас! :people_hugging:",

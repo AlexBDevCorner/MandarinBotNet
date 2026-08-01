@@ -27,6 +27,8 @@ public sealed class MandarinBotOptionsTests
         options.Discord.Commands.RegistrationMode.Should()
             .Be(DiscordCommandRegistrationMode.Disabled);
         new NotificationTargetOptions().MentionEveryone.Should().BeFalse();
+        options.FantasyPremierLeague.MaxStandingsPages.Should().Be(
+            FantasyPremierLeagueOptions.DefaultMaxStandingsPages);
     }
 
     [Test]
@@ -135,6 +137,29 @@ public sealed class MandarinBotOptionsTests
         // Assert
         result.Failed.Should().BeTrue();
         result.Failures.Should().Contain(failure => failure.Contains("duplicates"));
+    }
+
+    [Test]
+    public void Validate_NonPositiveStandingsPageLimit_ReturnsFailure()
+    {
+        // Arrange
+        var options = CreateValidOptions(
+            leagueOptions: new FantasyPremierLeagueOptions
+            {
+                ClassicLeagueId = 123,
+                HeadToHeadLeagueId = 456,
+                MaxStandingsPages = 0
+            });
+        var validator = new MandarinBotOptionsValidator(
+            requireOperationalConfiguration: true);
+
+        // Act
+        var result = validator.Validate(null, options);
+
+        // Assert
+        result.Failed.Should().BeTrue();
+        result.Failures.Should().Contain(failure =>
+            failure.Contains("MaxStandingsPages"));
     }
 
     [Test]

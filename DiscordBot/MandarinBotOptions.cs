@@ -34,9 +34,13 @@ public sealed class DiscordCommandOptions
 
 public sealed class FantasyPremierLeagueOptions
 {
+    public const int DefaultMaxStandingsPages = 10;
+
     public int ClassicLeagueId { get; init; }
 
     public int HeadToHeadLeagueId { get; init; }
+
+    public int MaxStandingsPages { get; init; } = DefaultMaxStandingsPages;
 }
 
 public sealed class JobSchedulesOptions

@@ -24,6 +24,7 @@ Bot__Discord__ReadinessTimeout=00:00:30
 Bot__Discord__Commands__RegistrationMode=Global
 Bot__FantasyPremierLeague__ClassicLeagueId=<CLASSIC-LEAGUE-ID>
 Bot__FantasyPremierLeague__HeadToHeadLeagueId=<HEAD-TO-HEAD-LEAGUE-ID>
+Bot__FantasyPremierLeague__MaxStandingsPages=10
 Bot__Schedules__TimeZoneId=Europe/Riga
 Bot__Schedules__PremierLeagueNotifications__Enabled=true
 Bot__Schedules__PremierLeagueNotifications__Cron=0 0 * * * ?
@@ -39,6 +40,10 @@ Bot__Notifications__Targets__0__MentionEveryone=false
 Keep `Bot__Discord__Token` only in the VM env file or the deployment platform's
 secret provider. Never put it in `appsettings.json`, source control, logs, or a
 container image.
+
+`MaxStandingsPages` bounds the number of FPL standings pages fetched by each
+job. The default of 10 represents up to 500 league entries while preventing a
+bad or unexpectedly large upstream pagination sequence from running forever.
 
 ## Multiple targets and mentions
 
