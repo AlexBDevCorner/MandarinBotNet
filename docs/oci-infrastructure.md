@@ -149,8 +149,20 @@ Register the runner as follows:
    The file must contain:
 
    ```dotenv
-   BOT_TOKEN=<DISCORD-BOT-TOKEN>
+   Bot__Discord__Token=<DISCORD-BOT-TOKEN>
+   Bot__Discord__Commands__RegistrationMode=Global
+   Bot__FantasyPremierLeague__ClassicLeagueId=<CLASSIC-LEAGUE-ID>
+   Bot__FantasyPremierLeague__HeadToHeadLeagueId=<HEAD-TO-HEAD-LEAGUE-ID>
+   Bot__Schedules__PremierLeagueNotifications__Enabled=true
+   Bot__Schedules__ClassicStandings__Enabled=true
+   Bot__Schedules__HeadToHeadStandings__Enabled=true
+   Bot__Notifications__Targets__0__GuildId=<DISCORD-GUILD-ID>
+   Bot__Notifications__Targets__0__ChannelId=<DISCORD-CHANNEL-ID>
+   Bot__Notifications__Targets__0__MentionEveryone=false
    ```
+
+   See [bot configuration](bot-configuration.md) for schedule overrides and
+   additional notification targets.
 
 5. Confirm the runner appears online, then remove temporary SSH ingress if it
    is no longer needed.

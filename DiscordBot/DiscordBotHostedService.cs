@@ -7,7 +7,7 @@ using Microsoft.Extensions.Logging;
 namespace DiscordBot
 {
     public class DiscordBotHostedService(
-        DiscordBotSettings settings,
+        DiscordOptions options,
         DiscordSocketClient client,
         IDiscordGatewayConnection gatewayConnection,
         DiscordConnectionReadiness readiness,
@@ -15,15 +15,16 @@ namespace DiscordBot
         ILogger<DiscordBotHostedService> logger) : IHostedService
     {
         private const string DeploymentReadyMessage = "Bot is connected and ready.";
-        private Dictionary<string, Func<SocketSlashCommand, Task>> _commandHandlers = []; 
+        private Dictionary<string, Func<SocketSlashCommand, Task>> _commandHandlers = [];
 
         public async Task StartAsync(CancellationToken cancellationToken)
         {
             logger.LogInformation("Starting Discord bot.");
 
-            if (string.IsNullOrWhiteSpace(settings.Token))
+            if (string.IsNullOrWhiteSpace(options.Token))
             {
-                throw new InvalidOperationException("BOT_TOKEN must be configured.");
+                throw new InvalidOperationException(
+                    "Bot:Discord:Token must be configured by a secret provider.");
             }
 
             _commandHandlers = new()
@@ -38,7 +39,7 @@ namespace DiscordBot
 
             try
             {
-                await gatewayConnection.LoginAsync(settings.Token).WaitAsync(cancellationToken);
+                await gatewayConnection.LoginAsync(options.Token).WaitAsync(cancellationToken);
                 await gatewayConnection.StartAsync().WaitAsync(cancellationToken);
                 await readiness.WaitUntilReadyAsync(cancellationToken);
             }

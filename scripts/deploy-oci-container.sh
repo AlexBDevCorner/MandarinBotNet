@@ -59,8 +59,8 @@ command -v docker >/dev/null 2>&1 || fail "Docker is not installed."
 docker info >/dev/null 2>&1 || fail "The runner cannot access the Docker daemon."
 [[ -r "$env_file" ]] || fail "$env_file is missing or unreadable."
 [[ -d "$data_directory" ]] || fail "$data_directory is missing."
-grep -Eq '^[[:space:]]*BOT_TOKEN=.+$' "$env_file" ||
-  fail "$env_file does not contain a non-empty BOT_TOKEN."
+grep -Eq '^[[:space:]]*Bot__Discord__Token=.+$' "$env_file" ||
+  fail "$env_file does not contain a non-empty Bot__Discord__Token."
 
 printf 'Pulling %s\n' "$IMAGE"
 docker pull "$IMAGE"

@@ -72,8 +72,10 @@ public sealed class DiscordConnectionReadinessTests
     private static DiscordConnectionReadiness CreateReadiness(TimeSpan? timeout = null)
     {
         return new DiscordConnectionReadiness(
-            new DiscordBotSettings(
-                Token: "test-token",
-                ReadinessTimeout: timeout ?? TimeSpan.FromSeconds(5)));
+            new DiscordOptions
+            {
+                Token = "test-token",
+                ReadinessTimeout = timeout ?? TimeSpan.FromSeconds(5)
+            });
     }
 }
