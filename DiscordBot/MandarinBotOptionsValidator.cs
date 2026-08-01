@@ -64,6 +64,12 @@ public sealed class MandarinBotOptionsValidator(bool requireOperationalConfigura
                 "Bot:FantasyPremierLeague:HeadToHeadLeagueId is required when the head-to-head standings job is enabled.");
         }
 
+        if (options.FantasyPremierLeague.MaxStandingsPages <= 0)
+        {
+            failures.Add(
+                "Bot:FantasyPremierLeague:MaxStandingsPages must be greater than zero.");
+        }
+
         ValidateTargets(options, failures);
 
         return failures.Count == 0

@@ -69,6 +69,74 @@ public sealed class FantasyPremierLeagueClientTests
     }
 
     [Test]
+    public async Task GetClassicStandingsAsync_MultiplePages_AggregatesEveryPageInOrder()
+    {
+        // Arrange
+        var handler = new StubHttpMessageHandler((attempt, _) =>
+            Task.FromResult(CreateJsonResponse(attempt switch
+            {
+                1 => ClassicStandingsPage(page: 1, hasNext: true, rank: 1),
+                2 => ClassicStandingsPage(page: 2, hasNext: true, rank: 51),
+                3 => ClassicStandingsPage(page: 3, hasNext: false, rank: 101),
+                _ => throw new InvalidOperationException("Unexpected page request.")
+            })));
+        using var provider = CreateProvider(handler);
+        var client = provider.GetRequiredService<IFantasyPremierLeagueClient>();
+
+        // Act
+        var result = await client.GetClassicStandingsAsync(
+            1671531,
+            CancellationToken.None);
+
+        // Assert
+        result.Standings.Results.Select(standing => standing.Rank).Should()
+            .BeEquivalentTo([1, 51, 101], options => options.WithStrictOrdering());
+        handler.RequestUris.Select(uri => uri.PathAndQuery).Should()
+            .BeEquivalentTo(
+                [
+                    "/api/leagues-classic/1671531/standings/",
+                    "/api/leagues-classic/1671531/standings/?page_standings=2",
+                    "/api/leagues-classic/1671531/standings/?page_standings=3"
+                ],
+                options => options.WithStrictOrdering());
+    }
+
+    [Test]
+    public async Task GetHeadToHeadStandingsAsync_MorePagesThanConfigured_StopsAtLimit()
+    {
+        // Arrange
+        var handler = new StubHttpMessageHandler((attempt, _) =>
+            Task.FromResult(CreateJsonResponse(
+                HeadToHeadStandingsPage(
+                    page: attempt,
+                    hasNext: true,
+                    rank: attempt))));
+        using var provider = CreateProvider(
+            handler,
+            leagueOptions: new FantasyPremierLeagueOptions
+            {
+                MaxStandingsPages = 2
+            });
+        var client = provider.GetRequiredService<IFantasyPremierLeagueClient>();
+
+        // Act
+        var result = await client.GetHeadToHeadStandingsAsync(
+            7654321,
+            CancellationToken.None);
+
+        // Assert
+        result.HeadToHeadStandings.Results.Select(standing => standing.Rank).Should()
+            .BeEquivalentTo([1, 2], options => options.WithStrictOrdering());
+        handler.RequestUris.Select(uri => uri.PathAndQuery).Should()
+            .BeEquivalentTo(
+                [
+                    "/api/leagues-h2h/7654321/standings/",
+                    "/api/leagues-h2h/7654321/standings/?page_standings=2"
+                ],
+                options => options.WithStrictOrdering());
+    }
+
+    [Test]
     public async Task GetBootstrapStaticAsync_ServerErrorsExhausted_ClassifiesTransientFailure()
     {
         // Arrange
@@ -226,10 +294,12 @@ public sealed class FantasyPremierLeagueClientTests
 
     private static ServiceProvider CreateProvider(
         HttpMessageHandler handler,
-        FantasyPremierLeagueClientOptions? options = null)
+        FantasyPremierLeagueClientOptions? options = null,
+        FantasyPremierLeagueOptions? leagueOptions = null)
     {
         var services = new ServiceCollection();
         services.AddLogging();
+        services.AddSingleton(leagueOptions ?? new FantasyPremierLeagueOptions());
         services
             .AddFantasyPremierLeagueClient(options ?? CreateTestOptions())
             .ConfigurePrimaryHttpMessageHandler(() => handler);
@@ -263,6 +333,49 @@ public sealed class FantasyPremierLeagueClientTests
         {
             Content = new StringContent(json, Encoding.UTF8, "application/json")
         };
+    }
+
+    private static string ClassicStandingsPage(
+        int page,
+        bool hasNext,
+        int rank)
+    {
+        return $$"""
+            {
+              "standings": {
+                "page": {{page}},
+                "has_next": {{hasNext.ToString().ToLowerInvariant()}},
+                "results": [
+                  {
+                    "rank": {{rank}},
+                    "entry_name": "Team {{rank}}"
+                  }
+                ]
+              },
+              "last_updated_data": "2027-02-02T12:00:00+00:00"
+            }
+            """;
+    }
+
+    private static string HeadToHeadStandingsPage(
+        int page,
+        bool hasNext,
+        int rank)
+    {
+        return $$"""
+            {
+              "standings": {
+                "page": {{page}},
+                "has_next": {{hasNext.ToString().ToLowerInvariant()}},
+                "results": [
+                  {
+                    "rank": {{rank}},
+                    "entry_name": "Team {{rank}}"
+                  }
+                ]
+              }
+            }
+            """;
     }
 
     private sealed class StubHttpMessageHandler(

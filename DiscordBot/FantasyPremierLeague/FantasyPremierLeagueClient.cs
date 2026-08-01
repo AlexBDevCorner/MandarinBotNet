@@ -10,6 +10,7 @@ namespace DiscordBot.FantasyPremierLeague;
 
 public sealed class FantasyPremierLeagueClient(
     HttpClient httpClient,
+    FantasyPremierLeagueOptions leagueOptions,
     ILogger<FantasyPremierLeagueClient> logger) : IFantasyPremierLeagueClient
 {
     private static readonly JsonSerializerOptions SerializerOptions =
@@ -24,28 +25,61 @@ public sealed class FantasyPremierLeagueClient(
             cancellationToken);
     }
 
-    public Task<ClassicStandingsResponse> GetClassicStandingsAsync(
+    public async Task<ClassicStandingsResponse> GetClassicStandingsAsync(
         int leagueId,
         CancellationToken cancellationToken)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(leagueId);
 
-        return GetAsync<ClassicStandingsResponse>(
+        var standings = await GetAsync<ClassicStandingsResponse>(
             $"/api/leagues-classic/{leagueId}/standings/",
             payload => payload.Standings?.Results is not null,
             cancellationToken);
+
+        for (var page = 2;
+             standings.Standings.HasNext && page <= leagueOptions.MaxStandingsPages;
+             page++)
+        {
+            var nextPage = await GetAsync<ClassicStandingsResponse>(
+                $"/api/leagues-classic/{leagueId}/standings/?page_standings={page}",
+                payload => payload.Standings?.Results is not null,
+                cancellationToken);
+            standings.Standings.Results.AddRange(nextPage.Standings.Results);
+            standings.Standings.Page = nextPage.Standings.Page;
+            standings.Standings.HasNext = nextPage.Standings.HasNext;
+        }
+
+        return standings;
     }
 
-    public Task<HeadToHeadStandingsResponse> GetHeadToHeadStandingsAsync(
+    public async Task<HeadToHeadStandingsResponse> GetHeadToHeadStandingsAsync(
         int leagueId,
         CancellationToken cancellationToken)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(leagueId);
 
-        return GetAsync<HeadToHeadStandingsResponse>(
+        var standings = await GetAsync<HeadToHeadStandingsResponse>(
             $"/api/leagues-h2h/{leagueId}/standings/",
             payload => payload.HeadToHeadStandings?.Results is not null,
             cancellationToken);
+
+        for (var page = 2;
+             standings.HeadToHeadStandings.HasNext && page <= leagueOptions.MaxStandingsPages;
+             page++)
+        {
+            var nextPage = await GetAsync<HeadToHeadStandingsResponse>(
+                $"/api/leagues-h2h/{leagueId}/standings/?page_standings={page}",
+                payload => payload.HeadToHeadStandings?.Results is not null,
+                cancellationToken);
+            standings.HeadToHeadStandings.Results.AddRange(
+                nextPage.HeadToHeadStandings.Results);
+            standings.HeadToHeadStandings.Page =
+                nextPage.HeadToHeadStandings.Page;
+            standings.HeadToHeadStandings.HasNext =
+                nextPage.HeadToHeadStandings.HasNext;
+        }
+
+        return standings;
     }
 
     private async Task<T> GetAsync<T>(

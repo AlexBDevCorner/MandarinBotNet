@@ -12,6 +12,10 @@ namespace DiscordBot.Responses
 
     public class ClassicStandings
     {
+        [JsonPropertyName("page")]
+        public int Page { get; set; }
+        [JsonPropertyName("has_next")]
+        public bool HasNext { get; set; }
         [JsonPropertyName("results")]
         public List<ClassicStanding> Results { get; set; } = [];
     }

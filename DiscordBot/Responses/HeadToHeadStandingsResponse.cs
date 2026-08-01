@@ -10,11 +10,15 @@ namespace DiscordBot.Responses
 
     public class HeadToHeadStandings
     {
+        [JsonPropertyName("page")]
+        public int Page { get; set; }
+        [JsonPropertyName("has_next")]
+        public bool HasNext { get; set; }
         [JsonPropertyName("results")]
         public List<HeadToHeadStanding> Results { get; set; } = [];
     }
 
-    public class HeadToHeadStanding 
+    public class HeadToHeadStanding
     {
         [JsonPropertyName("rank")]
         public int Rank { get; set; }

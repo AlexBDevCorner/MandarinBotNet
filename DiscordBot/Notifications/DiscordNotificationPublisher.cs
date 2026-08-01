@@ -1,3 +1,4 @@
+using Discord;
 using Discord.WebSocket;
 using Microsoft.Extensions.Logging;
 
@@ -59,9 +60,43 @@ public sealed class DiscordNotificationPublisher(
             sourceIdentifier,
             notificationType);
 
-        return await deliveryCoordinator.SendOnceAsync(
-            checkpoint,
-            () => channel.SendMessageAsync(target.FormatMessage(message)),
-            cancellationToken);
+        const string everyonePrefix = "@everyone ";
+        var contentLimit = DiscordConfig.MaxMessageSize -
+            (target.MentionEveryone ? everyonePrefix.Length : 0);
+        var chunks = DiscordMessageChunker.Split(message, contentLimit);
+        var sentAny = false;
+
+        for (var index = 0; index < chunks.Count; index++)
+        {
+            var chunkIndex = index;
+            var partCheckpoint = chunks.Count == 1
+                ? checkpoint
+                : checkpoint with
+                {
+                    NotificationType =
+                        $"{notificationType}:part-{index + 1}-of-{chunks.Count}"
+                };
+
+            var sent = await deliveryCoordinator.SendOnceAsync(
+                partCheckpoint,
+                async () =>
+                {
+                    var isFirstChunk = chunkIndex == 0;
+                    var content = isFirstChunk
+                        ? target.FormatMessage(chunks[chunkIndex])
+                        : chunks[chunkIndex];
+                    var allowedMentions = target.MentionEveryone && isFirstChunk
+                        ? null
+                        : AllowedMentions.None;
+
+                    await channel.SendMessageAsync(
+                        content,
+                        allowedMentions: allowedMentions);
+                },
+                cancellationToken);
+            sentAny |= sent;
+        }
+
+        return sentAny;
     }
 }

@@ -37,7 +37,7 @@ public sealed class PremierLeagueClassicStandingsInformationJob(
         var results = standings.Standings.Results;
         var message = messageComposer.ComposeClassicStandings(
             results,
-            winnerSelection.SelectEventWinner(results),
+            winnerSelection.SelectEventWinners(results),
             standingsChangeService.GetChanges(results),
             Random.Shared.Next(
                 PremierLeagueMessageCompositionService.ClassicCongratulationsVariantCount));

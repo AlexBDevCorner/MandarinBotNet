@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Http.Resilience;
 using Polly;
 
@@ -14,6 +15,7 @@ public static class FantasyPremierLeagueClientServiceCollectionExtensions
 
         options ??= new FantasyPremierLeagueClientOptions();
         Validate(options);
+        services.TryAddSingleton(new FantasyPremierLeagueOptions());
 
         var clientBuilder = services.AddHttpClient<
             IFantasyPremierLeagueClient,
