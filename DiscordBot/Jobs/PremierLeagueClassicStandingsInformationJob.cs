@@ -1,29 +1,31 @@
-using Discord.WebSocket;
 using DiscordBot.FantasyPremierLeague;
 using DiscordBot.Notifications;
 using DiscordBot.PremierLeague;
+using Microsoft.Extensions.Logging;
 using Quartz;
 
 namespace DiscordBot.Jobs;
 
 [DisallowConcurrentExecution]
 public sealed class PremierLeagueClassicStandingsInformationJob(
-    DiscordSocketClient discordClient,
     IDiscordConnectionReadiness discordReadiness,
     IFantasyPremierLeagueClient premierLeagueClient,
-    NotificationDeliveryCoordinator deliveryCoordinator,
+    IDiscordNotificationPublisher notificationPublisher,
+    FantasyPremierLeagueOptions leagueOptions,
+    NotificationOptions notificationOptions,
     StandingsPublicationEligibilityService publicationEligibility,
     StandingsChangeService standingsChangeService,
     WinnerSelectionService winnerSelection,
     PremierLeagueMessageCompositionService messageComposer,
-    TimeProvider timeProvider) : IJob
+    TimeProvider timeProvider,
+    ILogger<PremierLeagueClassicStandingsInformationJob> logger) : IJob
 {
     public async Task Execute(IJobExecutionContext context)
     {
         await discordReadiness.WaitUntilReadyAsync(context.CancellationToken);
 
         var standings = await premierLeagueClient.GetClassicStandingsAsync(
-            1671531,
+            leagueOptions.ClassicLeagueId,
             context.CancellationToken);
         if (!publicationEligibility.IsUpdatedSinceYesterday(
             standings.LastUpdatedData,
@@ -39,42 +41,32 @@ public sealed class PremierLeagueClassicStandingsInformationJob(
             standingsChangeService.GetChanges(results),
             Random.Shared.Next(
                 PremierLeagueMessageCompositionService.ClassicCongratulationsVariantCount));
+        var sourceIdentifier = standings.LastUpdatedData
+            .ToUniversalTime()
+            .ToString("O");
 
-        foreach (var guild in discordClient.Guilds)
+        foreach (var target in notificationOptions.Targets)
         {
-            var generalChannel = guild.TextChannels.FirstOrDefault(
-                channel => channel.Name.Equals(
-                        "general",
-                        StringComparison.OrdinalIgnoreCase)
-                    || channel.Name.Equals(
-                        "announcement-bot",
-                        StringComparison.OrdinalIgnoreCase));
-
-            if (generalChannel is null)
-            {
-                continue;
-            }
-
             try
             {
-                var checkpoint = new NotificationCheckpoint(
-                    guild.Id,
-                    generalChannel.Id,
-                    standings.LastUpdatedData.ToUniversalTime().ToString("O"),
-                    NotificationTypes.ClassicStandings);
-
-                await deliveryCoordinator.SendOnceAsync(
-                    checkpoint,
-                    () => generalChannel.SendMessageAsync(message),
+                await notificationPublisher.PublishOnceAsync(
+                    target,
+                    sourceIdentifier,
+                    NotificationTypes.ClassicStandings,
+                    message,
                     context.CancellationToken);
             }
             catch (OperationCanceledException) when (context.CancellationToken.IsCancellationRequested)
             {
                 throw;
             }
-            catch (Exception)
+            catch (Exception exception)
             {
-                Console.WriteLine("Failed to send message");
+                logger.LogError(
+                    exception,
+                    "Failed to publish classic standings to Discord guild {GuildId}, channel {ChannelId}.",
+                    target.GuildId,
+                    target.ChannelId);
             }
         }
     }

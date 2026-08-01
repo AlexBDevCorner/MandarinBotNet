@@ -16,10 +16,12 @@ public sealed class DiscordBotHostedServiceIntegrationTests
     public async Task StartAsync_GatewayBecomesReady_CompletesBeforeScheduledWorkCanStart()
     {
         // Arrange
-        var settings = new DiscordBotSettings(
-            Token: "test-token",
-            ReadinessTimeout: TimeSpan.FromSeconds(5));
-        var readiness = new DiscordConnectionReadiness(settings);
+        var options = new DiscordOptions
+        {
+            Token = "test-token",
+            ReadinessTimeout = TimeSpan.FromSeconds(5)
+        };
+        var readiness = new DiscordConnectionReadiness(options);
         var gateway = new TestDiscordGatewayConnection();
         var commandSynchronizer = new TestCommandSynchronizer();
         using var client = new DiscordSocketClient();
@@ -28,7 +30,7 @@ public sealed class DiscordBotHostedServiceIntegrationTests
         var builder = Host.CreateApplicationBuilder();
         builder.Logging.ClearProviders();
         builder.Logging.AddProvider(new CollectingLoggerProvider(logMessages));
-        builder.Services.AddSingleton(settings);
+        builder.Services.AddSingleton(options);
         builder.Services.AddSingleton(client);
         builder.Services.AddSingleton(readiness);
         builder.Services.AddSingleton<IDiscordGatewayConnection>(gateway);

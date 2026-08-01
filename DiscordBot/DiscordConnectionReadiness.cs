@@ -13,17 +13,17 @@ public sealed class DiscordConnectionReadiness : IDiscordConnectionReadiness
     private readonly TimeSpan _timeout;
     private TaskCompletionSource _ready = CreateCompletionSource();
 
-    public DiscordConnectionReadiness(DiscordBotSettings settings)
+    public DiscordConnectionReadiness(DiscordOptions options)
     {
-        if (settings.ReadinessTimeout <= TimeSpan.Zero)
+        if (options.ReadinessTimeout <= TimeSpan.Zero)
         {
             throw new ArgumentOutOfRangeException(
-                nameof(settings),
-                settings.ReadinessTimeout,
+                nameof(options),
+                options.ReadinessTimeout,
                 "Discord readiness timeout must be greater than zero.");
         }
 
-        _timeout = settings.ReadinessTimeout;
+        _timeout = options.ReadinessTimeout;
     }
 
     public bool IsReady

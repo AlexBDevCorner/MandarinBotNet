@@ -8,18 +8,39 @@ namespace DiscordBot.Tests.Jobs
     [TestFixture]
     public sealed class JobSchedulesTests
     {
+        private static readonly JobSchedulesOptions Options = new()
+        {
+            TimeZoneId = "Europe/Riga",
+            PremierLeagueNotifications = new ScheduledJobOptions
+            {
+                Enabled = true,
+                Cron = "0 0 * * * ?"
+            },
+            ClassicStandings = new ScheduledJobOptions
+            {
+                Enabled = true,
+                Cron = "0 0 17 * * ?"
+            },
+            HeadToHeadStandings = new ScheduledJobOptions
+            {
+                Enabled = true,
+                Cron = "0 0 17 * * ?"
+            }
+        };
+
         [Test]
         public void CreatePremierLeagueNotificationTrigger_DefaultSchedule_RunsHourlyInRiga()
         {
             // Arrange
-            var expectedTimeZone = JobSchedules.RigaTimeZone;
+            var expectedTimeZone = JobSchedules.GetTimeZone(Options);
 
             // Act
-            var trigger = JobSchedules.CreatePremierLeagueNotificationTrigger();
+            var trigger = JobSchedules.CreatePremierLeagueNotificationTrigger(Options);
 
             // Assert
             var cronTrigger = trigger.Should().BeAssignableTo<ICronTrigger>().Subject;
-            cronTrigger.CronExpressionString.Should().Be(JobSchedules.PremierLeagueNotificationCron);
+            cronTrigger.CronExpressionString.Should()
+                .Be(Options.PremierLeagueNotifications.Cron);
             cronTrigger.TimeZone.Should().Be(expectedTimeZone);
         }
 
@@ -27,7 +48,8 @@ namespace DiscordBot.Tests.Jobs
         public void CreateDailyStandingsTrigger_WinterAndSummer_FiresAtConfiguredRigaLocalTime()
         {
             // Arrange
-            var trigger = JobSchedules.CreatePremierLeagueClassicStandingsInformationTrigger();
+            var trigger = JobSchedules.CreatePremierLeagueClassicStandingsInformationTrigger(
+                Options);
             var winterReference = new DateTimeOffset(2027, 1, 15, 12, 0, 0, TimeSpan.Zero);
             var summerReference = new DateTimeOffset(2027, 7, 15, 12, 0, 0, TimeSpan.Zero);
 
@@ -36,10 +58,10 @@ namespace DiscordBot.Tests.Jobs
             var summerFireTime = trigger.GetFireTimeAfter(summerReference);
             var winterRigaTime = TimeZoneInfo.ConvertTime(
                 winterFireTime!.Value,
-                JobSchedules.RigaTimeZone);
+                JobSchedules.GetTimeZone(Options));
             var summerRigaTime = TimeZoneInfo.ConvertTime(
                 summerFireTime!.Value,
-                JobSchedules.RigaTimeZone);
+                JobSchedules.GetTimeZone(Options));
 
             // Assert
             winterRigaTime.Hour.Should().Be(17);
@@ -52,7 +74,8 @@ namespace DiscordBot.Tests.Jobs
         public void CreateDailyStandingsTrigger_SpringDstTransition_PreservesRigaLocalTime()
         {
             // Arrange
-            var trigger = JobSchedules.CreatePremierLeagueClassicStandingsInformationTrigger();
+            var trigger = JobSchedules.CreatePremierLeagueClassicStandingsInformationTrigger(
+                Options);
             var reference = new DateTimeOffset(2027, 3, 26, 16, 0, 0, TimeSpan.Zero);
 
             // Act
@@ -60,7 +83,9 @@ namespace DiscordBot.Tests.Jobs
             var transitionDay = trigger.GetFireTimeAfter(beforeTransition)!.Value;
             var afterTransition = trigger.GetFireTimeAfter(transitionDay)!.Value;
             var rigaFireTimes = new[] { beforeTransition, transitionDay, afterTransition }
-                .Select(time => TimeZoneInfo.ConvertTime(time, JobSchedules.RigaTimeZone))
+                .Select(time => TimeZoneInfo.ConvertTime(
+                    time,
+                    JobSchedules.GetTimeZone(Options)))
                 .ToArray();
 
             // Assert
@@ -76,7 +101,7 @@ namespace DiscordBot.Tests.Jobs
             var expectedInstruction = MisfireInstruction.CronTrigger.DoNothing;
 
             // Act
-            var triggers = JobSchedules.CreateAllTriggers();
+            var triggers = JobSchedules.CreateAllTriggers(Options);
 
             // Assert
             triggers.Should().OnlyContain(

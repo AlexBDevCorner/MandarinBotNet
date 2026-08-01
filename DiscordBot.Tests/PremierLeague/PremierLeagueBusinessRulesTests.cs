@@ -1,4 +1,5 @@
 using AwesomeAssertions;
+using DiscordBot;
 using DiscordBot.Notifications;
 using DiscordBot.PremierLeague;
 using DiscordBot.Responses;
@@ -112,7 +113,8 @@ public sealed class StandingsPublicationEligibilityServiceTests
             0,
             0,
             TimeSpan.Zero);
-        var service = new StandingsPublicationEligibilityService();
+        var service = new StandingsPublicationEligibilityService(
+            TestTimeZones.Riga());
 
         // Act
         var atBoundary = service.IsUpdatedSinceYesterday(startOfYesterdayUtc, now);
@@ -209,7 +211,8 @@ public sealed class PremierLeagueMessageCompositionServiceTests
     [SetUp]
     public void SetUp()
     {
-        _service = new PremierLeagueMessageCompositionService();
+        _service = new PremierLeagueMessageCompositionService(
+            TestTimeZones.Riga());
     }
 
     [Test]
@@ -271,7 +274,7 @@ public sealed class PremierLeagueMessageCompositionServiceTests
 
         // Assert
         result.Should().StartWith(
-            "@everyone Лига Пельменных Обнимашек:\n:one: Пельмени 100\n:four: Обнимашки 80");
+            "Лига Пельменных Обнимашек:\n:one: Пельмени 100\n:four: Обнимашки 80");
         result.Should().Contain(
             "В последнем туре больше всех баллов набрала команда Пельмени - 72");
         result.Should().Contain(
@@ -295,6 +298,15 @@ public sealed class PremierLeagueMessageCompositionServiceTests
 
         // Assert
         result.Should().Be(
-            "@everyone Лига Пельменных Обнимашек-К-Обнимашкам:\n:one: A 9\n:two: B 6");
+            "Лига Пельменных Обнимашек-К-Обнимашкам:\n:one: A 9\n:two: B 6");
+    }
+}
+
+internal static class TestTimeZones
+{
+    public static ConfiguredTimeZone Riga()
+    {
+        return new ConfiguredTimeZone(
+            new JobSchedulesOptions { TimeZoneId = "Europe/Riga" });
     }
 }

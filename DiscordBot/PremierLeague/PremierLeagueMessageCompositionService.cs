@@ -4,7 +4,8 @@ using DiscordBot.Responses;
 
 namespace DiscordBot.PremierLeague;
 
-public sealed class PremierLeagueMessageCompositionService
+public sealed class PremierLeagueMessageCompositionService(
+    ConfiguredTimeZone configuredTimeZone)
 {
     public const int ClassicCongratulationsVariantCount = 31;
 
@@ -14,11 +15,11 @@ public sealed class PremierLeagueMessageCompositionService
         DateTimeOffset deadlineUtc,
         DateTimeOffset utcNow)
     {
-        var deadlineInRiga = RigaTime.FromUtc(deadlineUtc);
+        var localDeadline = configuredTimeZone.FromUtc(deadlineUtc);
         var remaining = deadlineUtc - utcNow;
 
-        return "@everyone Привет мои любители АПЛ и обнимашек! :people_hugging: Следующий тур уже скоро -" +
-            $" {deadlineInRiga.ToString("dd MMMM yyyy, HH:mm", RussianCulture)}, это {deadlineInRiga.ToString("dddd", RussianCulture)}" +
+        return "Привет мои любители АПЛ и обнимашек! :people_hugging: Следующий тур уже скоро -" +
+            $" {localDeadline.ToString("dd MMMM yyyy, HH:mm", RussianCulture)}, это {localDeadline.ToString("dddd", RussianCulture)}" +
             $". До этого момента осталось всего {DateTimeUtility.GenerateRemainingDaysMessageInRussian(remaining)}.";
     }
 
@@ -31,7 +32,7 @@ public sealed class PremierLeagueMessageCompositionService
         ArgumentNullException.ThrowIfNull(standings);
         ArgumentNullException.ThrowIfNull(changes);
 
-        var summary = new StringBuilder("@everyone Лига Пельменных Обнимашек:");
+        var summary = new StringBuilder("Лига Пельменных Обнимашек:");
 
         foreach (var result in standings)
         {
@@ -67,7 +68,7 @@ public sealed class PremierLeagueMessageCompositionService
         ArgumentNullException.ThrowIfNull(standings);
 
         var summary = new StringBuilder(
-            "@everyone Лига Пельменных Обнимашек-К-Обнимашкам:");
+            "Лига Пельменных Обнимашек-К-Обнимашкам:");
 
         foreach (var result in standings)
         {

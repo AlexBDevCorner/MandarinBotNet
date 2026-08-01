@@ -1,22 +1,23 @@
 using System.Globalization;
-using Discord.WebSocket;
 using DiscordBot.FantasyPremierLeague;
 using DiscordBot.Notifications;
 using DiscordBot.PremierLeague;
+using Microsoft.Extensions.Logging;
 using Quartz;
 
 namespace DiscordBot.Jobs;
 
 [DisallowConcurrentExecution]
 public sealed class PremierLeagueNotificationJob(
-    DiscordSocketClient discordClient,
     IDiscordConnectionReadiness discordReadiness,
     IFantasyPremierLeagueClient premierLeagueClient,
-    NotificationDeliveryCoordinator deliveryCoordinator,
+    IDiscordNotificationPublisher notificationPublisher,
+    NotificationOptions notificationOptions,
     DeadlineSelectionService deadlineSelection,
     ReminderEligibilityService reminderEligibility,
     PremierLeagueMessageCompositionService messageComposer,
-    TimeProvider timeProvider) : IJob
+    TimeProvider timeProvider,
+    ILogger<PremierLeagueNotificationJob> logger) : IJob
 {
     public async Task Execute(IJobExecutionContext context)
     {
@@ -43,41 +44,28 @@ public sealed class PremierLeagueNotificationJob(
             deadline.DeadlineUtc,
             utcNow);
 
-        foreach (var guild in discordClient.Guilds)
+        foreach (var target in notificationOptions.Targets)
         {
-            var generalChannel = guild.TextChannels.FirstOrDefault(
-                channel => channel.Name.Equals(
-                        "general",
-                        StringComparison.OrdinalIgnoreCase)
-                    || channel.Name.Equals(
-                        "announcement-bot",
-                        StringComparison.OrdinalIgnoreCase));
-
-            if (generalChannel is null)
-            {
-                continue;
-            }
-
             try
             {
-                var checkpoint = new NotificationCheckpoint(
-                    guild.Id,
-                    generalChannel.Id,
+                await notificationPublisher.PublishOnceAsync(
+                    target,
                     deadline.EventId.ToString(CultureInfo.InvariantCulture),
-                    notificationType);
-
-                await deliveryCoordinator.SendOnceAsync(
-                    checkpoint,
-                    () => generalChannel.SendMessageAsync(message),
+                    notificationType,
+                    message,
                     context.CancellationToken);
             }
             catch (OperationCanceledException) when (context.CancellationToken.IsCancellationRequested)
             {
                 throw;
             }
-            catch (Exception)
+            catch (Exception exception)
             {
-                Console.WriteLine("Failed to send message");
+                logger.LogError(
+                    exception,
+                    "Failed to publish deadline notification to Discord guild {GuildId}, channel {ChannelId}.",
+                    target.GuildId,
+                    target.ChannelId);
             }
         }
     }

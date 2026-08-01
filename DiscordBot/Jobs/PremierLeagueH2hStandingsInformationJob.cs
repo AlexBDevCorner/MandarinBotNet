@@ -1,26 +1,28 @@
 using System.Globalization;
-using Discord.WebSocket;
 using DiscordBot.FantasyPremierLeague;
 using DiscordBot.Notifications;
 using DiscordBot.PremierLeague;
+using Microsoft.Extensions.Logging;
 using Quartz;
 
 namespace DiscordBot.Jobs;
 
 [DisallowConcurrentExecution]
 public sealed class PremierLeagueH2hStandingsInformationJob(
-    DiscordSocketClient discordClient,
     IDiscordConnectionReadiness discordReadiness,
     IFantasyPremierLeagueClient premierLeagueClient,
-    NotificationDeliveryCoordinator deliveryCoordinator,
-    PremierLeagueMessageCompositionService messageComposer) : IJob
+    IDiscordNotificationPublisher notificationPublisher,
+    FantasyPremierLeagueOptions leagueOptions,
+    NotificationOptions notificationOptions,
+    PremierLeagueMessageCompositionService messageComposer,
+    ILogger<PremierLeagueH2hStandingsInformationJob> logger) : IJob
 {
     public async Task Execute(IJobExecutionContext context)
     {
         await discordReadiness.WaitUntilReadyAsync(context.CancellationToken);
 
         var standings = await premierLeagueClient.GetHeadToHeadStandingsAsync(
-            1671824,
+            leagueOptions.HeadToHeadLeagueId,
             context.CancellationToken);
         var results = standings.HeadToHeadStandings.Results;
         if (results.Count == 0)
@@ -29,42 +31,31 @@ public sealed class PremierLeagueH2hStandingsInformationJob(
         }
 
         var message = messageComposer.ComposeHeadToHeadStandings(results);
+        var sourceIdentifier = results[0].MatchesPlayed
+            .ToString(CultureInfo.InvariantCulture);
 
-        foreach (var guild in discordClient.Guilds)
+        foreach (var target in notificationOptions.Targets)
         {
-            var generalChannel = guild.TextChannels.FirstOrDefault(
-                channel => channel.Name.Equals(
-                        "general",
-                        StringComparison.OrdinalIgnoreCase)
-                    || channel.Name.Equals(
-                        "announcement-bot",
-                        StringComparison.OrdinalIgnoreCase));
-
-            if (generalChannel is null)
-            {
-                continue;
-            }
-
             try
             {
-                var checkpoint = new NotificationCheckpoint(
-                    guild.Id,
-                    generalChannel.Id,
-                    results[0].MatchesPlayed.ToString(CultureInfo.InvariantCulture),
-                    NotificationTypes.HeadToHeadStandings);
-
-                await deliveryCoordinator.SendOnceAsync(
-                    checkpoint,
-                    () => generalChannel.SendMessageAsync(message),
+                await notificationPublisher.PublishOnceAsync(
+                    target,
+                    sourceIdentifier,
+                    NotificationTypes.HeadToHeadStandings,
+                    message,
                     context.CancellationToken);
             }
             catch (OperationCanceledException) when (context.CancellationToken.IsCancellationRequested)
             {
                 throw;
             }
-            catch (Exception)
+            catch (Exception exception)
             {
-                Console.WriteLine("Failed to send message");
+                logger.LogError(
+                    exception,
+                    "Failed to publish head-to-head standings to Discord guild {GuildId}, channel {ChannelId}.",
+                    target.GuildId,
+                    target.ChannelId);
             }
         }
     }

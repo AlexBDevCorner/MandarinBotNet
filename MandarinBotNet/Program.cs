@@ -9,12 +9,17 @@ using DiscordBot.PremierLeague;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Quartz;
 
 var builder = Host.CreateApplicationBuilder(args);
 
+builder.Services.AddMandarinBotConfiguration(
+    builder.Configuration,
+    builder.Environment);
 builder.Services.AddFantasyPremierLeagueClient();
 builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddSingleton<ConfiguredTimeZone>();
 builder.Services.AddSingleton<DeadlineSelectionService>();
 builder.Services.AddSingleton<ReminderEligibilityService>();
 builder.Services.AddSingleton<StandingsPublicationEligibilityService>();
@@ -32,21 +37,19 @@ var discordClient = new DiscordSocketClient(new DiscordSocketConfig
 });
 builder.Services.AddSingleton(discordClient);
 
-var readinessTimeout = int.TryParse(
-    builder.Configuration["DISCORD_READINESS_TIMEOUT_SECONDS"],
-    out var readinessTimeoutSeconds)
-    ? TimeSpan.FromSeconds(readinessTimeoutSeconds)
-    : TimeSpan.FromSeconds(30);
-var discordSettings = new DiscordBotSettings(
-    builder.Configuration["BOT_TOKEN"],
-    readinessTimeout);
-builder.Services.AddSingleton(discordSettings);
 builder.Services.AddSingleton<DiscordConnectionReadiness>();
 builder.Services.AddSingleton<IDiscordConnectionReadiness>(
     services => services.GetRequiredService<DiscordConnectionReadiness>());
 builder.Services.AddSingleton<IDiscordGatewayConnection, DiscordGatewayConnection>();
-builder.Services.AddSingleton(
-    DiscordCommandRegistrationOptions.FromConfiguration(builder.Configuration));
+builder.Services.AddSingleton(services =>
+{
+    var commandOptions = services
+        .GetRequiredService<DiscordOptions>()
+        .Commands;
+    return new DiscordCommandRegistrationOptions(
+        commandOptions.RegistrationMode,
+        commandOptions.GuildId);
+});
 builder.Services.AddSingleton<
     IDiscordApplicationCommandClient,
     DiscordApplicationCommandClient>();
@@ -60,62 +63,67 @@ var notificationDatabasePath = Path.Combine(
 builder.Services.AddSingleton<INotificationCheckpointStore>(
     new SqliteNotificationCheckpointStore(notificationDatabasePath));
 builder.Services.AddSingleton<NotificationDeliveryCoordinator>();
+builder.Services.AddSingleton<
+    IDiscordNotificationPublisher,
+    DiscordNotificationPublisher>();
 
 
 builder.Services.AddHostedService<DiscordBotHostedService>();
 
-builder.Services.AddQuartz(q =>
+builder.Services.AddQuartz();
+builder.Services.AddOptions<QuartzOptions>()
+    .Configure<IOptions<MandarinBotOptions>>((q, botOptions) =>
 {
-    var jobs = new List<(string JobName, bool IsEnabled)>
-    {
-        new (Jobs.PremierLeagueNotificationJob, true),
-        new (Jobs.PremierLeagueClassicStandingsInformationJob, true),
-        new (Jobs.PremierLeagueH2hStandingsInformationJob, true)
-    };
+    var schedules = botOptions.Value.Schedules;
+    var timeZone = JobSchedules.GetTimeZone(schedules);
 
-    if (jobs.Any(j => j.JobName == Jobs.PremierLeagueNotificationJob && j.IsEnabled))
+    if (schedules.PremierLeagueNotifications.Enabled)
     {
         q.AddJob<PremierLeagueNotificationJob>(
-            j => j.WithIdentity(JobSchedules.PremierLeagueNotificationJobKey));
+            job => job.WithIdentity(JobSchedules.PremierLeagueNotificationJobKey));
         q.AddTrigger(trigger => trigger
             .ForJob(JobSchedules.PremierLeagueNotificationJobKey)
             .WithIdentity(JobSchedules.PremierLeagueNotificationTriggerName)
             .WithCronSchedule(
-                JobSchedules.PremierLeagueNotificationCron,
+                schedules.PremierLeagueNotifications.Cron,
                 schedule => schedule
-                    .InTimeZone(JobSchedules.RigaTimeZone)
+                    .InTimeZone(timeZone)
                     .WithMisfireHandlingInstructionDoNothing()));
     }
 
-    if (jobs.Any(j => j.JobName == Jobs.PremierLeagueClassicStandingsInformationJob && j.IsEnabled))
+    if (schedules.ClassicStandings.Enabled)
     {
         q.AddJob<PremierLeagueClassicStandingsInformationJob>(
-            j => j.WithIdentity(JobSchedules.PremierLeagueClassicStandingsInformationJobKey));
+            job => job.WithIdentity(
+                JobSchedules.PremierLeagueClassicStandingsInformationJobKey));
         q.AddTrigger(trigger => trigger
             .ForJob(JobSchedules.PremierLeagueClassicStandingsInformationJobKey)
-            .WithIdentity(JobSchedules.PremierLeagueClassicStandingsInformationTriggerName)
+            .WithIdentity(
+                JobSchedules.PremierLeagueClassicStandingsInformationTriggerName)
             .WithCronSchedule(
-                JobSchedules.StandingsCron,
+                schedules.ClassicStandings.Cron,
                 schedule => schedule
-                    .InTimeZone(JobSchedules.RigaTimeZone)
+                    .InTimeZone(timeZone)
                     .WithMisfireHandlingInstructionDoNothing()));
     }
 
-    if (jobs.Any(j => j.JobName == Jobs.PremierLeagueH2hStandingsInformationJob && j.IsEnabled))
+    if (schedules.HeadToHeadStandings.Enabled)
     {
         q.AddJob<PremierLeagueH2hStandingsInformationJob>(
-            j => j.WithIdentity(JobSchedules.PremierLeagueH2hStandingsInformationJobKey));
+            job => job.WithIdentity(
+                JobSchedules.PremierLeagueH2hStandingsInformationJobKey));
         q.AddTrigger(trigger => trigger
             .ForJob(JobSchedules.PremierLeagueH2hStandingsInformationJobKey)
-            .WithIdentity(JobSchedules.PremierLeagueH2hStandingsInformationTriggerName)
+            .WithIdentity(
+                JobSchedules.PremierLeagueH2hStandingsInformationTriggerName)
             .WithCronSchedule(
-                JobSchedules.StandingsCron,
+                schedules.HeadToHeadStandings.Cron,
                 schedule => schedule
-                    .InTimeZone(JobSchedules.RigaTimeZone)
+                    .InTimeZone(timeZone)
                     .WithMisfireHandlingInstructionDoNothing()));
     }
-})
-.AddQuartzHostedService(q => q.WaitForJobsToComplete = true);
+});
+builder.Services.AddQuartzHostedService(q => q.WaitForJobsToComplete = true);
 
 var host = builder.Build();
 await host.RunAsync();
