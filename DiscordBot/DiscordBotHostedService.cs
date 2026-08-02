@@ -12,10 +12,12 @@ namespace DiscordBot
         IDiscordGatewayConnection gatewayConnection,
         DiscordConnectionReadiness readiness,
         DiscordCommandRegistrationCoordinator commandRegistration,
+        DiscordNetLogHandler discordLogHandler,
         ILogger<DiscordBotHostedService> logger) : IHostedService
     {
         private const string DeploymentReadyMessage = "Bot is connected and ready.";
         private Dictionary<string, Func<SocketSlashCommand, Task>> _commandHandlers = [];
+        private int _readyCount;
 
         public async Task StartAsync(CancellationToken cancellationToken)
         {
@@ -32,7 +34,7 @@ namespace DiscordBot
                 { DiscordApplicationCommands.HugMeName, HandleHugMeCommand }
             };
 
-            client.Log += LogAsync;
+            client.Log += discordLogHandler.HandleAsync;
             gatewayConnection.Ready += ReadyAsync;
             gatewayConnection.Disconnected += DisconnectedAsync;
             client.SlashCommandExecuted += SlashCommandHandler;
@@ -43,53 +45,93 @@ namespace DiscordBot
                 await gatewayConnection.StartAsync().WaitAsync(cancellationToken);
                 await readiness.WaitUntilReadyAsync(cancellationToken);
             }
-            catch
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
                 readiness.MarkDisconnected();
                 DetachEventHandlers();
+                logger.LogInformation(
+                    "Discord bot startup ended with outcome {Outcome}.",
+                    "Canceled");
+                throw;
+            }
+            catch (Exception exception)
+            {
+                readiness.MarkDisconnected();
+                DetachEventHandlers();
+                logger.LogCritical(
+                    exception,
+                    "Discord bot startup ended with outcome {Outcome}.",
+                    "Failed");
                 throw;
             }
 
-            logger.LogInformation("Discord bot startup completed after gateway readiness.");
+            logger.LogInformation(
+                "Discord bot startup completed after gateway readiness with outcome {Outcome}.",
+                "Ready");
         }
 
         public async Task StopAsync(CancellationToken cancellationToken)
         {
             readiness.MarkDisconnected();
+            logger.LogInformation("Stopping Discord bot.");
 
             try
             {
                 await gatewayConnection.StopAsync().WaitAsync(cancellationToken);
             }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                logger.LogInformation(
+                    "Discord bot shutdown ended with outcome {Outcome}.",
+                    "Canceled");
+                throw;
+            }
+            catch (Exception exception)
+            {
+                logger.LogError(
+                    exception,
+                    "Discord bot shutdown ended with outcome {Outcome}.",
+                    "Failed");
+                throw;
+            }
             finally
             {
                 DetachEventHandlers();
             }
-        }
 
-        private Task LogAsync(LogMessage log)
-        {
-            Console.WriteLine(log);
-            return Task.CompletedTask;
+            logger.LogInformation(
+                "Discord bot shutdown completed with outcome {Outcome}.",
+                "Stopped");
         }
 
         private async Task ReadyAsync()
         {
             await commandRegistration.SynchronizeOnceAsync(CancellationToken.None);
             readiness.MarkReady();
-            logger.LogInformation("{DeploymentReadyMessage}", DeploymentReadyMessage);
+            var gatewayEvent = Interlocked.Increment(ref _readyCount) == 1
+                ? "Ready"
+                : "Reconnected";
+            logger.LogInformation(
+                "{DeploymentReadyMessage} Gateway event {Event} completed with outcome {Outcome}.",
+                DeploymentReadyMessage,
+                gatewayEvent,
+                "Ready");
         }
 
         private Task DisconnectedAsync(Exception exception)
         {
             readiness.MarkDisconnected();
-            logger.LogWarning(exception, "Discord gateway disconnected; scheduled jobs will wait for readiness.");
+            logger.LogWarning(
+                exception,
+                "Discord gateway event {Event} completed with outcome {Outcome}; scheduled jobs will wait for readiness.",
+                "Disconnected",
+                "WaitingForReadiness");
             return Task.CompletedTask;
         }
 
         private void DetachEventHandlers()
         {
-            client.Log -= LogAsync;
+            client.Log -= discordLogHandler.HandleAsync;
             gatewayConnection.Ready -= ReadyAsync;
             gatewayConnection.Disconnected -= DisconnectedAsync;
             client.SlashCommandExecuted -= SlashCommandHandler;

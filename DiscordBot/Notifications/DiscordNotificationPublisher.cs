@@ -37,9 +37,12 @@ public sealed class DiscordNotificationPublisher(
         if (guild is null)
         {
             logger.LogWarning(
-                "Configured Discord guild {GuildId} is not available; notification {NotificationType} was skipped.",
+                "Configured Discord guild {GuildId} is not available for event {Event}; " +
+                "notification {NotificationType} finished with outcome {Outcome}.",
                 target.GuildId,
-                notificationType);
+                sourceIdentifier,
+                notificationType,
+                "SkippedGuildUnavailable");
             return false;
         }
 
@@ -47,10 +50,13 @@ public sealed class DiscordNotificationPublisher(
         if (channel is null)
         {
             logger.LogWarning(
-                "Configured Discord channel {ChannelId} was not found in guild {GuildId}; notification {NotificationType} was skipped.",
+                "Configured Discord channel {ChannelId} was not found in guild {GuildId} for event {Event}; " +
+                "notification {NotificationType} finished with outcome {Outcome}.",
                 target.ChannelId,
                 target.GuildId,
-                notificationType);
+                sourceIdentifier,
+                notificationType,
+                "SkippedChannelUnavailable");
             return false;
         }
 

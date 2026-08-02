@@ -3,6 +3,7 @@ using System.Text;
 using AwesomeAssertions;
 using DiscordBot.FantasyPremierLeague;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using NUnit.Framework;
 
 namespace DiscordBot.Tests.FantasyPremierLeague;
@@ -204,7 +205,8 @@ public sealed class FantasyPremierLeagueClientTests
         // Arrange
         var handler = new StubHttpMessageHandler((_, _) =>
             Task.FromResult(CreateJsonResponse("""{"events": [""")));
-        using var provider = CreateProvider(handler);
+        var logger = new RecordingLogger<FantasyPremierLeagueClient>();
+        using var provider = CreateProvider(handler, logger: logger);
         var client = provider.GetRequiredService<IFantasyPremierLeagueClient>();
 
         // Act
@@ -214,6 +216,10 @@ public sealed class FantasyPremierLeagueClientTests
         var exception = await act.Should().ThrowAsync<FantasyPremierLeagueApiException>();
         exception.Which.FailureKind.Should().Be(FantasyPremierLeagueFailureKind.InvalidPayload);
         handler.AttemptCount.Should().Be(1);
+        var warning = logger.Entries.Should().ContainSingle().Subject;
+        warning.Level.Should().Be(LogLevel.Warning);
+        warning.Exception.Should().BeSameAs(exception.Which.InnerException);
+        warning.Properties["RequestPath"].Should().Be("/api/bootstrap-static/");
     }
 
     [Test]
@@ -295,7 +301,8 @@ public sealed class FantasyPremierLeagueClientTests
     private static ServiceProvider CreateProvider(
         HttpMessageHandler handler,
         FantasyPremierLeagueClientOptions? options = null,
-        FantasyPremierLeagueOptions? leagueOptions = null)
+        FantasyPremierLeagueOptions? leagueOptions = null,
+        ILogger<FantasyPremierLeagueClient>? logger = null)
     {
         var services = new ServiceCollection();
         services.AddLogging();
@@ -303,6 +310,10 @@ public sealed class FantasyPremierLeagueClientTests
         services
             .AddFantasyPremierLeagueClient(options ?? CreateTestOptions())
             .ConfigurePrimaryHttpMessageHandler(() => handler);
+        if (logger is not null)
+        {
+            services.AddSingleton(logger);
+        }
 
         return services.BuildServiceProvider();
     }

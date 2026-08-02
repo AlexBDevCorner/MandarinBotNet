@@ -19,54 +19,88 @@ public sealed class PremierLeagueNotificationJob(
     TimeProvider timeProvider,
     ILogger<PremierLeagueNotificationJob> logger) : IJob
 {
-    public async Task Execute(IJobExecutionContext context)
+    public Task Execute(IJobExecutionContext context)
     {
-        await discordReadiness.WaitUntilReadyAsync(context.CancellationToken);
-
-        var bootstrap = await premierLeagueClient.GetBootstrapStaticAsync(
-            context.CancellationToken);
-        var deadline = deadlineSelection.SelectNext(bootstrap.Events);
-        if (deadline is null)
-        {
-            return;
-        }
-
-        var utcNow = timeProvider.GetUtcNow();
-        var notificationType = reminderEligibility.SelectNotificationType(
-            utcNow,
-            deadline.DeadlineUtc);
-        if (notificationType is null)
-        {
-            return;
-        }
-
-        var message = messageComposer.ComposeDeadlineReminder(
-            deadline.DeadlineUtc,
-            utcNow);
-
-        foreach (var target in notificationOptions.Targets)
-        {
-            try
+        return JobExecutionLogging.RunAsync(
+            context,
+            timeProvider,
+            logger,
+            async execution =>
             {
-                await notificationPublisher.PublishOnceAsync(
-                    target,
-                    deadline.EventId.ToString(CultureInfo.InvariantCulture),
-                    notificationType,
-                    message,
+                await discordReadiness.WaitUntilReadyAsync(context.CancellationToken);
+
+                var bootstrap = await premierLeagueClient.GetBootstrapStaticAsync(
                     context.CancellationToken);
-            }
-            catch (OperationCanceledException) when (context.CancellationToken.IsCancellationRequested)
-            {
-                throw;
-            }
-            catch (Exception exception)
-            {
-                logger.LogError(
-                    exception,
-                    "Failed to publish deadline notification to Discord guild {GuildId}, channel {ChannelId}.",
-                    target.GuildId,
-                    target.ChannelId);
-            }
-        }
+                var deadline = deadlineSelection.SelectNext(bootstrap.Events);
+                if (deadline is null)
+                {
+                    execution.SetEvent("NoUpcomingEvent");
+                    return new JobExecutionResult("SkippedNoUpcomingEvent");
+                }
+
+                var eventIdentifier = deadline.EventId.ToString(
+                    CultureInfo.InvariantCulture);
+                execution.SetEvent(eventIdentifier);
+                var utcNow = timeProvider.GetUtcNow();
+                var notificationType = reminderEligibility.SelectNotificationType(
+                    utcNow,
+                    deadline.DeadlineUtc);
+                if (notificationType is null)
+                {
+                    return new JobExecutionResult("SkippedOutsideReminderWindow");
+                }
+
+                var message = messageComposer.ComposeDeadlineReminder(
+                    deadline.DeadlineUtc,
+                    utcNow);
+                var deliveredCount = 0;
+                var skippedCount = 0;
+                var failedCount = 0;
+
+                foreach (var target in notificationOptions.Targets)
+                {
+                    try
+                    {
+                        var delivered = await notificationPublisher.PublishOnceAsync(
+                            target,
+                            eventIdentifier,
+                            notificationType,
+                            message,
+                            context.CancellationToken);
+                        if (delivered)
+                        {
+                            deliveredCount++;
+                        }
+                        else
+                        {
+                            skippedCount++;
+                        }
+                    }
+                    catch (OperationCanceledException) when (context.CancellationToken.IsCancellationRequested)
+                    {
+                        throw;
+                    }
+                    catch (Exception exception)
+                    {
+                        failedCount++;
+                        logger.LogError(
+                            exception,
+                            "Failed to publish notification {NotificationType} for event {Event} to Discord " +
+                            "guild {GuildId}, channel {ChannelId}, on job attempt {Attempt} with outcome {Outcome}",
+                            notificationType,
+                            eventIdentifier,
+                            target.GuildId,
+                            target.ChannelId,
+                            execution.Attempt,
+                            "Failed");
+                    }
+                }
+
+                return new JobExecutionResult(
+                    failedCount == 0 ? "Completed" : "CompletedWithDeliveryFailures",
+                    deliveredCount,
+                    skippedCount,
+                    failedCount);
+            });
     }
 }

@@ -15,48 +15,81 @@ public sealed class PremierLeagueH2hStandingsInformationJob(
     FantasyPremierLeagueOptions leagueOptions,
     NotificationOptions notificationOptions,
     PremierLeagueMessageCompositionService messageComposer,
+    TimeProvider timeProvider,
     ILogger<PremierLeagueH2hStandingsInformationJob> logger) : IJob
 {
-    public async Task Execute(IJobExecutionContext context)
+    public Task Execute(IJobExecutionContext context)
     {
-        await discordReadiness.WaitUntilReadyAsync(context.CancellationToken);
-
-        var standings = await premierLeagueClient.GetHeadToHeadStandingsAsync(
-            leagueOptions.HeadToHeadLeagueId,
-            context.CancellationToken);
-        var results = standings.HeadToHeadStandings.Results;
-        if (results.Count == 0)
-        {
-            return;
-        }
-
-        var message = messageComposer.ComposeHeadToHeadStandings(results);
-        var sourceIdentifier = results[0].MatchesPlayed
-            .ToString(CultureInfo.InvariantCulture);
-
-        foreach (var target in notificationOptions.Targets)
-        {
-            try
+        return JobExecutionLogging.RunAsync(
+            context,
+            timeProvider,
+            logger,
+            async execution =>
             {
-                await notificationPublisher.PublishOnceAsync(
-                    target,
-                    sourceIdentifier,
-                    NotificationTypes.HeadToHeadStandings,
-                    message,
+                await discordReadiness.WaitUntilReadyAsync(context.CancellationToken);
+
+                var standings = await premierLeagueClient.GetHeadToHeadStandingsAsync(
+                    leagueOptions.HeadToHeadLeagueId,
                     context.CancellationToken);
-            }
-            catch (OperationCanceledException) when (context.CancellationToken.IsCancellationRequested)
-            {
-                throw;
-            }
-            catch (Exception exception)
-            {
-                logger.LogError(
-                    exception,
-                    "Failed to publish head-to-head standings to Discord guild {GuildId}, channel {ChannelId}.",
-                    target.GuildId,
-                    target.ChannelId);
-            }
-        }
+                var results = standings.HeadToHeadStandings.Results;
+                if (results.Count == 0)
+                {
+                    execution.SetEvent("NoMatches");
+                    return new JobExecutionResult("SkippedNoMatches");
+                }
+
+                var message = messageComposer.ComposeHeadToHeadStandings(results);
+                var sourceIdentifier = results[0].MatchesPlayed
+                    .ToString(CultureInfo.InvariantCulture);
+                execution.SetEvent(sourceIdentifier);
+                var deliveredCount = 0;
+                var skippedCount = 0;
+                var failedCount = 0;
+
+                foreach (var target in notificationOptions.Targets)
+                {
+                    try
+                    {
+                        var delivered = await notificationPublisher.PublishOnceAsync(
+                            target,
+                            sourceIdentifier,
+                            NotificationTypes.HeadToHeadStandings,
+                            message,
+                            context.CancellationToken);
+                        if (delivered)
+                        {
+                            deliveredCount++;
+                        }
+                        else
+                        {
+                            skippedCount++;
+                        }
+                    }
+                    catch (OperationCanceledException) when (context.CancellationToken.IsCancellationRequested)
+                    {
+                        throw;
+                    }
+                    catch (Exception exception)
+                    {
+                        failedCount++;
+                        logger.LogError(
+                            exception,
+                            "Failed to publish notification {NotificationType} for event {Event} to Discord " +
+                            "guild {GuildId}, channel {ChannelId}, on job attempt {Attempt} with outcome {Outcome}",
+                            NotificationTypes.HeadToHeadStandings,
+                            sourceIdentifier,
+                            target.GuildId,
+                            target.ChannelId,
+                            execution.Attempt,
+                            "Failed");
+                    }
+                }
+
+                return new JobExecutionResult(
+                    failedCount == 0 ? "Completed" : "CompletedWithDeliveryFailures",
+                    deliveredCount,
+                    skippedCount,
+                    failedCount);
+            });
     }
 }

@@ -135,6 +135,7 @@ public sealed class FantasyPremierLeagueClient(
         catch (TimeoutRejectedException exception)
         {
             logger.LogWarning(
+                exception,
                 "FPL request {RequestPath} exhausted its timeout retries.",
                 requestPath);
             throw new FantasyPremierLeagueApiException(
@@ -145,6 +146,7 @@ public sealed class FantasyPremierLeagueClient(
         catch (OperationCanceledException exception)
         {
             logger.LogWarning(
+                exception,
                 "FPL request {RequestPath} timed out.",
                 requestPath);
             throw new FantasyPremierLeagueApiException(
@@ -155,6 +157,7 @@ public sealed class FantasyPremierLeagueClient(
         catch (BrokenCircuitException exception)
         {
             logger.LogWarning(
+                exception,
                 "FPL request {RequestPath} was blocked by the open circuit.",
                 requestPath);
             throw new FantasyPremierLeagueApiException(
@@ -165,6 +168,7 @@ public sealed class FantasyPremierLeagueClient(
         catch (HttpRequestException exception)
         {
             logger.LogWarning(
+                exception,
                 "FPL request {RequestPath} failed after transient transport retries.",
                 requestPath);
             throw new FantasyPremierLeagueApiException(
@@ -200,6 +204,7 @@ public sealed class FantasyPremierLeagueClient(
         Exception? innerException = null)
     {
         logger.LogWarning(
+            innerException,
             "FPL request {RequestPath} returned an invalid payload.",
             requestPath);
 

@@ -41,6 +41,7 @@ builder.Services.AddSingleton<DiscordConnectionReadiness>();
 builder.Services.AddSingleton<IDiscordConnectionReadiness>(
     services => services.GetRequiredService<DiscordConnectionReadiness>());
 builder.Services.AddSingleton<IDiscordGatewayConnection, DiscordGatewayConnection>();
+builder.Services.AddSingleton<DiscordNetLogHandler>();
 builder.Services.AddSingleton(services =>
 {
     var commandOptions = services

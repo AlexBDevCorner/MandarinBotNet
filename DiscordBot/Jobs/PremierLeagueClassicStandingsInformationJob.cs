@@ -20,54 +20,85 @@ public sealed class PremierLeagueClassicStandingsInformationJob(
     TimeProvider timeProvider,
     ILogger<PremierLeagueClassicStandingsInformationJob> logger) : IJob
 {
-    public async Task Execute(IJobExecutionContext context)
+    public Task Execute(IJobExecutionContext context)
     {
-        await discordReadiness.WaitUntilReadyAsync(context.CancellationToken);
-
-        var standings = await premierLeagueClient.GetClassicStandingsAsync(
-            leagueOptions.ClassicLeagueId,
-            context.CancellationToken);
-        if (!publicationEligibility.IsUpdatedSinceYesterday(
-            standings.LastUpdatedData,
-            timeProvider.GetUtcNow()))
-        {
-            return;
-        }
-
-        var results = standings.Standings.Results;
-        var message = messageComposer.ComposeClassicStandings(
-            results,
-            winnerSelection.SelectEventWinners(results),
-            standingsChangeService.GetChanges(results),
-            Random.Shared.Next(
-                PremierLeagueMessageCompositionService.ClassicCongratulationsVariantCount));
-        var sourceIdentifier = standings.LastUpdatedData
-            .ToUniversalTime()
-            .ToString("O");
-
-        foreach (var target in notificationOptions.Targets)
-        {
-            try
+        return JobExecutionLogging.RunAsync(
+            context,
+            timeProvider,
+            logger,
+            async execution =>
             {
-                await notificationPublisher.PublishOnceAsync(
-                    target,
-                    sourceIdentifier,
-                    NotificationTypes.ClassicStandings,
-                    message,
+                await discordReadiness.WaitUntilReadyAsync(context.CancellationToken);
+
+                var standings = await premierLeagueClient.GetClassicStandingsAsync(
+                    leagueOptions.ClassicLeagueId,
                     context.CancellationToken);
-            }
-            catch (OperationCanceledException) when (context.CancellationToken.IsCancellationRequested)
-            {
-                throw;
-            }
-            catch (Exception exception)
-            {
-                logger.LogError(
-                    exception,
-                    "Failed to publish classic standings to Discord guild {GuildId}, channel {ChannelId}.",
-                    target.GuildId,
-                    target.ChannelId);
-            }
-        }
+                var sourceIdentifier = standings.LastUpdatedData
+                    .ToUniversalTime()
+                    .ToString("O");
+                execution.SetEvent(sourceIdentifier);
+                if (!publicationEligibility.IsUpdatedSinceYesterday(
+                    standings.LastUpdatedData,
+                    timeProvider.GetUtcNow()))
+                {
+                    return new JobExecutionResult("SkippedStandingsNotUpdated");
+                }
+
+                var results = standings.Standings.Results;
+                var message = messageComposer.ComposeClassicStandings(
+                    results,
+                    winnerSelection.SelectEventWinners(results),
+                    standingsChangeService.GetChanges(results),
+                    Random.Shared.Next(
+                        PremierLeagueMessageCompositionService.ClassicCongratulationsVariantCount));
+                var deliveredCount = 0;
+                var skippedCount = 0;
+                var failedCount = 0;
+
+                foreach (var target in notificationOptions.Targets)
+                {
+                    try
+                    {
+                        var delivered = await notificationPublisher.PublishOnceAsync(
+                            target,
+                            sourceIdentifier,
+                            NotificationTypes.ClassicStandings,
+                            message,
+                            context.CancellationToken);
+                        if (delivered)
+                        {
+                            deliveredCount++;
+                        }
+                        else
+                        {
+                            skippedCount++;
+                        }
+                    }
+                    catch (OperationCanceledException) when (context.CancellationToken.IsCancellationRequested)
+                    {
+                        throw;
+                    }
+                    catch (Exception exception)
+                    {
+                        failedCount++;
+                        logger.LogError(
+                            exception,
+                            "Failed to publish notification {NotificationType} for event {Event} to Discord " +
+                            "guild {GuildId}, channel {ChannelId}, on job attempt {Attempt} with outcome {Outcome}",
+                            NotificationTypes.ClassicStandings,
+                            sourceIdentifier,
+                            target.GuildId,
+                            target.ChannelId,
+                            execution.Attempt,
+                            "Failed");
+                    }
+                }
+
+                return new JobExecutionResult(
+                    failedCount == 0 ? "Completed" : "CompletedWithDeliveryFailures",
+                    deliveredCount,
+                    skippedCount,
+                    failedCount);
+            });
     }
 }
