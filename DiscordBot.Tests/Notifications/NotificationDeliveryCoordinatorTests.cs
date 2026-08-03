@@ -1,6 +1,7 @@
 using AwesomeAssertions;
 using DiscordBot.Notifications;
 using Microsoft.Data.Sqlite;
+using Microsoft.Extensions.Logging;
 using NUnit.Framework;
 
 namespace DiscordBot.Tests.Notifications
@@ -194,7 +195,8 @@ namespace DiscordBot.Tests.Notifications
             var store = new RecordingCheckpointStore();
             var coordinator = new NotificationDeliveryCoordinator(
                 store,
-                new FixedTimeProvider(utcNow));
+                new FixedTimeProvider(utcNow),
+                new RecordingLogger<NotificationDeliveryCoordinator>());
 
             // Act
             await coordinator.SendOnceAsync(
@@ -222,11 +224,72 @@ namespace DiscordBot.Tests.Notifications
             store.IsDelivered(checkpoint with { NotificationType = NotificationTypes.Deadline1Hour }).Should().BeFalse();
         }
 
-        private NotificationDeliveryCoordinator CreateCoordinator()
+        [Test]
+        public async Task SendOnceAsync_FailureThenRetry_LogsDiagnosableAttemptsAndOutcomes()
+        {
+            // Arrange
+            var checkpoint = CreateCheckpoint();
+            var logger = new RecordingLogger<NotificationDeliveryCoordinator>();
+            var coordinator = CreateCoordinator(logger);
+            var exception = new InvalidOperationException("Discord rejected the message.");
+
+            // Act
+            Func<Task> failedDelivery = () => coordinator.SendOnceAsync(
+                checkpoint,
+                () => Task.FromException(exception));
+            await failedDelivery.Should().ThrowAsync<InvalidOperationException>();
+            await coordinator.SendOnceAsync(checkpoint, () => Task.CompletedTask);
+
+            // Assert
+            var failure = logger.Entries.Single(entry => entry.Level == LogLevel.Error);
+            failure.Exception.Should().BeSameAs(exception);
+            failure.Properties["GuildId"].Should().Be(checkpoint.GuildId);
+            failure.Properties["ChannelId"].Should().Be(checkpoint.ChannelId);
+            failure.Properties["Event"].Should().Be(checkpoint.SourceIdentifier);
+            failure.Properties["NotificationType"].Should().Be(checkpoint.NotificationType);
+            failure.Properties["Attempt"].Should().Be(1);
+            failure.Properties["Outcome"].Should().Be("Failed");
+            failure.Properties.Should().ContainKey("DurationMs");
+
+            var success = logger.Entries.Single(entry =>
+                entry.Properties.GetValueOrDefault("Outcome") as string ==
+                "DeliveredAndCheckpointed");
+            success.Properties["Attempt"].Should().Be(2);
+        }
+
+        [Test]
+        public async Task SendOnceAsync_ExistingCheckpoint_LogsSkipDecision()
+        {
+            // Arrange
+            var checkpoint = CreateCheckpoint();
+            var store = new SqliteNotificationCheckpointStore(_databasePath);
+            store.RecordDelivered(checkpoint, DateTimeOffset.UtcNow);
+            var logger = new RecordingLogger<NotificationDeliveryCoordinator>();
+            var coordinator = new NotificationDeliveryCoordinator(
+                store,
+                TimeProvider.System,
+                logger);
+
+            // Act
+            var result = await coordinator.SendOnceAsync(
+                checkpoint,
+                () => Task.CompletedTask);
+
+            // Assert
+            result.Should().BeFalse();
+            var decision = logger.Entries.Should().ContainSingle().Subject;
+            decision.Properties["Outcome"].Should().Be("AlreadyDelivered");
+            decision.Properties["GuildId"].Should().Be(checkpoint.GuildId);
+            decision.Properties["ChannelId"].Should().Be(checkpoint.ChannelId);
+        }
+
+        private NotificationDeliveryCoordinator CreateCoordinator(
+            ILogger<NotificationDeliveryCoordinator>? logger = null)
         {
             return new NotificationDeliveryCoordinator(
                 new SqliteNotificationCheckpointStore(_databasePath),
-                TimeProvider.System);
+                TimeProvider.System,
+                logger ?? new RecordingLogger<NotificationDeliveryCoordinator>());
         }
 
         private static NotificationCheckpoint CreateCheckpoint(ulong channelId = 100)

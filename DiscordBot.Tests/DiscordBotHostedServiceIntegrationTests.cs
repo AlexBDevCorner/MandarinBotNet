@@ -34,6 +34,7 @@ public sealed class DiscordBotHostedServiceIntegrationTests
         builder.Services.AddSingleton(client);
         builder.Services.AddSingleton(readiness);
         builder.Services.AddSingleton<IDiscordGatewayConnection>(gateway);
+        builder.Services.AddSingleton<DiscordNetLogHandler>();
         builder.Services.AddSingleton<IDiscordCommandSynchronizer>(commandSynchronizer);
         builder.Services.AddSingleton<DiscordCommandRegistrationCoordinator>();
         builder.Services.AddHostedService<DiscordBotHostedService>();
@@ -54,7 +55,10 @@ public sealed class DiscordBotHostedServiceIntegrationTests
         await startTask;
         scheduledWork.Started.Task.IsCompletedSuccessfully.Should().BeTrue();
         readiness.IsReady.Should().BeTrue();
-        logMessages.Should().Contain("Bot is connected and ready.");
+        logMessages.Should().Contain(message =>
+            message.Contains("Bot is connected and ready.") &&
+            message.Contains("event Ready") &&
+            message.Contains("outcome Ready"));
         commandSynchronizer.CallCount.Should().Be(1);
 
         await gateway.RaiseDisconnectedAsync();
@@ -66,6 +70,9 @@ public sealed class DiscordBotHostedServiceIntegrationTests
         await reconnectWait;
         readiness.IsReady.Should().BeTrue();
         commandSynchronizer.CallCount.Should().Be(1);
+        logMessages.Should().Contain(message =>
+            message.Contains("event Reconnected") &&
+            message.Contains("outcome Ready"));
 
         await host.StopAsync();
         readiness.IsReady.Should().BeFalse();
