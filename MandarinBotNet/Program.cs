@@ -1,14 +1,35 @@
 using DiscordBot;
 using DiscordBot.Commands;
 using DiscordBot.FantasyPremierLeague;
+using DiscordBot.Health;
 using DiscordBot.Jobs;
 using DiscordBot.Notifications;
 using DiscordBot.PremierLeague;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Quartz;
+
+if (args.FirstOrDefault() == "--health-check")
+{
+    if (args is not [_, var probeHealthStatePath, var maximumAgeSecondsText] ||
+        !int.TryParse(maximumAgeSecondsText, out var maximumAgeSeconds) ||
+        maximumAgeSeconds <= 0)
+    {
+        Console.Error.WriteLine(
+            "Usage: --health-check <health-state-path> <maximum-age-seconds>");
+        return 2;
+    }
+
+    var probeResult = await HealthStateProbe.CheckReadinessAsync(
+        probeHealthStatePath,
+        TimeSpan.FromSeconds(maximumAgeSeconds),
+        TimeProvider.System);
+    Console.Error.WriteLine(probeResult.Message);
+    return probeResult.IsHealthy ? 0 : 1;
+}
 
 var builder = Host.CreateApplicationBuilder(args);
 
@@ -60,6 +81,31 @@ builder.Services.AddSingleton<NotificationDeliveryCoordinator>();
 builder.Services.AddSingleton<
     IDiscordNotificationPublisher,
     DiscordNotificationPublisher>();
+
+var healthStatePath = Path.Combine(
+    AppContext.BaseDirectory,
+    "data",
+    "health-state.json");
+builder.Services.AddSingleton<DiscordReadinessHealthCheck>();
+builder.Services.AddSingleton(new SqliteStorageHealthCheck(notificationDatabasePath));
+builder.Services.AddHealthChecks()
+    .AddCheck<DiscordReadinessHealthCheck>(
+        "discord_gateway",
+        tags: ["ready"])
+    .AddCheck<SqliteStorageHealthCheck>(
+        "sqlite_storage",
+        tags: ["ready"]);
+builder.Services.AddSingleton<IHealthCheckPublisher>(services =>
+    new FileHealthCheckPublisher(
+        healthStatePath,
+        services.GetRequiredService<TimeProvider>()));
+builder.Services.Configure<HealthCheckPublisherOptions>(options =>
+{
+    options.Delay = TimeSpan.Zero;
+    options.Period = TimeSpan.FromSeconds(5);
+    options.Timeout = TimeSpan.FromSeconds(4);
+    options.Predicate = registration => registration.Tags.Contains("ready");
+});
 
 
 builder.Services.AddHostedService<DiscordBotHostedService>();
@@ -121,3 +167,4 @@ builder.Services.AddQuartzHostedService(q => q.WaitForJobsToComplete = true);
 
 var host = builder.Build();
 await host.RunAsync();
+return 0;

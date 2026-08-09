@@ -100,6 +100,7 @@ jobs:
       CONTAINER_NAME: mandarinbot
       DEPLOY_DIRECTORY: /opt/mandarinbot
       STARTUP_TIMEOUT_SECONDS: "90"
+      READINESS_STABILIZATION_SECONDS: "15"
 
     steps:
       - name: Check out deployment script
