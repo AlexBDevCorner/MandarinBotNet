@@ -8,7 +8,6 @@ namespace DiscordBot
 {
     public class DiscordBotHostedService(
         DiscordOptions options,
-        DiscordSocketClient client,
         IDiscordGatewayConnection gatewayConnection,
         DiscordConnectionReadiness readiness,
         DiscordCommandRegistrationCoordinator commandRegistration,
@@ -34,10 +33,10 @@ namespace DiscordBot
                 { DiscordApplicationCommands.HugMeName, HandleHugMeCommand }
             };
 
-            client.Log += discordLogHandler.HandleAsync;
+            gatewayConnection.Log += discordLogHandler.HandleAsync;
             gatewayConnection.Ready += ReadyAsync;
             gatewayConnection.Disconnected += DisconnectedAsync;
-            client.SlashCommandExecuted += SlashCommandHandler;
+            gatewayConnection.SlashCommandExecuted += SlashCommandHandler;
 
             try
             {
@@ -74,10 +73,11 @@ namespace DiscordBot
         {
             readiness.MarkDisconnected();
             logger.LogInformation("Stopping Discord bot.");
+            DetachEventHandlers();
 
             try
             {
-                await gatewayConnection.StopAsync().WaitAsync(cancellationToken);
+                await gatewayConnection.LogoutAsync().WaitAsync(cancellationToken);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
@@ -94,11 +94,6 @@ namespace DiscordBot
                     "Failed");
                 throw;
             }
-            finally
-            {
-                DetachEventHandlers();
-            }
-
             logger.LogInformation(
                 "Discord bot shutdown completed with outcome {Outcome}.",
                 "Stopped");
@@ -131,10 +126,10 @@ namespace DiscordBot
 
         private void DetachEventHandlers()
         {
-            client.Log -= discordLogHandler.HandleAsync;
+            gatewayConnection.Log -= discordLogHandler.HandleAsync;
             gatewayConnection.Ready -= ReadyAsync;
             gatewayConnection.Disconnected -= DisconnectedAsync;
-            client.SlashCommandExecuted -= SlashCommandHandler;
+            gatewayConnection.SlashCommandExecuted -= SlashCommandHandler;
         }
 
         private async Task SlashCommandHandler(SocketSlashCommand command)

@@ -1,5 +1,3 @@
-using Discord.WebSocket;
-using Discord;
 using DiscordBot;
 using DiscordBot.Commands;
 using DiscordBot.FantasyPremierLeague;
@@ -31,16 +29,11 @@ builder.Logging.ClearProviders();
 builder.Logging.AddConsole();
 builder.Logging.AddDebug();
 
-var discordClient = new DiscordSocketClient(new DiscordSocketConfig
-{
-    GatewayIntents = GatewayIntents.AllUnprivileged
-});
-builder.Services.AddSingleton(discordClient);
+builder.Services.AddDiscordGateway();
 
 builder.Services.AddSingleton<DiscordConnectionReadiness>();
 builder.Services.AddSingleton<IDiscordConnectionReadiness>(
     services => services.GetRequiredService<DiscordConnectionReadiness>());
-builder.Services.AddSingleton<IDiscordGatewayConnection, DiscordGatewayConnection>();
 builder.Services.AddSingleton<DiscordNetLogHandler>();
 builder.Services.AddSingleton(services =>
 {
