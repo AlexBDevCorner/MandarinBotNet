@@ -1,4 +1,5 @@
 using AwesomeAssertions;
+using Discord;
 using Discord.WebSocket;
 using DiscordBot.Commands;
 using Microsoft.Extensions.DependencyInjection;
@@ -24,14 +25,12 @@ public sealed class DiscordBotHostedServiceIntegrationTests
         var readiness = new DiscordConnectionReadiness(options);
         var gateway = new TestDiscordGatewayConnection();
         var commandSynchronizer = new TestCommandSynchronizer();
-        using var client = new DiscordSocketClient();
         var scheduledWork = new StartTrackingHostedService();
         var logMessages = new ConcurrentQueue<string>();
         var builder = Host.CreateApplicationBuilder();
         builder.Logging.ClearProviders();
         builder.Logging.AddProvider(new CollectingLoggerProvider(logMessages));
         builder.Services.AddSingleton(options);
-        builder.Services.AddSingleton(client);
         builder.Services.AddSingleton(readiness);
         builder.Services.AddSingleton<IDiscordGatewayConnection>(gateway);
         builder.Services.AddSingleton<DiscordNetLogHandler>();
@@ -76,7 +75,76 @@ public sealed class DiscordBotHostedServiceIntegrationTests
 
         await host.StopAsync();
         readiness.IsReady.Should().BeFalse();
-        gateway.Operations.Should().Equal("Login", "Start", "Stop");
+        gateway.Operations.Should().Equal("Login", "Start", "Logout");
+        gateway.SubscriberCount.Should().Be(0);
+    }
+
+    [Test]
+    public async Task StopAsync_ShutdownIsCanceled_DetachesAllEventHandlers()
+    {
+        // Arrange
+        var options = new DiscordOptions
+        {
+            Token = "test-token",
+            ReadinessTimeout = TimeSpan.FromSeconds(5)
+        };
+        var readiness = new DiscordConnectionReadiness(options);
+        var gateway = new TestDiscordGatewayConnection
+        {
+            LogoutTask = new TaskCompletionSource(
+                TaskCreationOptions.RunContinuationsAsynchronously).Task
+        };
+        using var provider = CreateServiceProvider(options, readiness, gateway);
+        var service = provider.GetRequiredService<DiscordBotHostedService>();
+        var startTask = service.StartAsync(CancellationToken.None);
+        await gateway.RaiseReadyAsync();
+        await startTask;
+        using var shutdown = new CancellationTokenSource();
+        shutdown.Cancel();
+
+        // Act
+        Func<Task> stop = () => service.StopAsync(shutdown.Token);
+
+        // Assert
+        await stop.Should().ThrowAsync<OperationCanceledException>();
+        readiness.IsReady.Should().BeFalse();
+        gateway.Operations.Should().Equal("Login", "Start", "Logout");
+        gateway.SubscriberCount.Should().Be(0);
+    }
+
+    [Test]
+    public void AddDiscordGateway_RegistersContainerOwnedSocketClientFactory()
+    {
+        // Arrange
+        var services = new ServiceCollection();
+
+        // Act
+        services.AddDiscordGateway();
+
+        // Assert
+        var descriptor = services.Single(service =>
+            service.ServiceType == typeof(DiscordSocketClient));
+        descriptor.ImplementationFactory.Should().NotBeNull();
+        descriptor.ImplementationInstance.Should().BeNull();
+        descriptor.Lifetime.Should().Be(ServiceLifetime.Singleton);
+    }
+
+    private static ServiceProvider CreateServiceProvider(
+        DiscordOptions options,
+        DiscordConnectionReadiness readiness,
+        IDiscordGatewayConnection gateway)
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddSingleton(options);
+        services.AddSingleton(readiness);
+        services.AddSingleton(gateway);
+        services.AddSingleton<DiscordNetLogHandler>();
+        services.AddSingleton<IDiscordCommandSynchronizer, TestCommandSynchronizer>();
+        services.AddSingleton<DiscordCommandRegistrationCoordinator>();
+        services.AddSingleton<DiscordBotHostedService>();
+
+        return services.BuildServiceProvider();
     }
 
     private sealed class CollectingLoggerProvider(ConcurrentQueue<string> messages) : ILoggerProvider
@@ -134,14 +202,47 @@ public sealed class DiscordBotHostedServiceIntegrationTests
 
     private sealed class TestDiscordGatewayConnection : IDiscordGatewayConnection
     {
-        public event Func<Task>? Ready;
+        private Func<LogMessage, Task>? _log;
+        private Func<Task>? _ready;
+        private Func<Exception, Task>? _disconnected;
+        private Func<SocketSlashCommand, Task>? _slashCommandExecuted;
 
-        public event Func<Exception, Task>? Disconnected;
+        public event Func<LogMessage, Task>? Log
+        {
+            add => _log += value;
+            remove => _log -= value;
+        }
+
+        public event Func<Task>? Ready
+        {
+            add => _ready += value;
+            remove => _ready -= value;
+        }
+
+        public event Func<Exception, Task>? Disconnected
+        {
+            add => _disconnected += value;
+            remove => _disconnected -= value;
+        }
+
+        public event Func<SocketSlashCommand, Task>? SlashCommandExecuted
+        {
+            add => _slashCommandExecuted += value;
+            remove => _slashCommandExecuted -= value;
+        }
 
         public List<string> Operations { get; } = [];
 
         public TaskCompletionSource StartCalled { get; } =
             new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public Task LogoutTask { get; init; } = Task.CompletedTask;
+
+        public int SubscriberCount =>
+            SubscriberCountFor(_log) +
+            SubscriberCountFor(_ready) +
+            SubscriberCountFor(_disconnected) +
+            SubscriberCountFor(_slashCommandExecuted);
 
         public Task LoginAsync(string token)
         {
@@ -156,21 +257,26 @@ public sealed class DiscordBotHostedServiceIntegrationTests
             return Task.CompletedTask;
         }
 
-        public Task StopAsync()
+        public Task LogoutAsync()
         {
-            Operations.Add("Stop");
-            return Task.CompletedTask;
+            Operations.Add("Logout");
+            return LogoutTask;
         }
 
         public Task RaiseReadyAsync()
         {
-            return Ready?.Invoke() ?? Task.CompletedTask;
+            return _ready?.Invoke() ?? Task.CompletedTask;
         }
 
         public Task RaiseDisconnectedAsync()
         {
-            return Disconnected?.Invoke(new InvalidOperationException("Gateway disconnected."))
+            return _disconnected?.Invoke(new InvalidOperationException("Gateway disconnected."))
                 ?? Task.CompletedTask;
+        }
+
+        private static int SubscriberCountFor(Delegate? handlers)
+        {
+            return handlers?.GetInvocationList().Length ?? 0;
         }
     }
 
