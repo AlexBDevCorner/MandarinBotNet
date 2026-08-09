@@ -184,17 +184,39 @@ For a manual redeployment:
 
 The workflow publishes an immutable commit-SHA image to GHCR. On the VM it
 stops and retains the previous container, starts the new one with
-`--restart unless-stopped`, and waits for the Discord client readiness message.
-If startup fails, the previous container is restored automatically. Deployments
-are serialized.
+`--restart unless-stopped`, and runs the image's machine-readable health probe.
+The rollout succeeds only after Discord and SQLite readiness remains healthy
+for 15 continuous seconds. A failed probe resets that stabilization window. If
+startup fails or sustained readiness is not reached within 90 seconds, the new
+container is removed and the previous container is restored automatically.
+Deployments are serialized.
 
 Useful VM checks are:
 
 ```bash
 docker ps --filter name=mandarinbot
+docker inspect --format '{{json .State.Health}}' mandarinbot
+docker exec mandarinbot dotnet MandarinBotNet.dll --health-check /app/data/health-state.json 15
 docker logs --tail 100 mandarinbot
 sudo systemctl status actions.runner.*
 ```
+
+## Health semantics
+
+The container publishes `/app/data/health-state.json` every five seconds and
+the Docker `HEALTHCHECK` rejects state older than 15 seconds.
+
+- **Liveness** means the worker process is running and continuing to publish a
+  fresh health state. A stopped or wedged process becomes unhealthy without
+  inspecting logs.
+- **Readiness** requires an active Discord gateway connection and a successful
+  SQLite integrity and writeability check against the persistent notification
+  database.
+- FPL API availability is deliberately excluded. Its transient failures are
+  handled by the client retry policy and do not kill liveness or readiness.
+
+The health state contains only timestamps, booleans, and named check statuses;
+it never contains the Discord token or other configuration values.
 
 After the first successful OCI deployment, remove the obsolete Azure App
 Service publish-profile secret and the old Docker Hub credentials from the

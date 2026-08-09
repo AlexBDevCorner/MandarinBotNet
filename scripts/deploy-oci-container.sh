@@ -2,10 +2,9 @@
 
 set -Eeuo pipefail
 
-# Keep this marker aligned with DiscordBotHostedService; its integration test pins the contract.
-readonly ready_message="Bot is connected and ready."
 readonly env_file="${DEPLOY_DIRECTORY:-}/mandarinbot.env"
 readonly data_directory="${DEPLOY_DIRECTORY:-}/data"
+readonly health_state_file="$data_directory/health-state.json"
 readonly rollback_name="${CONTAINER_NAME:-}-rollback"
 
 fail() {
@@ -54,6 +53,12 @@ rollback() {
   fail "STARTUP_TIMEOUT_SECONDS must be an integer."
 (( STARTUP_TIMEOUT_SECONDS >= 10 && STARTUP_TIMEOUT_SECONDS <= 300 )) ||
   fail "STARTUP_TIMEOUT_SECONDS must be between 10 and 300."
+[[ "${READINESS_STABILIZATION_SECONDS:-}" =~ ^[0-9]+$ ]] ||
+  fail "READINESS_STABILIZATION_SECONDS must be an integer."
+(( READINESS_STABILIZATION_SECONDS >= 5 && READINESS_STABILIZATION_SECONDS <= 60 )) ||
+  fail "READINESS_STABILIZATION_SECONDS must be between 5 and 60."
+(( READINESS_STABILIZATION_SECONDS < STARTUP_TIMEOUT_SECONDS )) ||
+  fail "READINESS_STABILIZATION_SECONDS must be less than STARTUP_TIMEOUT_SECONDS."
 
 command -v docker >/dev/null 2>&1 || fail "Docker is not installed."
 docker info >/dev/null 2>&1 || fail "The runner cannot access the Docker daemon."
@@ -85,6 +90,10 @@ if container_exists "$CONTAINER_NAME"; then
   fi
 fi
 
+# A state file from the previous container can still be fresh during the first
+# probe of the replacement. Remove it so only the new process can become ready.
+rm -f "$health_state_file" || rollback "Stale health state could not be cleared."
+
 if ! docker run \
   --detach \
   --name "$CONTAINER_NAME" \
@@ -97,21 +106,32 @@ fi
 
 deadline=$((SECONDS + STARTUP_TIMEOUT_SECONDS))
 ready=false
+stable_since=""
 
 while (( SECONDS < deadline )); do
   running="$(docker container inspect --format '{{.State.Running}}' "$CONTAINER_NAME" 2>/dev/null || true)"
   [[ "$running" == "true" ]] || rollback "The new container stopped during startup."
 
-  if docker logs "$CONTAINER_NAME" 2>&1 | grep -Fq "$ready_message"; then
-    ready=true
-    break
+  if docker exec "$CONTAINER_NAME" \
+    dotnet MandarinBotNet.dll \
+      --health-check /app/data/health-state.json 15 >/dev/null 2>&1; then
+    if [[ -z "$stable_since" ]]; then
+      stable_since=$SECONDS
+      printf 'Readiness observed; starting %s-second stabilization period.\n' \
+        "$READINESS_STABILIZATION_SECONDS"
+    elif (( SECONDS - stable_since >= READINESS_STABILIZATION_SECONDS )); then
+      ready=true
+      break
+    fi
+  else
+    stable_since=""
   fi
 
   sleep 2
 done
 
 [[ "$ready" == "true" ]] ||
-  rollback "The bot did not report readiness within ${STARTUP_TIMEOUT_SECONDS} seconds."
+  rollback "The bot did not sustain readiness for ${READINESS_STABILIZATION_SECONDS} seconds within the ${STARTUP_TIMEOUT_SECONDS}-second startup timeout."
 
 if container_exists "$rollback_name"; then
   docker rm "$rollback_name" >/dev/null ||

@@ -19,4 +19,6 @@ RUN dotnet publish "./MandarinBotNet.csproj" -c $BUILD_CONFIGURATION -o /app/pub
 FROM base AS final
 WORKDIR /app
 COPY --from=publish /app/publish .
+HEALTHCHECK --interval=5s --timeout=5s --start-period=10s --retries=2 \
+  CMD ["dotnet", "MandarinBotNet.dll", "--health-check", "/app/data/health-state.json", "15"]
 ENTRYPOINT ["dotnet", "MandarinBotNet.dll"]
