@@ -1,5 +1,6 @@
 using Discord;
 using Discord.WebSocket;
+using DiscordBot.Notifications;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace DiscordBot;
@@ -13,6 +14,9 @@ public static class DiscordGatewayServiceCollectionExtensions
             GatewayIntents = GatewayIntents.AllUnprivileged
         }));
         services.AddSingleton<IDiscordGatewayConnection, DiscordGatewayConnection>();
+        services.AddSingleton<
+            IDiscordNotificationChannelResolver,
+            DiscordNotificationChannelResolver>();
 
         return services;
     }

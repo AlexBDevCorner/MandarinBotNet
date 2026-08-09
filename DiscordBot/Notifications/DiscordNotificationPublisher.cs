@@ -14,8 +14,53 @@ public interface IDiscordNotificationPublisher
         CancellationToken cancellationToken);
 }
 
+public interface IDiscordNotificationChannelResolver
+{
+    DiscordNotificationDestination Resolve(ulong guildId, ulong channelId);
+}
+
+public interface IDiscordNotificationChannel
+{
+    Task SendMessageAsync(string content, bool allowEveryoneMention);
+}
+
+public sealed record DiscordNotificationDestination(
+    bool GuildAvailable,
+    IDiscordNotificationChannel? Channel);
+
+public sealed class DiscordNotificationChannelResolver(
+    DiscordSocketClient discordClient) : IDiscordNotificationChannelResolver
+{
+    public DiscordNotificationDestination Resolve(ulong guildId, ulong channelId)
+    {
+        var guild = discordClient.GetGuild(guildId);
+        if (guild is null)
+        {
+            return new DiscordNotificationDestination(false, null);
+        }
+
+        var channel = guild.GetTextChannel(channelId);
+        return new DiscordNotificationDestination(
+            true,
+            channel is null ? null : new DiscordNotificationChannel(channel));
+    }
+
+    private sealed class DiscordNotificationChannel(
+        SocketTextChannel channel) : IDiscordNotificationChannel
+    {
+        public Task SendMessageAsync(string content, bool allowEveryoneMention)
+        {
+            return channel.SendMessageAsync(
+                content,
+                allowedMentions: allowEveryoneMention
+                    ? null
+                    : AllowedMentions.None);
+        }
+    }
+}
+
 public sealed class DiscordNotificationPublisher(
-    DiscordSocketClient discordClient,
+    IDiscordNotificationChannelResolver channelResolver,
     NotificationDeliveryCoordinator deliveryCoordinator,
     ILogger<DiscordNotificationPublisher> logger) : IDiscordNotificationPublisher
 {
@@ -33,8 +78,8 @@ public sealed class DiscordNotificationPublisher(
 
         cancellationToken.ThrowIfCancellationRequested();
 
-        var guild = discordClient.GetGuild(target.GuildId);
-        if (guild is null)
+        var destination = channelResolver.Resolve(target.GuildId, target.ChannelId);
+        if (!destination.GuildAvailable)
         {
             logger.LogWarning(
                 "Configured Discord guild {GuildId} is not available for event {Event}; " +
@@ -46,8 +91,7 @@ public sealed class DiscordNotificationPublisher(
             return false;
         }
 
-        var channel = guild.GetTextChannel(target.ChannelId);
-        if (channel is null)
+        if (destination.Channel is null)
         {
             logger.LogWarning(
                 "Configured Discord channel {ChannelId} was not found in guild {GuildId} for event {Event}; " +
@@ -91,13 +135,9 @@ public sealed class DiscordNotificationPublisher(
                     var content = isFirstChunk
                         ? target.FormatMessage(chunks[chunkIndex])
                         : chunks[chunkIndex];
-                    var allowedMentions = target.MentionEveryone && isFirstChunk
-                        ? null
-                        : AllowedMentions.None;
-
-                    await channel.SendMessageAsync(
+                    await destination.Channel.SendMessageAsync(
                         content,
-                        allowedMentions: allowedMentions);
+                        target.MentionEveryone && isFirstChunk);
                 },
                 cancellationToken);
             sentAny |= sent;
