@@ -1,4 +1,4 @@
-﻿using Discord;
+using Discord;
 using Discord.WebSocket;
 using DiscordBot.Commands;
 using Microsoft.Extensions.Hosting;

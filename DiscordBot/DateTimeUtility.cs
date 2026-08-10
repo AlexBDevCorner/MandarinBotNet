@@ -1,4 +1,4 @@
-﻿namespace DiscordBot
+namespace DiscordBot
 {
     internal static class DateTimeUtility
     {
