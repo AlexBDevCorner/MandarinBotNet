@@ -70,6 +70,25 @@ grep -Eq '^[[:space:]]*Bot__Discord__Token=.+$' "$env_file" ||
 printf 'Pulling %s\n' "$IMAGE"
 docker pull "$IMAGE"
 
+if [[ ! -w "$data_directory" ]]; then
+  data_group="$(stat -c '%G' "$data_directory")"
+  [[ "$data_group" == "docker" ]] ||
+    fail "$data_directory is not writable and is not owned by the docker group."
+
+  printf 'Granting the docker group write access to %s\n' "$data_directory"
+  if ! docker run \
+    --rm \
+    --entrypoint chmod \
+    --mount "type=bind,src=$data_directory,dst=/app/data" \
+    "$IMAGE" \
+    0770 /app/data; then
+    fail "$data_directory permissions could not be repaired."
+  fi
+
+  [[ -w "$data_directory" ]] ||
+    fail "$data_directory is still not writable after permission repair."
+fi
+
 if container_exists "$rollback_name"; then
   if container_exists "$CONTAINER_NAME"; then
     docker rm --force "$rollback_name" >/dev/null
