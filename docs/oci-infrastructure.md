@@ -141,7 +141,7 @@ Register the runner as follows:
    never copies it into an image or GitHub Actions:
 
    ```bash
-   sudo install -d -m 0750 -o ubuntu -g docker /opt/mandarinbot/data
+   sudo install -d -m 0770 -o ubuntu -g docker /opt/mandarinbot/data
    sudo install -m 0640 -o root -g docker /dev/null /opt/mandarinbot/mandarinbot.env
    sudoedit /opt/mandarinbot/mandarinbot.env
    ```

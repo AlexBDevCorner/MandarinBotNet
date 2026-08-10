@@ -22,4 +22,4 @@ runcmd:
   - [systemctl, restart, docker]
   - [usermod, -aG, docker, ubuntu]
   - [install, -d, -m, "0750", -o, ubuntu, -g, docker, /opt/mandarinbot]
-  - [install, -d, -m, "0750", -o, ubuntu, -g, docker, /opt/mandarinbot/data]
+  - [install, -d, -m, "0770", -o, ubuntu, -g, docker, /opt/mandarinbot/data]
