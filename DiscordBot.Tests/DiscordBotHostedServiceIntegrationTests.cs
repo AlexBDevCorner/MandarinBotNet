@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using AwesomeAssertions;
 using Discord;
 using Discord.WebSocket;
@@ -6,7 +7,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using NUnit.Framework;
-using System.Collections.Concurrent;
 
 namespace DiscordBot.Tests;
 
