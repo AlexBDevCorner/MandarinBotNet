@@ -1,0 +1,141 @@
+name: CI quality gates
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_call:
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+  DOTNET_NOLOGO: "1"
+
+jobs:
+  changes:
+    name: Detect relevant changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      actions: ${{ steps.filter.outputs.actions }}
+      terraform: ${{ steps.filter.outputs.terraform }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 20
+          persist-credentials: false
+
+      - name: Detect changed files
+        id: filter
+        uses: dorny/paths-filter@0e4a8c6effa4802afeda77dc8d303f8176d7dfad # v3.0.3
+        with:
+          filters: |
+            actions:
+              - '.github/actionlint.yaml'
+              - '.github/workflows/**'
+            terraform:
+              - 'infra/terraform/**/*.tf'
+              - 'infra/terraform/**/*.tfvars'
+
+  dotnet:
+    name: Restore, build, test, format, and audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: Set up .NET SDK
+        uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Restore and audit dependencies
+        run: >-
+          dotnet restore MandarinBotNet.sln
+          --source https://api.nuget.org/v3/index.json
+          -p:NuGetAudit=true
+          -p:NuGetAuditMode=all
+          -p:WarningsAsErrors=NU1901%3BNU1902%3BNU1903%3BNU1904
+
+      - name: Build Release configuration
+        run: dotnet build MandarinBotNet.sln --configuration Release --no-restore
+
+      - name: Run tests
+        run: dotnet test MandarinBotNet.sln --configuration Release --no-build --no-restore
+
+      - name: Verify formatting
+        run: dotnet format MandarinBotNet.sln --verify-no-changes --no-restore
+
+      - name: Report vulnerable packages
+        run: >-
+          dotnet list MandarinBotNet.sln package
+          --vulnerable
+          --include-transitive
+          --source https://api.nuget.org/v3/index.json
+          --no-restore
+
+  actions:
+    name: Lint GitHub Actions
+    needs: changes
+    if: needs.changes.outputs.actions == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      ACTIONLINT_VERSION: 1.7.12
+      ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: Install verified actionlint release
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive="actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          url="https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/${archive}"
+
+          curl --fail --location --silent --show-error --output "$archive" "$url"
+          printf '%s  %s\n' "$ACTIONLINT_SHA256" "$archive" | sha256sum --check --strict
+          tar --extract --gzip --file "$archive" actionlint
+          install -m 0755 actionlint "$RUNNER_TEMP/actionlint"
+
+      - name: Lint workflows
+        run: '"$RUNNER_TEMP/actionlint" -color'
+
+  terraform:
+    name: Check Terraform formatting
+    needs: changes
+    if: needs.changes.outputs.terraform == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4
+        with:
+          terraform_version: 1.14.5
+          terraform_wrapper: false
+
+      - name: Verify Terraform formatting
+        run: terraform fmt -check -diff -recursive infra/terraform

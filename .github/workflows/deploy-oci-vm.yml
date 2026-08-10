@@ -21,8 +21,16 @@ env:
   REGISTRY: ghcr.io
 
 jobs:
+  validation:
+    name: Validate release candidate
+    permissions:
+      contents: read
+      pull-requests: read
+    uses: ./.github/workflows/ci.yml
+
   build:
     name: Build and publish image
+    needs: validation
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
