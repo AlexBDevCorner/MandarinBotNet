@@ -13,6 +13,8 @@ public interface IDiscordGatewayConnection
 
     event Func<SocketSlashCommand, Task> SlashCommandExecuted;
 
+    event Func<DiscordGuildMember, Task> UserJoined;
+
     Task LoginAsync(string token);
 
     Task StartAsync();
@@ -20,44 +22,67 @@ public interface IDiscordGatewayConnection
     Task LogoutAsync();
 }
 
-public sealed class DiscordGatewayConnection(DiscordSocketClient client) : IDiscordGatewayConnection
+public sealed record DiscordGuildMember(
+    ulong GuildId,
+    ulong UserId,
+    string Mention);
+
+public sealed class DiscordGatewayConnection : IDiscordGatewayConnection
 {
+    private readonly DiscordSocketClient _client;
+
+    public DiscordGatewayConnection(DiscordSocketClient client)
+    {
+        _client = client;
+        _client.UserJoined += HandleUserJoinedAsync;
+    }
+
     public event Func<LogMessage, Task> Log
     {
-        add => client.Log += value;
-        remove => client.Log -= value;
+        add => _client.Log += value;
+        remove => _client.Log -= value;
     }
 
     public event Func<Task> Ready
     {
-        add => client.Ready += value;
-        remove => client.Ready -= value;
+        add => _client.Ready += value;
+        remove => _client.Ready -= value;
     }
 
     public event Func<Exception, Task> Disconnected
     {
-        add => client.Disconnected += value;
-        remove => client.Disconnected -= value;
+        add => _client.Disconnected += value;
+        remove => _client.Disconnected -= value;
     }
 
     public event Func<SocketSlashCommand, Task> SlashCommandExecuted
     {
-        add => client.SlashCommandExecuted += value;
-        remove => client.SlashCommandExecuted -= value;
+        add => _client.SlashCommandExecuted += value;
+        remove => _client.SlashCommandExecuted -= value;
     }
+
+    public event Func<DiscordGuildMember, Task>? UserJoined;
 
     public Task LoginAsync(string token)
     {
-        return client.LoginAsync(TokenType.Bot, token);
+        return _client.LoginAsync(TokenType.Bot, token);
     }
 
     public Task StartAsync()
     {
-        return client.StartAsync();
+        return _client.StartAsync();
     }
 
     public Task LogoutAsync()
     {
-        return client.LogoutAsync();
+        return _client.LogoutAsync();
+    }
+
+    private Task HandleUserJoinedAsync(SocketGuildUser user)
+    {
+        return UserJoined?.Invoke(new DiscordGuildMember(
+            user.Guild.Id,
+            user.Id,
+            user.Mention)) ?? Task.CompletedTask;
     }
 }

@@ -18,4 +18,8 @@
     <ProjectReference Include="..\DiscordBot\DiscordBot.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Update="Assets\pc7n1.jpg" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

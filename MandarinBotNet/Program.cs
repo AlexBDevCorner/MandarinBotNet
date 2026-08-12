@@ -5,6 +5,7 @@ using DiscordBot.Health;
 using DiscordBot.Jobs;
 using DiscordBot.Notifications;
 using DiscordBot.PremierLeague;
+using DiscordBot.WelcomeMessages;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Hosting;
@@ -71,6 +72,15 @@ builder.Services.AddSingleton<
 builder.Services.AddSingleton<IDiscordCommandSynchronizer, DiscordCommandSynchronizer>();
 builder.Services.AddSingleton<DiscordCommandRegistrationCoordinator>();
 builder.Services.AddSingleton<IStandingsCommandHandler, StandingsCommandHandler>();
+builder.Services.AddSingleton<WelcomeMessageTemplateRotator>();
+builder.Services.AddSingleton<
+    IWelcomeMessageDestinationResolver,
+    WelcomeMessageDestinationResolver>();
+builder.Services.AddSingleton<IWelcomeMessageHandler, WelcomeMessageHandler>();
+builder.Services.AddSingleton(new WelcomeMessageAsset(Path.Combine(
+    AppContext.BaseDirectory,
+    "Assets",
+    "pc7n1.jpg")));
 
 var notificationDatabasePath = Path.Combine(
     AppContext.BaseDirectory,

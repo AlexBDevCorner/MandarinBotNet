@@ -26,6 +26,7 @@ public sealed class MandarinBotOptionsTests
         options.Notifications.Targets.Should().BeEmpty();
         options.Discord.Commands.RegistrationMode.Should()
             .Be(DiscordCommandRegistrationMode.Disabled);
+        options.WelcomeMessages.Enabled.Should().BeFalse();
         new NotificationTargetOptions().MentionEveryone.Should().BeFalse();
         options.FantasyPremierLeague.MaxStandingsPages.Should().Be(
             FantasyPremierLeagueOptions.DefaultMaxStandingsPages);

@@ -11,7 +11,8 @@ public static class DiscordGatewayServiceCollectionExtensions
     {
         services.AddSingleton(_ => new DiscordSocketClient(new DiscordSocketConfig
         {
-            GatewayIntents = GatewayIntents.AllUnprivileged
+            GatewayIntents = GatewayIntents.AllUnprivileged |
+                GatewayIntents.GuildMembers
         }));
         services.AddSingleton<IDiscordGatewayConnection, DiscordGatewayConnection>();
         services.AddSingleton<
