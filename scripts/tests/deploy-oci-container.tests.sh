@@ -142,9 +142,11 @@ test_repairs_docker_group_permissions_before_deployment() {
     fail "stale health state was not removed"
   grep -Fq -- '--user 0:0 --entrypoint chown' "$test_directory/docker.log" ||
     fail "permission repair did not use a root-only helper container"
+  grep -Fq -- '--recursive app:999 /app/data' "$test_directory/docker.log" ||
+    fail "permission repair did not assign the mounted data to the app user"
   grep -Fq -- '--entrypoint chmod' "$test_directory/docker.log" ||
     fail "permission repair container was not run"
-  grep -Eq -- '--user 10001:[0-9]+' "$test_directory/docker.log" ||
+  grep -Eq -- '--user app:[0-9]+' "$test_directory/docker.log" ||
     fail "application container did not run as the dedicated non-root user"
   for required_option in \
     '--read-only' \

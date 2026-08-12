@@ -6,7 +6,7 @@ readonly env_file="${DEPLOY_DIRECTORY:-}/mandarinbot.env"
 readonly data_directory="${DEPLOY_DIRECTORY:-}/data"
 readonly health_state_file="$data_directory/health-state.json"
 readonly rollback_name="${CONTAINER_NAME:-}-rollback"
-readonly container_user_id="${CONTAINER_USER_ID:-10001}"
+readonly container_user="app"
 
 fail() {
   printf '::error::%s\n' "$1" >&2
@@ -50,8 +50,6 @@ rollback() {
 [[ "${CONTAINER_NAME:-}" =~ ^[a-zA-Z0-9][a-zA-Z0-9_.-]*$ ]] ||
   fail "CONTAINER_NAME is invalid."
 [[ "${DEPLOY_DIRECTORY:-}" == /* ]] || fail "DEPLOY_DIRECTORY must be absolute."
-[[ "$container_user_id" =~ ^[1-9][0-9]*$ ]] ||
-  fail "CONTAINER_USER_ID must be a positive integer."
 [[ "${STARTUP_TIMEOUT_SECONDS:-}" =~ ^[0-9]+$ ]] ||
   fail "STARTUP_TIMEOUT_SECONDS must be an integer."
 (( STARTUP_TIMEOUT_SECONDS >= 10 && STARTUP_TIMEOUT_SECONDS <= 300 )) ||
@@ -87,7 +85,7 @@ if ! docker run \
   --entrypoint chown \
   --mount "type=bind,src=$data_directory,dst=/app/data" \
   "$IMAGE" \
-  --recursive "$container_user_id:$data_group_id" /app/data; then
+  --recursive "$container_user:$data_group_id" /app/data; then
   fail "$data_directory ownership could not be repaired."
 fi
 if ! docker run \
@@ -131,7 +129,7 @@ if ! docker run \
   --name "$CONTAINER_NAME" \
   --restart unless-stopped \
   --env-file "$env_file" \
-  --user "$container_user_id:$data_group_id" \
+  --user "$container_user:$data_group_id" \
   --read-only \
   --tmpfs /tmp:rw,noexec,nosuid,size=16m \
   --security-opt no-new-privileges:true \
