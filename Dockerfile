@@ -1,8 +1,8 @@
-FROM mcr.microsoft.com/dotnet/runtime:8.0.29 AS base
+FROM mcr.microsoft.com/dotnet/runtime:10.0.10 AS base
 WORKDIR /app
 RUN mkdir -p /app/data
 
-FROM mcr.microsoft.com/dotnet/sdk:8.0.423 AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0.302 AS build
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
 COPY ["global.json", "."]

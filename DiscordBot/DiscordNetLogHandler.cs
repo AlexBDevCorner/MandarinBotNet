@@ -8,8 +8,6 @@ public sealed class DiscordNetLogHandler(
 {
     public Task HandleAsync(LogMessage message)
     {
-        ArgumentNullException.ThrowIfNull(message);
-
         logger.Log(
             ToLogLevel(message.Severity),
             message.Exception,
