@@ -6,6 +6,7 @@ readonly env_file="${DEPLOY_DIRECTORY:-}/mandarinbot.env"
 readonly data_directory="${DEPLOY_DIRECTORY:-}/data"
 readonly health_state_file="$data_directory/health-state.json"
 readonly rollback_name="${CONTAINER_NAME:-}-rollback"
+readonly container_user="app"
 
 fail() {
   printf '::error::%s\n' "$1" >&2
@@ -67,27 +68,37 @@ docker info >/dev/null 2>&1 || fail "The runner cannot access the Docker daemon.
 grep -Eq '^[[:space:]]*Bot__Discord__Token=.+$' "$env_file" ||
   fail "$env_file does not contain a non-empty Bot__Discord__Token."
 
+data_group_name="$(stat -c '%G' "$data_directory")"
+[[ "$data_group_name" == "docker" ]] ||
+  fail "$data_directory must be owned by the docker group."
+data_group_id="$(stat -c '%g' "$data_directory")"
+[[ "$data_group_id" =~ ^[0-9]+$ ]] ||
+  fail "$data_directory has an invalid group ID."
+
 printf 'Pulling %s\n' "$IMAGE"
 docker pull "$IMAGE"
 
-if [[ ! -w "$data_directory" ]]; then
-  data_group="$(stat -c '%G' "$data_directory")"
-  [[ "$data_group" == "docker" ]] ||
-    fail "$data_directory is not writable and is not owned by the docker group."
-
-  printf 'Granting the docker group write access to %s\n' "$data_directory"
-  if ! docker run \
-    --rm \
-    --entrypoint chmod \
-    --mount "type=bind,src=$data_directory,dst=/app/data" \
-    "$IMAGE" \
-    0770 /app/data; then
-    fail "$data_directory permissions could not be repaired."
-  fi
-
-  [[ -w "$data_directory" ]] ||
-    fail "$data_directory is still not writable after permission repair."
+printf 'Granting application user and docker group access to %s\n' "$data_directory"
+if ! docker run \
+  --rm \
+  --user 0:0 \
+  --entrypoint chown \
+  --mount "type=bind,src=$data_directory,dst=/app/data" \
+  "$IMAGE" \
+  --recursive "$container_user:$data_group_id" /app/data; then
+  fail "$data_directory ownership could not be repaired."
 fi
+if ! docker run \
+  --rm \
+  --user 0:0 \
+  --entrypoint chmod \
+  --mount "type=bind,src=$data_directory,dst=/app/data" \
+  "$IMAGE" \
+  0770 /app/data; then
+  fail "$data_directory permissions could not be repaired."
+fi
+[[ -w "$data_directory" ]] ||
+  fail "$data_directory is not writable by the deployment runner after permission repair."
 
 if container_exists "$rollback_name"; then
   if container_exists "$CONTAINER_NAME"; then
@@ -118,6 +129,15 @@ if ! docker run \
   --name "$CONTAINER_NAME" \
   --restart unless-stopped \
   --env-file "$env_file" \
+  --user "$container_user:$data_group_id" \
+  --read-only \
+  --tmpfs /tmp:rw,noexec,nosuid,size=16m \
+  --security-opt no-new-privileges:true \
+  --cap-drop ALL \
+  --memory 512m \
+  --memory-reservation 256m \
+  --cpus 0.75 \
+  --pids-limit 128 \
   --mount "type=bind,src=$data_directory,dst=/app/data" \
   "$IMAGE" >/dev/null; then
   rollback "Docker could not start the new container."
