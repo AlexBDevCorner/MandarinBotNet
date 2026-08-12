@@ -69,9 +69,11 @@ public sealed class DiscordCommandRegistrationTests
         // Assert
         commandClient.GlobalCalls.Should().Be(1);
         commandClient.GuildCalls.Should().Be(0);
-        commandClient.Commands.Should().ContainSingle();
-        commandClient.Commands![0].Name.Value.Should()
-            .Be(DiscordApplicationCommands.HugMeName);
+        commandClient.Commands.Should().HaveCount(2);
+        commandClient.Commands!.Select(command => command.Name.Value).Should()
+            .Equal(
+                DiscordApplicationCommands.HugMeName,
+                DiscordApplicationCommands.StandingsName);
     }
 
     [Test]
@@ -94,7 +96,7 @@ public sealed class DiscordCommandRegistrationTests
         commandClient.GlobalCalls.Should().Be(0);
         commandClient.GuildCalls.Should().Be(1);
         commandClient.GuildId.Should().Be(guildId);
-        commandClient.Commands.Should().ContainSingle();
+        commandClient.Commands.Should().HaveCount(2);
     }
 
     [Test]

@@ -11,11 +11,13 @@ namespace DiscordBot
         IDiscordGatewayConnection gatewayConnection,
         DiscordConnectionReadiness readiness,
         DiscordCommandRegistrationCoordinator commandRegistration,
+        IStandingsCommandHandler standingsCommandHandler,
         DiscordNetLogHandler discordLogHandler,
         ILogger<DiscordBotHostedService> logger) : IHostedService
     {
         private const string DeploymentReadyMessage = "Bot is connected and ready.";
-        private Dictionary<string, Func<SocketSlashCommand, Task>> _commandHandlers = [];
+        private Dictionary<string, Func<IDiscordSlashCommandInteraction, Task>>
+            _commandHandlers = [];
         private int _readyCount;
 
         public async Task StartAsync(CancellationToken cancellationToken)
@@ -30,7 +32,8 @@ namespace DiscordBot
 
             _commandHandlers = new()
             {
-                { DiscordApplicationCommands.HugMeName, HandleHugMeCommand }
+                { DiscordApplicationCommands.HugMeName, HandleHugMeCommand },
+                { DiscordApplicationCommands.StandingsName, standingsCommandHandler.HandleAsync }
             };
 
             gatewayConnection.Log += discordLogHandler.HandleAsync;
@@ -134,7 +137,14 @@ namespace DiscordBot
 
         private async Task SlashCommandHandler(SocketSlashCommand command)
         {
-            if (_commandHandlers.TryGetValue(command.Data.Name, out var handler))
+            await HandleSlashCommandAsync(
+                new DiscordNetSlashCommandInteraction(command));
+        }
+
+        internal async Task HandleSlashCommandAsync(
+            IDiscordSlashCommandInteraction command)
+        {
+            if (_commandHandlers.TryGetValue(command.Name, out var handler))
             {
                 await handler(command);
             }
@@ -144,11 +154,11 @@ namespace DiscordBot
             }
         }
 
-        private async Task HandleHugMeCommand(SocketSlashCommand command)
+        private async Task HandleHugMeCommand(
+            IDiscordSlashCommandInteraction command)
         {
-            var user = command.User;
-
-            await command.RespondAsync($"{user.Mention} :people_hugging:");
+            await command.RespondAsync(
+                $"{command.UserMention} :people_hugging:");
         }
     }
 }

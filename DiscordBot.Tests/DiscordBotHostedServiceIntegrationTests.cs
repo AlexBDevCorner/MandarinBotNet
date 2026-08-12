@@ -36,6 +36,8 @@ public sealed class DiscordBotHostedServiceIntegrationTests
         builder.Services.AddSingleton<DiscordNetLogHandler>();
         builder.Services.AddSingleton<IDiscordCommandSynchronizer>(commandSynchronizer);
         builder.Services.AddSingleton<DiscordCommandRegistrationCoordinator>();
+        builder.Services.AddSingleton<IStandingsCommandHandler,
+            TestStandingsCommandHandler>();
         builder.Services.AddHostedService<DiscordBotHostedService>();
         builder.Services.AddSingleton<IHostedService>(scheduledWork);
         using var host = builder.Build();
@@ -77,6 +79,36 @@ public sealed class DiscordBotHostedServiceIntegrationTests
         readiness.IsReady.Should().BeFalse();
         gateway.Operations.Should().Equal("Login", "Start", "Logout");
         gateway.SubscriberCount.Should().Be(0);
+    }
+
+    [Test]
+    public async Task HandleSlashCommandAsync_StandingsCommand_RoutesToDedicatedHandler()
+    {
+        // Arrange
+        var options = new DiscordOptions
+        {
+            Token = "test-token",
+            ReadinessTimeout = TimeSpan.FromSeconds(5)
+        };
+        var readiness = new DiscordConnectionReadiness(options);
+        var gateway = new TestDiscordGatewayConnection();
+        using var provider = CreateServiceProvider(options, readiness, gateway);
+        var service = provider.GetRequiredService<DiscordBotHostedService>();
+        var handler = provider.GetRequiredService<IStandingsCommandHandler>();
+        var interaction = new TestSlashCommandInteraction(
+            DiscordApplicationCommands.StandingsName);
+        var startTask = service.StartAsync(CancellationToken.None);
+        await gateway.RaiseReadyAsync();
+        await startTask;
+
+        // Act
+        await service.HandleSlashCommandAsync(interaction);
+
+        // Assert
+        ((TestStandingsCommandHandler)handler).Interaction.Should()
+            .BeSameAs(interaction);
+
+        await service.StopAsync(CancellationToken.None);
     }
 
     [Test]
@@ -142,6 +174,8 @@ public sealed class DiscordBotHostedServiceIntegrationTests
         services.AddSingleton<DiscordNetLogHandler>();
         services.AddSingleton<IDiscordCommandSynchronizer, TestCommandSynchronizer>();
         services.AddSingleton<DiscordCommandRegistrationCoordinator>();
+        services.AddSingleton<IStandingsCommandHandler,
+            TestStandingsCommandHandler>();
         services.AddSingleton<DiscordBotHostedService>();
 
         return services.BuildServiceProvider();
@@ -289,5 +323,33 @@ public sealed class DiscordBotHostedServiceIntegrationTests
             CallCount++;
             return Task.CompletedTask;
         }
+    }
+
+    private sealed class TestStandingsCommandHandler : IStandingsCommandHandler
+    {
+        public IDiscordSlashCommandInteraction? Interaction { get; private set; }
+
+        public Task HandleAsync(IDiscordSlashCommandInteraction interaction)
+        {
+            Interaction = interaction;
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class TestSlashCommandInteraction(string name)
+        : IDiscordSlashCommandInteraction
+    {
+        public string Name { get; } = name;
+
+        public string UserMention => "<@123>";
+
+        public Task RespondAsync(string content) => Task.CompletedTask;
+
+        public Task DeferAsync() => Task.CompletedTask;
+
+        public Task ModifyOriginalResponseAsync(string content) =>
+            Task.CompletedTask;
+
+        public Task FollowupAsync(string content) => Task.CompletedTask;
     }
 }

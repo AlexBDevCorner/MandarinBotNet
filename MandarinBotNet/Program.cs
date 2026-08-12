@@ -70,6 +70,7 @@ builder.Services.AddSingleton<
     DiscordApplicationCommandClient>();
 builder.Services.AddSingleton<IDiscordCommandSynchronizer, DiscordCommandSynchronizer>();
 builder.Services.AddSingleton<DiscordCommandRegistrationCoordinator>();
+builder.Services.AddSingleton<IStandingsCommandHandler, StandingsCommandHandler>();
 
 var notificationDatabasePath = Path.Combine(
     AppContext.BaseDirectory,
