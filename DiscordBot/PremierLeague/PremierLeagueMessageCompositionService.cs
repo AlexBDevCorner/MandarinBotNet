@@ -10,6 +10,13 @@ public sealed class PremierLeagueMessageCompositionService(
 {
     public const int ClassicCongratulationsVariantCount = 31;
 
+    private const string ClassicSnapshotHeading = "Classic league standings:";
+    private const string HeadToHeadSnapshotHeading =
+        "Head-to-head league standings:";
+    private const string EmptyStandingsMessage = "(No standings returned.)";
+    private const string UnavailableStandingsMessage =
+        "This league is currently unavailable.";
+
     private static readonly CultureInfo RussianCulture = new("ru-RU");
 
     public string ComposeDeadlineReminder(
@@ -37,11 +44,12 @@ public sealed class PremierLeagueMessageCompositionService(
         var winners = eventWinners.ToArray();
         var summary = new StringBuilder("Лига Пельменных Обнимашек:");
 
-        foreach (var result in standings)
-        {
-            summary.Append('\n');
-            summary.Append($"{GetRankLabel(result.Rank)} {DiscordTextSafety.SanitizeExternalName(result.EntryName)} {result.Total}");
-        }
+        AppendStandings(
+            summary,
+            standings,
+            result => result.Rank,
+            result => result.EntryName,
+            result => result.Total);
 
         if (winners.Length == 1)
         {
@@ -89,13 +97,87 @@ public sealed class PremierLeagueMessageCompositionService(
         var summary = new StringBuilder(
             "Лига Пельменных Обнимашек-К-Обнимашкам:");
 
-        foreach (var result in standings)
+        AppendStandings(
+            summary,
+            standings,
+            result => result.Rank,
+            result => result.EntryName,
+            result => result.Total);
+
+        return summary.ToString();
+    }
+
+    public string ComposeClassicStandingsSnapshot(
+        IEnumerable<ClassicStanding> standings)
+    {
+        ArgumentNullException.ThrowIfNull(standings);
+
+        return ComposeStandingsSnapshot(
+            ClassicSnapshotHeading,
+            standings,
+            result => result.Rank,
+            result => result.EntryName,
+            result => result.Total);
+    }
+
+    public string ComposeHeadToHeadStandingsSnapshot(
+        IEnumerable<HeadToHeadStanding> standings)
+    {
+        ArgumentNullException.ThrowIfNull(standings);
+
+        return ComposeStandingsSnapshot(
+            HeadToHeadSnapshotHeading,
+            standings,
+            result => result.Rank,
+            result => result.EntryName,
+            result => result.Total);
+    }
+
+    public static string ComposeUnavailableClassicStandings()
+    {
+        return $"{ClassicSnapshotHeading}\n{UnavailableStandingsMessage}";
+    }
+
+    public static string ComposeUnavailableHeadToHeadStandings()
+    {
+        return $"{HeadToHeadSnapshotHeading}\n{UnavailableStandingsMessage}";
+    }
+
+    private static string ComposeStandingsSnapshot<T>(
+        string heading,
+        IEnumerable<T> standings,
+        Func<T, int> rank,
+        Func<T, string?> entryName,
+        Func<T, int> total)
+    {
+        var summary = new StringBuilder(heading);
+        var count = AppendStandings(summary, standings, rank, entryName, total);
+        if (count == 0)
         {
             summary.Append('\n');
-            summary.Append($"{GetRankLabel(result.Rank)} {DiscordTextSafety.SanitizeExternalName(result.EntryName)} {result.Total}");
+            summary.Append(EmptyStandingsMessage);
         }
 
         return summary.ToString();
+    }
+
+    private static int AppendStandings<T>(
+        StringBuilder summary,
+        IEnumerable<T> standings,
+        Func<T, int> rank,
+        Func<T, string?> entryName,
+        Func<T, int> total)
+    {
+        var count = 0;
+        foreach (var result in standings)
+        {
+            summary.Append('\n');
+            summary.Append(
+                $"{GetRankLabel(rank(result))} {DiscordTextSafety.SanitizeExternalName(entryName(result))} {total(result)}");
+            count++;
+        }
+
+        return count;
     }
 
     private static string GetRankLabel(int rank) => rank switch
