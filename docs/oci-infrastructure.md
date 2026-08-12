@@ -182,14 +182,29 @@ For a manual redeployment:
 2. Select the default branch and enter `DEPLOY`.
 3. Approve the `oci-production` environment if protection rules are configured.
 
-The workflow publishes an immutable commit-SHA image to GHCR. On the VM it
-stops and retains the previous container, starts the new one with
-`--restart unless-stopped`, and runs the image's machine-readable health probe.
+The workflow publishes an immutable commit-SHA image to GHCR. The Dockerfile
+pins both .NET base images to manifest digests; update the version and digest
+together only after CI validates the new image. On the VM the deployment stops
+and retains the previous container, starts the new one with `--restart
+unless-stopped`, and runs the image's machine-readable health probe.
 The rollout succeeds only after Discord and SQLite readiness remains healthy
 for 15 continuous seconds. A failed probe resets that stabilization window. If
 startup fails or sustained readiness is not reached within 90 seconds, the new
 container is removed and the previous container is restored automatically.
 Deployments are serialized.
+
+### Container runtime restrictions
+
+The application process runs as the dedicated non-root `app` user. Its root
+filesystem is read-only; only `/app/data` is writable through the persistent
+host mount, and `/tmp` is a 16 MiB in-memory mount. Before every rollout the
+script gives the application user ownership of the data directory while
+retaining the host `docker` group so the deployment runner can manage it.
+
+Every production container also has all Linux capabilities dropped,
+`no-new-privileges`, a 512 MiB hard memory limit (256 MiB reservation), 0.75
+CPU, and a PID limit of 128. These limits leave headroom for Docker and the
+self-hosted runner on the 1 GB VM while containing a faulty bot process.
 
 Useful VM checks are:
 

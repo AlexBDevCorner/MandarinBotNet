@@ -38,6 +38,10 @@ if [[ "$1" == "info" || "$1" == "pull" ]]; then
   exit 0
 fi
 
+if [[ "$1" == "run" && "$*" == *"--entrypoint chown"* ]]; then
+  exit 0
+fi
+
 if [[ "$1" == "run" && "$*" == *"--entrypoint chmod"* ]]; then
   chmod 0770 "$TEST_DATA_DIRECTORY"
   exit 0
@@ -76,7 +80,12 @@ create_stat_mock() {
 set -Eeuo pipefail
 
 if [[ "$1" == "-c" && "$2" == "%G" ]]; then
-  printf '%s\n' "$TEST_STAT_GROUP"
+  printf '%s\n' "$TEST_STAT_GROUP_NAME"
+  exit 0
+fi
+
+if [[ "$1" == "-c" && "$2" == "%g" ]]; then
+  printf '%s\n' "$TEST_STAT_GROUP_ID"
   exit 0
 fi
 
@@ -87,7 +96,7 @@ EOF
 
 run_deployment() {
   local test_directory="$1"
-  local stat_group="$2"
+  local stat_group_name="$2"
   local output_file="$3"
 
   local deploy_directory="$test_directory/deploy"
@@ -105,7 +114,8 @@ run_deployment() {
     TEST_DOCKER_LOG="$test_directory/docker.log" \
     TEST_CONTAINER_STATE="$test_directory/container.state" \
     TEST_IMAGE="$image" \
-    TEST_STAT_GROUP="$stat_group" \
+    TEST_STAT_GROUP_NAME="$stat_group_name" \
+    TEST_STAT_GROUP_ID="999" \
     PATH="$mock_directory:$PATH" \
     IMAGE="$image" \
     CONTAINER_NAME="mandarinbot" \
@@ -130,8 +140,24 @@ test_repairs_docker_group_permissions_before_deployment() {
   fi
   [[ ! -e "$test_directory/deploy/data/health-state.json" ]] ||
     fail "stale health state was not removed"
+  grep -Fq -- '--user 0:0 --entrypoint chown' "$test_directory/docker.log" ||
+    fail "permission repair did not use a root-only helper container"
   grep -Fq -- '--entrypoint chmod' "$test_directory/docker.log" ||
     fail "permission repair container was not run"
+  grep -Eq -- '--user 10001:[0-9]+' "$test_directory/docker.log" ||
+    fail "application container did not run as the dedicated non-root user"
+  for required_option in \
+    '--read-only' \
+    '--tmpfs /tmp:rw,noexec,nosuid,size=16m' \
+    '--security-opt no-new-privileges:true' \
+    '--cap-drop ALL' \
+    '--memory 512m' \
+    '--memory-reservation 256m' \
+    '--cpus 0.75' \
+    '--pids-limit 128'; do
+    grep -Fq -- "$required_option" "$test_directory/docker.log" ||
+      fail "application container is missing runtime option: $required_option"
+  done
   grep -Fq 'Deployment succeeded' "$test_directory/output.log" ||
     fail "deployment did not report success"
 }
@@ -144,10 +170,10 @@ test_rejects_unexpected_data_directory_group() {
     fail "deployment accepted an unwritable directory outside the docker group"
   fi
 
-  grep -Fq 'is not writable and is not owned by the docker group' \
+  grep -Fq 'must be owned by the docker group' \
     "$test_directory/output.log" ||
     fail "unexpected group failure was not explained"
-  if grep -Fq -- '--entrypoint chmod' "$test_directory/docker.log"; then
+  if grep -Fq -- '--entrypoint chown' "$test_directory/docker.log"; then
     fail "permission repair was attempted for an unexpected group"
   fi
 }
