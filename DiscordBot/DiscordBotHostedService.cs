@@ -1,6 +1,7 @@
 using Discord;
 using Discord.WebSocket;
 using DiscordBot.Commands;
+using DiscordBot.WelcomeMessages;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
@@ -12,6 +13,7 @@ namespace DiscordBot
         DiscordConnectionReadiness readiness,
         DiscordCommandRegistrationCoordinator commandRegistration,
         IStandingsCommandHandler standingsCommandHandler,
+        IWelcomeMessageHandler welcomeMessageHandler,
         DiscordNetLogHandler discordLogHandler,
         ILogger<DiscordBotHostedService> logger) : IHostedService
     {
@@ -40,6 +42,7 @@ namespace DiscordBot
             gatewayConnection.Ready += ReadyAsync;
             gatewayConnection.Disconnected += DisconnectedAsync;
             gatewayConnection.SlashCommandExecuted += SlashCommandHandler;
+            gatewayConnection.UserJoined += welcomeMessageHandler.HandleAsync;
 
             try
             {
@@ -133,6 +136,7 @@ namespace DiscordBot
             gatewayConnection.Ready -= ReadyAsync;
             gatewayConnection.Disconnected -= DisconnectedAsync;
             gatewayConnection.SlashCommandExecuted -= SlashCommandHandler;
+            gatewayConnection.UserJoined -= welcomeMessageHandler.HandleAsync;
         }
 
         private async Task SlashCommandHandler(SocketSlashCommand command)

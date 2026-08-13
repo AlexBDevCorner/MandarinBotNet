@@ -13,6 +13,8 @@ public sealed class MandarinBotOptions
     public JobSchedulesOptions Schedules { get; init; } = new();
 
     public NotificationOptions Notifications { get; init; } = new();
+
+    public WelcomeMessageOptions WelcomeMessages { get; init; } = new();
 }
 
 public sealed class DiscordOptions
@@ -84,4 +86,13 @@ public sealed class NotificationTargetOptions
         ArgumentException.ThrowIfNullOrWhiteSpace(message);
         return MentionEveryone ? $"@everyone {message}" : message;
     }
+}
+
+public sealed class WelcomeMessageOptions
+{
+    public bool Enabled { get; init; }
+
+    public ulong GuildId { get; init; }
+
+    public ulong ChannelId { get; init; }
 }

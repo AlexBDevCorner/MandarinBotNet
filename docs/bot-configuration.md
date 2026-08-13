@@ -9,8 +9,17 @@ work.
 
 The tracked `appsettings.json` contains only non-secret schedule defaults. All
 jobs and command registration are disabled, and the notification target list is
-empty. A checkout therefore cannot broadcast or mutate Discord merely because
-someone supplies a token.
+empty. Welcome messages are also disabled. A checkout therefore cannot
+broadcast or mutate Discord merely because someone supplies a token.
+
+## Discord member intent
+
+Welcome messages use Discord's guild-member join event. The application enables
+Discord.NET's `GuildMembers` gateway intent in code, but Discord must also permit
+the privileged intent for the bot application. In the Discord Developer Portal,
+open **Applications > your application > Bot > Privileged Gateway Intents** and
+enable **Server Members Intent** before enabling welcome messages. Without both
+sides configured, Discord will not deliver member-join events.
 
 ## Production environment
 
@@ -22,6 +31,9 @@ jobs for one target looks like this:
 Bot__Discord__Token=<DISCORD-BOT-TOKEN>
 Bot__Discord__ReadinessTimeout=00:00:30
 Bot__Discord__Commands__RegistrationMode=Global
+Bot__WelcomeMessages__Enabled=true
+Bot__WelcomeMessages__GuildId=<WELCOME-GUILD-ID>
+Bot__WelcomeMessages__ChannelId=<WELCOME-CHANNEL-ID>
 Bot__FantasyPremierLeague__ClassicLeagueId=<CLASSIC-LEAGUE-ID>
 Bot__FantasyPremierLeague__HeadToHeadLeagueId=<HEAD-TO-HEAD-LEAGUE-ID>
 Bot__FantasyPremierLeague__MaxStandingsPages=10
@@ -40,6 +52,12 @@ Bot__Notifications__Targets__0__MentionEveryone=false
 Keep `Bot__Discord__Token` only in the VM env file or the deployment platform's
 secret provider. Never put it in `appsettings.json`, source control, logs, or a
 container image.
+
+`Bot__WelcomeMessages__Enabled` is an explicit opt-in. When enabled, only joins
+in `Bot__WelcomeMessages__GuildId` are handled, and the welcome text plus the
+packaged `pc7n1.jpg` image are sent together to
+`Bot__WelcomeMessages__ChannelId`. Missing or unavailable destination settings
+are logged and skipped without disconnecting the bot.
 
 `MaxStandingsPages` bounds the number of FPL standings pages fetched by each
 job. The default of 10 represents up to 500 league entries while preventing a

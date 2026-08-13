@@ -3,6 +3,7 @@ using AwesomeAssertions;
 using Discord;
 using Discord.WebSocket;
 using DiscordBot.Commands;
+using DiscordBot.WelcomeMessages;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -38,6 +39,8 @@ public sealed class DiscordBotHostedServiceIntegrationTests
         builder.Services.AddSingleton<DiscordCommandRegistrationCoordinator>();
         builder.Services.AddSingleton<IStandingsCommandHandler,
             TestStandingsCommandHandler>();
+        builder.Services.AddSingleton<IWelcomeMessageHandler,
+            TestWelcomeMessageHandler>();
         builder.Services.AddHostedService<DiscordBotHostedService>();
         builder.Services.AddSingleton<IHostedService>(scheduledWork);
         using var host = builder.Build();
@@ -112,6 +115,35 @@ public sealed class DiscordBotHostedServiceIntegrationTests
     }
 
     [Test]
+    public async Task StartAsync_MemberJoins_ForwardsToWelcomeMessageHandler()
+    {
+        // Arrange
+        var options = new DiscordOptions
+        {
+            Token = "test-token",
+            ReadinessTimeout = TimeSpan.FromSeconds(5)
+        };
+        var readiness = new DiscordConnectionReadiness(options);
+        var gateway = new TestDiscordGatewayConnection();
+        using var provider = CreateServiceProvider(options, readiness, gateway);
+        var service = provider.GetRequiredService<DiscordBotHostedService>();
+        var handler = (TestWelcomeMessageHandler)provider
+            .GetRequiredService<IWelcomeMessageHandler>();
+        var member = new DiscordGuildMember(10, 20, "<@20>");
+        var startTask = service.StartAsync(CancellationToken.None);
+        await gateway.RaiseReadyAsync();
+        await startTask;
+
+        // Act
+        await gateway.RaiseUserJoinedAsync(member);
+
+        // Assert
+        handler.Members.Should().ContainSingle().Which.Should().Be(member);
+
+        await service.StopAsync(CancellationToken.None);
+    }
+
+    [Test]
     public async Task StopAsync_ShutdownIsCanceled_DetachesAllEventHandlers()
     {
         // Arrange
@@ -176,6 +208,8 @@ public sealed class DiscordBotHostedServiceIntegrationTests
         services.AddSingleton<DiscordCommandRegistrationCoordinator>();
         services.AddSingleton<IStandingsCommandHandler,
             TestStandingsCommandHandler>();
+        services.AddSingleton<IWelcomeMessageHandler,
+            TestWelcomeMessageHandler>();
         services.AddSingleton<DiscordBotHostedService>();
 
         return services.BuildServiceProvider();
@@ -240,6 +274,7 @@ public sealed class DiscordBotHostedServiceIntegrationTests
         private Func<Task>? _ready;
         private Func<Exception, Task>? _disconnected;
         private Func<SocketSlashCommand, Task>? _slashCommandExecuted;
+        private Func<DiscordGuildMember, Task>? _userJoined;
 
         public event Func<LogMessage, Task>? Log
         {
@@ -265,6 +300,12 @@ public sealed class DiscordBotHostedServiceIntegrationTests
             remove => _slashCommandExecuted -= value;
         }
 
+        public event Func<DiscordGuildMember, Task>? UserJoined
+        {
+            add => _userJoined += value;
+            remove => _userJoined -= value;
+        }
+
         public List<string> Operations { get; } = [];
 
         public TaskCompletionSource StartCalled { get; } =
@@ -276,7 +317,8 @@ public sealed class DiscordBotHostedServiceIntegrationTests
             SubscriberCountFor(_log) +
             SubscriberCountFor(_ready) +
             SubscriberCountFor(_disconnected) +
-            SubscriberCountFor(_slashCommandExecuted);
+            SubscriberCountFor(_slashCommandExecuted) +
+            SubscriberCountFor(_userJoined);
 
         public Task LoginAsync(string token)
         {
@@ -308,6 +350,11 @@ public sealed class DiscordBotHostedServiceIntegrationTests
                 ?? Task.CompletedTask;
         }
 
+        public Task RaiseUserJoinedAsync(DiscordGuildMember member)
+        {
+            return _userJoined?.Invoke(member) ?? Task.CompletedTask;
+        }
+
         private static int SubscriberCountFor(Delegate? handlers)
         {
             return handlers?.GetInvocationList().Length ?? 0;
@@ -332,6 +379,17 @@ public sealed class DiscordBotHostedServiceIntegrationTests
         public Task HandleAsync(IDiscordSlashCommandInteraction interaction)
         {
             Interaction = interaction;
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class TestWelcomeMessageHandler : IWelcomeMessageHandler
+    {
+        public List<DiscordGuildMember> Members { get; } = [];
+
+        public Task HandleAsync(DiscordGuildMember member)
+        {
+            Members.Add(member);
             return Task.CompletedTask;
         }
     }
