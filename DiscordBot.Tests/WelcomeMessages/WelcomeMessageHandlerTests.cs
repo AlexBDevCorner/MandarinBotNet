@@ -70,7 +70,7 @@ public sealed class WelcomeMessageHandlerTests
     }
 
     [Test]
-    public async Task HandleAsync_FiveMatchingJoins_SendsImageAndRotatesMessages()
+    public async Task HandleAsync_SixMatchingJoins_SendsImageAndRotatesMessages()
     {
         // Arrange
         var channel = new FakeWelcomeMessageChannel();
@@ -79,7 +79,7 @@ public sealed class WelcomeMessageHandlerTests
         var handler = CreateHandler(CreateEnabledOptions(), resolver);
 
         // Act
-        for (ulong userId = 1; userId <= 5; userId++)
+        for (ulong userId = 1; userId <= 6; userId++)
         {
             await handler.HandleAsync(new DiscordGuildMember(
                 10,
@@ -88,12 +88,12 @@ public sealed class WelcomeMessageHandlerTests
         }
 
         // Assert
-        channel.Messages.Should().HaveCount(5);
+        channel.Messages.Should().HaveCount(6);
         channel.Messages.Should().OnlyContain(message =>
             message.ImagePath == _imagePath);
-        channel.Messages.Take(4).Select(message => message.Content)
+        channel.Messages.Take(5).Select(message => message.Content)
             .Should().OnlyHaveUniqueItems();
-        RemoveMention(channel.Messages[4].Content, "<@5>").Should().Be(
+        RemoveMention(channel.Messages[5].Content, "<@6>").Should().Be(
             RemoveMention(channel.Messages[0].Content, "<@1>"));
         channel.Messages.Select((message, index) => (message, index))
             .Should().OnlyContain(item =>
