@@ -37,6 +37,8 @@ public sealed class DiscordBotHostedServiceIntegrationTests
         builder.Services.AddSingleton<DiscordNetLogHandler>();
         builder.Services.AddSingleton<IDiscordCommandSynchronizer>(commandSynchronizer);
         builder.Services.AddSingleton<DiscordCommandRegistrationCoordinator>();
+        builder.Services.AddSingleton<IDeadlineCommandHandler,
+            TestDeadlineCommandHandler>();
         builder.Services.AddSingleton<IStandingsCommandHandler,
             TestStandingsCommandHandler>();
         builder.Services.AddSingleton<IWelcomeMessageHandler,
@@ -109,6 +111,36 @@ public sealed class DiscordBotHostedServiceIntegrationTests
 
         // Assert
         ((TestStandingsCommandHandler)handler).Interaction.Should()
+            .BeSameAs(interaction);
+
+        await service.StopAsync(CancellationToken.None);
+    }
+
+    [Test]
+    public async Task HandleSlashCommandAsync_DeadlineCommand_RoutesToDedicatedHandler()
+    {
+        // Arrange
+        var options = new DiscordOptions
+        {
+            Token = "test-token",
+            ReadinessTimeout = TimeSpan.FromSeconds(5)
+        };
+        var readiness = new DiscordConnectionReadiness(options);
+        var gateway = new TestDiscordGatewayConnection();
+        using var provider = CreateServiceProvider(options, readiness, gateway);
+        var service = provider.GetRequiredService<DiscordBotHostedService>();
+        var handler = provider.GetRequiredService<IDeadlineCommandHandler>();
+        var interaction = new TestSlashCommandInteraction(
+            DiscordApplicationCommands.DeadlineName);
+        var startTask = service.StartAsync(CancellationToken.None);
+        await gateway.RaiseReadyAsync();
+        await startTask;
+
+        // Act
+        await service.HandleSlashCommandAsync(interaction);
+
+        // Assert
+        ((TestDeadlineCommandHandler)handler).Interaction.Should()
             .BeSameAs(interaction);
 
         await service.StopAsync(CancellationToken.None);
@@ -206,6 +238,8 @@ public sealed class DiscordBotHostedServiceIntegrationTests
         services.AddSingleton<DiscordNetLogHandler>();
         services.AddSingleton<IDiscordCommandSynchronizer, TestCommandSynchronizer>();
         services.AddSingleton<DiscordCommandRegistrationCoordinator>();
+        services.AddSingleton<IDeadlineCommandHandler,
+            TestDeadlineCommandHandler>();
         services.AddSingleton<IStandingsCommandHandler,
             TestStandingsCommandHandler>();
         services.AddSingleton<IWelcomeMessageHandler,
@@ -373,6 +407,17 @@ public sealed class DiscordBotHostedServiceIntegrationTests
     }
 
     private sealed class TestStandingsCommandHandler : IStandingsCommandHandler
+    {
+        public IDiscordSlashCommandInteraction? Interaction { get; private set; }
+
+        public Task HandleAsync(IDiscordSlashCommandInteraction interaction)
+        {
+            Interaction = interaction;
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class TestDeadlineCommandHandler : IDeadlineCommandHandler
     {
         public IDiscordSlashCommandInteraction? Interaction { get; private set; }
 
