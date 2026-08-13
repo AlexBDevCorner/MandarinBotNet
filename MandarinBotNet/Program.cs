@@ -1,5 +1,6 @@
 using DiscordBot;
 using DiscordBot.Commands;
+using DiscordBot.Deadlines;
 using DiscordBot.FantasyPremierLeague;
 using DiscordBot.Health;
 using DiscordBot.Jobs;
@@ -71,6 +72,9 @@ builder.Services.AddSingleton<
     DiscordApplicationCommandClient>();
 builder.Services.AddSingleton<IDiscordCommandSynchronizer, DiscordCommandSynchronizer>();
 builder.Services.AddSingleton<DiscordCommandRegistrationCoordinator>();
+builder.Services.AddSingleton<IUpcomingDeadlineProvider,
+    FantasyPremierLeagueDeadlineProvider>();
+builder.Services.AddSingleton<IDeadlineCommandHandler, DeadlineCommandHandler>();
 builder.Services.AddSingleton<IStandingsCommandHandler, StandingsCommandHandler>();
 builder.Services.AddSingleton<WelcomeMessageTemplateRotator>();
 builder.Services.AddSingleton<

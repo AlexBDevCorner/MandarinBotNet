@@ -1,0 +1,151 @@
+using System.Net;
+using AwesomeAssertions;
+using DiscordBot.Commands;
+using DiscordBot.Deadlines;
+using DiscordBot.FantasyPremierLeague;
+using DiscordBot.PremierLeague;
+using Microsoft.Extensions.Logging;
+using NUnit.Framework;
+
+namespace DiscordBot.Tests.Commands;
+
+[TestFixture]
+public sealed class DeadlineCommandHandlerTests
+{
+    [TestCase(
+        "2027-02-02T12:00:00+00:00",
+        "FPL Gameweek 42 deadline: Tuesday, 2 February 2027 at 14:00 (Riga, Latvia, UTC+02:00).")]
+    [TestCase(
+        "2027-08-02T12:00:00+00:00",
+        "FPL Gameweek 42 deadline: Monday, 2 August 2027 at 15:00 (Riga, Latvia, UTC+03:00).")]
+    public async Task HandleAsync_UpcomingDeadline_DisplaysRigaCivilTime(
+        string deadlineText,
+        string expectedMessage)
+    {
+        // Arrange
+        var deadline = DateTimeOffset.Parse(deadlineText);
+        var operations = new List<string>();
+        var provider = new TestDeadlineProvider(operations)
+        {
+            Result = new CompetitionDeadline("FPL", "Gameweek", 42, deadline)
+        };
+        var interaction = new TestSlashCommandInteraction(operations);
+        var handler = CreateHandler(provider);
+
+        // Act
+        await handler.HandleAsync(interaction);
+
+        // Assert
+        operations.Should().Equal("Defer", "Fetch", "Modify");
+        interaction.Messages.Should().Equal(expectedMessage);
+    }
+
+    [Test]
+    public async Task HandleAsync_NoUpcomingDeadline_ReturnsHelpfulMessage()
+    {
+        // Arrange
+        var provider = new TestDeadlineProvider([]);
+        var interaction = new TestSlashCommandInteraction([]);
+        var handler = CreateHandler(provider);
+
+        // Act
+        await handler.HandleAsync(interaction);
+
+        // Assert
+        interaction.Messages.Should().Equal(
+            "The next FPL deadline is not available yet.");
+    }
+
+    [Test]
+    public async Task HandleAsync_FplApiFails_ReturnsRetryMessageAndLogsFailure()
+    {
+        // Arrange
+        var logger = new RecordingLogger<DeadlineCommandHandler>();
+        var provider = new TestDeadlineProvider([])
+        {
+            Exception = new FantasyPremierLeagueApiException(
+                FantasyPremierLeagueFailureKind.Transient,
+                "Classified test failure.",
+                HttpStatusCode.ServiceUnavailable)
+        };
+        var interaction = new TestSlashCommandInteraction([]);
+        var handler = CreateHandler(provider, logger);
+
+        // Act
+        await handler.HandleAsync(interaction);
+
+        // Assert
+        interaction.Messages.Should().Equal(
+            "The FPL deadline is unavailable right now. Please try again later.");
+        var logEntry = logger.Entries.Should().ContainSingle().Which;
+        logEntry.Level.Should().Be(LogLevel.Warning);
+        logEntry.Properties["FailureKind"].Should()
+            .Be(FantasyPremierLeagueFailureKind.Transient);
+        logEntry.Properties["StatusCode"].Should()
+            .Be(HttpStatusCode.ServiceUnavailable);
+    }
+
+    private static DeadlineCommandHandler CreateHandler(
+        IUpcomingDeadlineProvider provider,
+        ILogger<DeadlineCommandHandler>? logger = null)
+    {
+        return new DeadlineCommandHandler(
+            provider,
+            DiscordBot.Tests.PremierLeague.TestTimeZones.Riga(),
+            logger ?? new RecordingLogger<DeadlineCommandHandler>());
+    }
+
+    private sealed class TestDeadlineProvider(List<string> operations)
+        : IUpcomingDeadlineProvider
+    {
+        public CompetitionDeadline? Result { get; init; }
+
+        public Exception? Exception { get; init; }
+
+        public Task<CompetitionDeadline?> GetNextAsync(
+            CancellationToken cancellationToken)
+        {
+            operations.Add("Fetch");
+            return Exception is null
+                ? Task.FromResult(Result)
+                : Task.FromException<CompetitionDeadline?>(Exception);
+        }
+    }
+
+    private sealed class TestSlashCommandInteraction(List<string> operations)
+        : IDiscordSlashCommandInteraction
+    {
+        public string Name => DiscordApplicationCommands.DeadlineName;
+
+        public string UserMention => "<@123>";
+
+        public List<string> Messages { get; } = [];
+
+        public Task RespondAsync(string content)
+        {
+            operations.Add("Respond");
+            Messages.Add(content);
+            return Task.CompletedTask;
+        }
+
+        public Task DeferAsync()
+        {
+            operations.Add("Defer");
+            return Task.CompletedTask;
+        }
+
+        public Task ModifyOriginalResponseAsync(string content)
+        {
+            operations.Add("Modify");
+            Messages.Add(content);
+            return Task.CompletedTask;
+        }
+
+        public Task FollowupAsync(string content)
+        {
+            operations.Add("Followup");
+            Messages.Add(content);
+            return Task.CompletedTask;
+        }
+    }
+}

@@ -12,6 +12,7 @@ namespace DiscordBot
         IDiscordGatewayConnection gatewayConnection,
         DiscordConnectionReadiness readiness,
         DiscordCommandRegistrationCoordinator commandRegistration,
+        IDeadlineCommandHandler deadlineCommandHandler,
         IStandingsCommandHandler standingsCommandHandler,
         IWelcomeMessageHandler welcomeMessageHandler,
         DiscordNetLogHandler discordLogHandler,
@@ -34,6 +35,7 @@ namespace DiscordBot
 
             _commandHandlers = new()
             {
+                { DiscordApplicationCommands.DeadlineName, deadlineCommandHandler.HandleAsync },
                 { DiscordApplicationCommands.HugMeName, HandleHugMeCommand },
                 { DiscordApplicationCommands.StandingsName, standingsCommandHandler.HandleAsync }
             };
