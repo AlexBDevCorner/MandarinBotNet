@@ -57,6 +57,14 @@ public sealed class WelcomeMessageDestinationResolver(
 
 public sealed class WelcomeMessageTemplateRotator
 {
+    private const string LeagueLinks =
+        "FPL Лига обнимашек:\n\n" +
+        "https://fantasy.premierleague.com/leagues/auto-join/n9ki9b\n\n" +
+        "FPL Лига обнимашек-к-обнимашкам\n\n" +
+        "https://fantasy.premierleague.com/leagues/auto-join/a5gnav\n\n" +
+        "ЛЧ Лига светоча нашего великого и единственного Мессии:\n\n" +
+        "https://gaming.uefa.com/en/uclfantasy/leagues/3gp3eN/004D0061006700750069007200650020004D0065007300730069006100680020004C00650061006700750065/Bebrakungs";
+
     private static readonly string[] Templates =
     [
         "**{user} вошёл на сервер.** Мбаппе — диктатор, у Винисиуса новый подбородок, **Магуайр — свят. Мир стабилен.**",
@@ -80,10 +88,11 @@ public sealed class WelcomeMessageTemplateRotator
             _nextIndex = (_nextIndex + 1) % Templates.Length;
         }
 
-        return template.Replace(
+        var welcomeText = template.Replace(
             "{user}",
             userMention,
             StringComparison.Ordinal);
+        return $"{welcomeText}\n\n{LeagueLinks}";
     }
 }
 
