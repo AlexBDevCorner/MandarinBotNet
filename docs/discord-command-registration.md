@@ -10,7 +10,10 @@ The synchronized command set currently contains:
 - `/standings`, which defers immediately and then returns on-demand snapshots
   of both configured Fantasy Premier League tables. The command always uses the
   configured classic and head-to-head league IDs and does not accept arbitrary
-  league IDs.
+  league IDs;
+- `/deadline`, which shows the next FPL gameweek deadline in Riga time;
+- `/benchleague`, which shows the current bench warming league standings from
+  the local SQLite storage.
 
 Registration runs once after the Discord gateway first becomes ready during a
 process startup. It uses Discord's bulk-overwrite endpoint, so removed or

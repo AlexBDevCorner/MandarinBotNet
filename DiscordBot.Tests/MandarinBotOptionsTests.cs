@@ -44,7 +44,8 @@ public sealed class MandarinBotOptionsTests
             ["Bot:Schedules:TimeZoneId"] = "Europe/Riga",
             ["Bot:Schedules:PremierLeagueNotifications:Cron"] = "0 0 * * * ?",
             ["Bot:Schedules:ClassicStandings:Cron"] = "0 0 17 * * ?",
-            ["Bot:Schedules:HeadToHeadStandings:Cron"] = "0 0 17 * * ?"
+            ["Bot:Schedules:HeadToHeadStandings:Cron"] = "0 0 17 * * ?",
+            ["Bot:Schedules:BenchWarmingLeague:Cron"] = "0 0 18 * * ?"
         });
         builder.Services.AddMandarinBotConfiguration(
             builder.Configuration,
@@ -73,7 +74,8 @@ public sealed class MandarinBotOptionsTests
                 TimeZoneId = "Europe/Riga",
                 PremierLeagueNotifications = ValidSchedule(enabled: false, "0 0 * * * ?"),
                 ClassicStandings = ValidSchedule(enabled: true, "0 0 17 * * ?"),
-                HeadToHeadStandings = ValidSchedule(enabled: false, "0 0 17 * * ?")
+                HeadToHeadStandings = ValidSchedule(enabled: false, "0 0 17 * * ?"),
+                BenchWarmingLeague = ValidSchedule(enabled: false, "0 0 18 * * ?")
             },
             targets: []);
         var validator = new MandarinBotOptionsValidator(
@@ -88,6 +90,36 @@ public sealed class MandarinBotOptionsTests
             failure.Contains("ClassicLeagueId"));
         result.Failures.Should().Contain(failure =>
             failure.Contains("Targets"));
+    }
+
+    [Test]
+    public void Validate_EnabledBenchWarmingJobWithoutClassicLeague_ReturnsFailure()
+    {
+        // Arrange
+        var options = CreateValidOptions(
+            leagueOptions: new FantasyPremierLeagueOptions
+            {
+                ClassicLeagueId = 0,
+                HeadToHeadLeagueId = 456
+            },
+            schedules: new JobSchedulesOptions
+            {
+                TimeZoneId = "Europe/Riga",
+                PremierLeagueNotifications = ValidSchedule(enabled: false, "0 0 * * * ?"),
+                ClassicStandings = ValidSchedule(enabled: false, "0 0 17 * * ?"),
+                HeadToHeadStandings = ValidSchedule(enabled: false, "0 0 17 * * ?"),
+                BenchWarmingLeague = ValidSchedule(enabled: true, "0 0 18 * * ?")
+            });
+        var validator = new MandarinBotOptionsValidator(
+            requireOperationalConfiguration: true);
+
+        // Act
+        var result = validator.Validate(null, options);
+
+        // Assert
+        result.Failed.Should().BeTrue();
+        result.Failures.Should().Contain(failure =>
+            failure.Contains("bench warming league job is enabled"));
     }
 
     [Test]
@@ -241,7 +273,8 @@ public sealed class MandarinBotOptionsTests
                 TimeZoneId = "Europe/Riga",
                 PremierLeagueNotifications = ValidSchedule(enabled: true, "0 0 * * * ?"),
                 ClassicStandings = ValidSchedule(enabled: true, "0 0 17 * * ?"),
-                HeadToHeadStandings = ValidSchedule(enabled: true, "0 0 17 * * ?")
+                HeadToHeadStandings = ValidSchedule(enabled: true, "0 0 17 * * ?"),
+                BenchWarmingLeague = ValidSchedule(enabled: true, "0 0 18 * * ?")
             },
             Notifications = new NotificationOptions
             {

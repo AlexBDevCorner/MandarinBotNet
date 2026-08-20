@@ -44,6 +44,8 @@ Bot__Schedules__ClassicStandings__Enabled=true
 Bot__Schedules__ClassicStandings__Cron=0 0 17 * * ?
 Bot__Schedules__HeadToHeadStandings__Enabled=true
 Bot__Schedules__HeadToHeadStandings__Cron=0 0 17 * * ?
+Bot__Schedules__BenchWarmingLeague__Enabled=true
+Bot__Schedules__BenchWarmingLeague__Cron=0 0 18 * * ?
 Bot__Notifications__Targets__0__GuildId=<FIRST-GUILD-ID>
 Bot__Notifications__Targets__0__ChannelId=<FIRST-CHANNEL-ID>
 Bot__Notifications__Targets__0__MentionEveryone=false
@@ -62,6 +64,22 @@ are logged and skipped without disconnecting the bot.
 `MaxStandingsPages` bounds the number of FPL standings pages fetched by each
 job. The default of 10 represents up to 500 league entries while preventing a
 bad or unexpectedly large upstream pagination sequence from running forever.
+
+## Bench warming league
+
+The bench warming league is an alternative standings table tracking fantasy
+points league managers leave on the bench. Once a gameweek finishes, the
+`BenchWarmingLeague` job fetches every classic-league entry's final lineup,
+sums the points of players who stayed benched (multiplier `0` after automatic
+substitutions), and persists per-round results into a separate SQLite database
+(`data/bench-warming-league.db` next to the notification database). Standings
+accumulate per manager across the season and reset naturally when a new FPL
+season starts because every row is keyed by the season name.
+
+The job requires `Bot:FantasyPremierLeague:ClassicLeagueId` and posts a round
+summary to every notification target after calculating a new round. The
+`/benchleague` slash command shows the current season standings on demand.
+Historical rounds are not backfilled; tracking starts when the feature ships.
 
 ## Multiple targets and mentions
 

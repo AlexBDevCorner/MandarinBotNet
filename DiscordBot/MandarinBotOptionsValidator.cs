@@ -43,6 +43,10 @@ public sealed class MandarinBotOptionsValidator(bool requireOperationalConfigura
             "Bot:Schedules:HeadToHeadStandings",
             options.Schedules.HeadToHeadStandings,
             failures);
+        ValidateSchedule(
+            "Bot:Schedules:BenchWarmingLeague",
+            options.Schedules.BenchWarmingLeague,
+            failures);
 
         if (requireOperationalConfiguration && !options.Schedules.HasEnabledJobs)
         {
@@ -62,6 +66,13 @@ public sealed class MandarinBotOptionsValidator(bool requireOperationalConfigura
         {
             failures.Add(
                 "Bot:FantasyPremierLeague:HeadToHeadLeagueId is required when the head-to-head standings job is enabled.");
+        }
+
+        if (options.Schedules.BenchWarmingLeague.Enabled &&
+            options.FantasyPremierLeague.ClassicLeagueId <= 0)
+        {
+            failures.Add(
+                "Bot:FantasyPremierLeague:ClassicLeagueId is required when the bench warming league job is enabled.");
         }
 
         if (options.FantasyPremierLeague.MaxStandingsPages <= 0)

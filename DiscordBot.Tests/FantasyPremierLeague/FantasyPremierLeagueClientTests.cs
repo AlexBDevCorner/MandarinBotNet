@@ -283,6 +283,109 @@ public sealed class FantasyPremierLeagueClientTests
     }
 
     [Test]
+    public async Task GetEntryEventPicksAsync_ValidPayload_ReturnsBenchAndStartingPicks()
+    {
+        // Arrange
+        var handler = new StubHttpMessageHandler((_, _) =>
+            Task.FromResult(CreateJsonResponse(
+                """
+                {
+                  "picks": [
+                    {
+                      "element": 1,
+                      "position": 12,
+                      "multiplier": 0,
+                      "is_captain": false,
+                      "is_vice_captain": false
+                    },
+                    {
+                      "element": 2,
+                      "position": 1,
+                      "multiplier": 2,
+                      "is_captain": true,
+                      "is_vice_captain": false
+                    }
+                  ]
+                }
+                """)));
+        using var provider = CreateProvider(handler);
+        var client = provider.GetRequiredService<IFantasyPremierLeagueClient>();
+
+        // Act
+        var result = await client.GetEntryEventPicksAsync(
+            4791912,
+            8,
+            CancellationToken.None);
+
+        // Assert
+        result.Picks.Should().HaveCount(2);
+        result.Picks[0].Element.Should().Be(1);
+        result.Picks[0].Multiplier.Should().Be(0);
+        result.Picks[1].Element.Should().Be(2);
+        result.Picks[1].Multiplier.Should().Be(2);
+        result.Picks[1].IsCaptain.Should().BeTrue();
+        handler.RequestUris.Should().OnlyContain(
+            uri => uri.PathAndQuery == "/api/entry/4791912/event/8/picks/");
+    }
+
+    [Test]
+    public async Task GetEventLiveAsync_ValidPayload_ReturnsElementTotalPoints()
+    {
+        // Arrange
+        var handler = new StubHttpMessageHandler((_, _) =>
+            Task.FromResult(CreateJsonResponse(
+                """
+                {
+                  "elements": [
+                    {
+                      "id": 1,
+                      "stats": { "total_points": 15, "goals_scored": 2 },
+                      "explain": []
+                    },
+                    {
+                      "id": 2,
+                      "stats": { "total_points": -1 },
+                      "explain": []
+                    }
+                  ]
+                }
+                """)));
+        using var provider = CreateProvider(handler);
+        var client = provider.GetRequiredService<IFantasyPremierLeagueClient>();
+
+        // Act
+        var result = await client.GetEventLiveAsync(8, CancellationToken.None);
+
+        // Assert
+        result.Elements.Select(element => (element.Id, element.Stats.TotalPoints))
+            .Should().BeEquivalentTo([(1, 15), (2, -1)]);
+        handler.RequestUris.Should().OnlyContain(
+            uri => uri.PathAndQuery == "/api/event/8/live/");
+    }
+
+    [Test]
+    public async Task GetEntryEventPicksAsync_MissingPicksPayload_ClassifiesInvalidPayload()
+    {
+        // Arrange
+        var handler = new StubHttpMessageHandler((_, _) =>
+            Task.FromResult(CreateJsonResponse("""{"active_chip": null}""")));
+        using var provider = CreateProvider(handler);
+        var client = provider.GetRequiredService<IFantasyPremierLeagueClient>();
+
+        // Act
+        Func<Task> act = () => client.GetEntryEventPicksAsync(
+            4791912,
+            8,
+            CancellationToken.None);
+
+        // Assert
+        var exception = await act.Should()
+            .ThrowAsync<FantasyPremierLeagueApiException>();
+        exception.Which.FailureKind.Should()
+            .Be(FantasyPremierLeagueFailureKind.InvalidPayload);
+    }
+
+    [Test]
     public void ClientOptions_Defaults_BoundRetriesAndEnableJitter()
     {
         // Arrange

@@ -11,6 +11,8 @@ public static class JobSchedules
         "PremierLeagueClassicStandingsInformationTrigger";
     public const string PremierLeagueH2hStandingsInformationTriggerName =
         "PremierLeagueH2hStandingsInformationTrigger";
+    public const string BenchWarmingLeagueCalculationTriggerName =
+        "BenchWarmingLeagueCalculationTrigger";
 
     public static readonly JobKey PremierLeagueNotificationJobKey =
         new("PremierLeagueNotification");
@@ -20,6 +22,9 @@ public static class JobSchedules
 
     public static readonly JobKey PremierLeagueH2hStandingsInformationJobKey =
         new("PremierLeagueH2hStandingsInformation");
+
+    public static readonly JobKey BenchWarmingLeagueCalculationJobKey =
+        new("BenchWarmingLeagueCalculation");
 
     public static TimeZoneInfo GetTimeZone(JobSchedulesOptions options)
     {
@@ -50,12 +55,21 @@ public static class JobSchedules
             options.HeadToHeadStandings.Cron,
             options.TimeZoneId);
 
+    public static ITrigger CreateBenchWarmingLeagueCalculationTrigger(
+        JobSchedulesOptions options) =>
+        CreateCronTrigger(
+            BenchWarmingLeagueCalculationJobKey,
+            BenchWarmingLeagueCalculationTriggerName,
+            options.BenchWarmingLeague.Cron,
+            options.TimeZoneId);
+
     public static IReadOnlyList<ITrigger> CreateAllTriggers(
         JobSchedulesOptions options) =>
     [
         CreatePremierLeagueNotificationTrigger(options),
         CreatePremierLeagueClassicStandingsInformationTrigger(options),
-        CreatePremierLeagueH2hStandingsInformationTrigger(options)
+        CreatePremierLeagueH2hStandingsInformationTrigger(options),
+        CreateBenchWarmingLeagueCalculationTrigger(options)
     ];
 
     private static ITrigger CreateCronTrigger(

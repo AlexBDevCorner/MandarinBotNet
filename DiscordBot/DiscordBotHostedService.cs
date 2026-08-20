@@ -14,6 +14,7 @@ namespace DiscordBot
         DiscordCommandRegistrationCoordinator commandRegistration,
         IDeadlineCommandHandler deadlineCommandHandler,
         IStandingsCommandHandler standingsCommandHandler,
+        IBenchLeagueCommandHandler benchLeagueCommandHandler,
         IWelcomeMessageHandler welcomeMessageHandler,
         DiscordNetLogHandler discordLogHandler,
         ILogger<DiscordBotHostedService> logger) : IHostedService
@@ -37,7 +38,8 @@ namespace DiscordBot
             {
                 { DiscordApplicationCommands.DeadlineName, deadlineCommandHandler.HandleAsync },
                 { DiscordApplicationCommands.HugMeName, HandleHugMeCommand },
-                { DiscordApplicationCommands.StandingsName, standingsCommandHandler.HandleAsync }
+                { DiscordApplicationCommands.StandingsName, standingsCommandHandler.HandleAsync },
+                { DiscordApplicationCommands.BenchLeagueName, benchLeagueCommandHandler.HandleAsync }
             };
 
             gatewayConnection.Log += discordLogHandler.HandleAsync;

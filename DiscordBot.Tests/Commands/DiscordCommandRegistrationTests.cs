@@ -69,12 +69,13 @@ public sealed class DiscordCommandRegistrationTests
         // Assert
         commandClient.GlobalCalls.Should().Be(1);
         commandClient.GuildCalls.Should().Be(0);
-        commandClient.Commands.Should().HaveCount(3);
+        commandClient.Commands.Should().HaveCount(4);
         commandClient.Commands!.Select(command => command.Name.Value).Should()
             .Equal(
                 DiscordApplicationCommands.HugMeName,
                 DiscordApplicationCommands.StandingsName,
-                DiscordApplicationCommands.DeadlineName);
+                DiscordApplicationCommands.DeadlineName,
+                DiscordApplicationCommands.BenchLeagueName);
     }
 
     [Test]
@@ -97,7 +98,7 @@ public sealed class DiscordCommandRegistrationTests
         commandClient.GlobalCalls.Should().Be(0);
         commandClient.GuildCalls.Should().Be(1);
         commandClient.GuildId.Should().Be(guildId);
-        commandClient.Commands.Should().HaveCount(3);
+        commandClient.Commands.Should().HaveCount(4);
     }
 
     [Test]

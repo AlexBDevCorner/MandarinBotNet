@@ -41,6 +41,8 @@ public sealed class DiscordBotHostedServiceIntegrationTests
             TestDeadlineCommandHandler>();
         builder.Services.AddSingleton<IStandingsCommandHandler,
             TestStandingsCommandHandler>();
+        builder.Services.AddSingleton<IBenchLeagueCommandHandler,
+            TestBenchLeagueCommandHandler>();
         builder.Services.AddSingleton<IWelcomeMessageHandler,
             TestWelcomeMessageHandler>();
         builder.Services.AddHostedService<DiscordBotHostedService>();
@@ -147,6 +149,36 @@ public sealed class DiscordBotHostedServiceIntegrationTests
     }
 
     [Test]
+    public async Task HandleSlashCommandAsync_BenchLeagueCommand_RoutesToDedicatedHandler()
+    {
+        // Arrange
+        var options = new DiscordOptions
+        {
+            Token = "test-token",
+            ReadinessTimeout = TimeSpan.FromSeconds(5)
+        };
+        var readiness = new DiscordConnectionReadiness(options);
+        var gateway = new TestDiscordGatewayConnection();
+        using var provider = CreateServiceProvider(options, readiness, gateway);
+        var service = provider.GetRequiredService<DiscordBotHostedService>();
+        var handler = provider.GetRequiredService<IBenchLeagueCommandHandler>();
+        var interaction = new TestSlashCommandInteraction(
+            DiscordApplicationCommands.BenchLeagueName);
+        var startTask = service.StartAsync(CancellationToken.None);
+        await gateway.RaiseReadyAsync();
+        await startTask;
+
+        // Act
+        await service.HandleSlashCommandAsync(interaction);
+
+        // Assert
+        ((TestBenchLeagueCommandHandler)handler).Interaction.Should()
+            .BeSameAs(interaction);
+
+        await service.StopAsync(CancellationToken.None);
+    }
+
+    [Test]
     public async Task StartAsync_MemberJoins_ForwardsToWelcomeMessageHandler()
     {
         // Arrange
@@ -242,6 +274,8 @@ public sealed class DiscordBotHostedServiceIntegrationTests
             TestDeadlineCommandHandler>();
         services.AddSingleton<IStandingsCommandHandler,
             TestStandingsCommandHandler>();
+        services.AddSingleton<IBenchLeagueCommandHandler,
+            TestBenchLeagueCommandHandler>();
         services.AddSingleton<IWelcomeMessageHandler,
             TestWelcomeMessageHandler>();
         services.AddSingleton<DiscordBotHostedService>();
@@ -418,6 +452,17 @@ public sealed class DiscordBotHostedServiceIntegrationTests
     }
 
     private sealed class TestDeadlineCommandHandler : IDeadlineCommandHandler
+    {
+        public IDiscordSlashCommandInteraction? Interaction { get; private set; }
+
+        public Task HandleAsync(IDiscordSlashCommandInteraction interaction)
+        {
+            Interaction = interaction;
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class TestBenchLeagueCommandHandler : IBenchLeagueCommandHandler
     {
         public IDiscordSlashCommandInteraction? Interaction { get; private set; }
 
