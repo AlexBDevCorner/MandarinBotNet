@@ -1,5 +1,6 @@
 using AwesomeAssertions;
 using DiscordBot.Jobs;
+using DiscordBot.UclFantasy;
 using NUnit.Framework;
 using Quartz;
 
@@ -12,6 +13,11 @@ namespace DiscordBot.Tests.Jobs
         {
             TimeZoneId = "Europe/Riga",
             PremierLeagueNotifications = new ScheduledJobOptions
+            {
+                Enabled = true,
+                Cron = "0 0 * * * ?"
+            },
+            UclFantasyNotifications = new ScheduledJobOptions
             {
                 Enabled = true,
                 Cron = "0 0 * * * ?"
@@ -46,6 +52,22 @@ namespace DiscordBot.Tests.Jobs
             var cronTrigger = trigger.Should().BeAssignableTo<ICronTrigger>().Subject;
             cronTrigger.CronExpressionString.Should()
                 .Be(Options.PremierLeagueNotifications.Cron);
+            cronTrigger.TimeZone.Should().Be(expectedTimeZone);
+        }
+
+        [Test]
+        public void CreateUclDeadlineNotificationTrigger_DefaultSchedule_UsesCronAndRigaTimeZone()
+        {
+            // Arrange
+            var expectedTimeZone = JobSchedules.GetTimeZone(Options);
+
+            // Act
+            var trigger = JobSchedules.CreateUclDeadlineNotificationTrigger(Options);
+
+            // Assert
+            var cronTrigger = trigger.Should().BeAssignableTo<ICronTrigger>().Subject;
+            cronTrigger.CronExpressionString.Should()
+                .Be(Options.UclFantasyNotifications.Cron);
             cronTrigger.TimeZone.Should().Be(expectedTimeZone);
         }
 
@@ -131,6 +153,7 @@ namespace DiscordBot.Tests.Jobs
         }
 
         [TestCase(typeof(PremierLeagueNotificationJob))]
+        [TestCase(typeof(UclDeadlineNotificationJob))]
         [TestCase(typeof(PremierLeagueClassicStandingsInformationJob))]
         [TestCase(typeof(PremierLeagueH2hStandingsInformationJob))]
         [TestCase(typeof(BenchWarmingLeagueCalculationJob))]

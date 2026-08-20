@@ -7,6 +7,7 @@ using DiscordBot.Health;
 using DiscordBot.Jobs;
 using DiscordBot.Notifications;
 using DiscordBot.PremierLeague;
+using DiscordBot.UclFantasy;
 using DiscordBot.WelcomeMessages;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
@@ -40,6 +41,7 @@ builder.Services.AddMandarinBotConfiguration(
     builder.Configuration,
     builder.Environment);
 builder.Services.AddFantasyPremierLeagueClient();
+builder.Services.AddUclFantasyClient();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<ConfiguredTimeZone>();
 builder.Services.AddSingleton<DeadlineSelectionService>();
@@ -48,6 +50,7 @@ builder.Services.AddSingleton<StandingsPublicationEligibilityService>();
 builder.Services.AddSingleton<StandingsChangeService>();
 builder.Services.AddSingleton<WinnerSelectionService>();
 builder.Services.AddSingleton<PremierLeagueMessageCompositionService>();
+builder.Services.AddSingleton<UclFantasyMessageCompositionService>();
 
 builder.Logging.ClearProviders();
 builder.Logging.AddConsole();
@@ -75,6 +78,9 @@ builder.Services.AddSingleton<IDiscordCommandSynchronizer, DiscordCommandSynchro
 builder.Services.AddSingleton<DiscordCommandRegistrationCoordinator>();
 builder.Services.AddSingleton<IUpcomingDeadlineProvider,
     FantasyPremierLeagueDeadlineProvider>();
+builder.Services.AddSingleton<UclFantasyDeadlineProvider>();
+builder.Services.AddSingleton<IUpcomingDeadlineProvider>(services =>
+    services.GetRequiredService<UclFantasyDeadlineProvider>());
 builder.Services.AddSingleton<IDeadlineCommandHandler, DeadlineCommandHandler>();
 builder.Services.AddSingleton<IStandingsCommandHandler, StandingsCommandHandler>();
 builder.Services.AddSingleton<IBenchLeagueCommandHandler, BenchLeagueCommandHandler>();
@@ -151,6 +157,20 @@ builder.Services.AddOptions<QuartzOptions>()
             .WithIdentity(JobSchedules.PremierLeagueNotificationTriggerName)
             .WithCronSchedule(
                 schedules.PremierLeagueNotifications.Cron,
+                schedule => schedule
+                    .InTimeZone(timeZone)
+                    .WithMisfireHandlingInstructionDoNothing()));
+    }
+
+    if (schedules.UclFantasyNotifications.Enabled)
+    {
+        q.AddJob<UclDeadlineNotificationJob>(
+            job => job.WithIdentity(JobSchedules.UclDeadlineNotificationJobKey));
+        q.AddTrigger(trigger => trigger
+            .ForJob(JobSchedules.UclDeadlineNotificationJobKey)
+            .WithIdentity(JobSchedules.UclDeadlineNotificationTriggerName)
+            .WithCronSchedule(
+                schedules.UclFantasyNotifications.Cron,
                 schedule => schedule
                     .InTimeZone(timeZone)
                     .WithMisfireHandlingInstructionDoNothing()));

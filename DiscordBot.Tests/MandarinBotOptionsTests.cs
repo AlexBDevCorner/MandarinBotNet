@@ -43,6 +43,7 @@ public sealed class MandarinBotOptionsTests
         {
             ["Bot:Schedules:TimeZoneId"] = "Europe/Riga",
             ["Bot:Schedules:PremierLeagueNotifications:Cron"] = "0 0 * * * ?",
+            ["Bot:Schedules:UclFantasyNotifications:Cron"] = "0 0 * * * ?",
             ["Bot:Schedules:ClassicStandings:Cron"] = "0 0 17 * * ?",
             ["Bot:Schedules:HeadToHeadStandings:Cron"] = "0 0 17 * * ?",
             ["Bot:Schedules:BenchWarmingLeague:Cron"] = "0 0 18 * * ?"
@@ -73,6 +74,7 @@ public sealed class MandarinBotOptionsTests
             {
                 TimeZoneId = "Europe/Riga",
                 PremierLeagueNotifications = ValidSchedule(enabled: false, "0 0 * * * ?"),
+                UclFantasyNotifications = ValidSchedule(enabled: false, "0 0 * * * ?"),
                 ClassicStandings = ValidSchedule(enabled: true, "0 0 17 * * ?"),
                 HeadToHeadStandings = ValidSchedule(enabled: false, "0 0 17 * * ?"),
                 BenchWarmingLeague = ValidSchedule(enabled: false, "0 0 18 * * ?")
@@ -106,6 +108,7 @@ public sealed class MandarinBotOptionsTests
             {
                 TimeZoneId = "Europe/Riga",
                 PremierLeagueNotifications = ValidSchedule(enabled: false, "0 0 * * * ?"),
+                UclFantasyNotifications = ValidSchedule(enabled: false, "0 0 * * * ?"),
                 ClassicStandings = ValidSchedule(enabled: false, "0 0 17 * * ?"),
                 HeadToHeadStandings = ValidSchedule(enabled: false, "0 0 17 * * ?"),
                 BenchWarmingLeague = ValidSchedule(enabled: true, "0 0 18 * * ?")
@@ -272,6 +275,7 @@ public sealed class MandarinBotOptionsTests
             {
                 TimeZoneId = "Europe/Riga",
                 PremierLeagueNotifications = ValidSchedule(enabled: true, "0 0 * * * ?"),
+                UclFantasyNotifications = ValidSchedule(enabled: true, "0 0 * * * ?"),
                 ClassicStandings = ValidSchedule(enabled: true, "0 0 17 * * ?"),
                 HeadToHeadStandings = ValidSchedule(enabled: true, "0 0 17 * * ?"),
                 BenchWarmingLeague = ValidSchedule(enabled: true, "0 0 18 * * ?")

@@ -15,6 +15,8 @@ COPY ["MandarinBotNet/MandarinBotNet.csproj", "MandarinBotNet/"]
 COPY ["MandarinBotNet/packages.lock.json", "MandarinBotNet/"]
 COPY ["DiscordBot/DiscordBot.csproj", "DiscordBot/"]
 COPY ["DiscordBot/packages.lock.json", "DiscordBot/"]
+COPY ["DiscordBot.UclFantasy/DiscordBot.UclFantasy.csproj", "DiscordBot.UclFantasy/"]
+COPY ["DiscordBot.UclFantasy/packages.lock.json", "DiscordBot.UclFantasy/"]
 RUN dotnet restore "./MandarinBotNet/MandarinBotNet.csproj" --locked-mode
 COPY . .
 WORKDIR "/src/MandarinBotNet"

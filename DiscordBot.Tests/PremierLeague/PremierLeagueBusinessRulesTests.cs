@@ -88,6 +88,31 @@ public sealed class ReminderEligibilityServiceTests
         // Assert
         result.Should().Be(expected);
     }
+
+    [Test]
+    public void SelectNotificationType_CustomNotificationTypes_UsesProvidedPrefix()
+    {
+        // Arrange
+        var deadline = new DateTimeOffset(
+            2027,
+            2,
+            2,
+            12,
+            0,
+            0,
+            TimeSpan.Zero);
+        var now = deadline.AddMinutes(-60);
+
+        // Act
+        var result = new ReminderEligibilityService().SelectNotificationType(
+            now,
+            deadline,
+            NotificationTypes.UclDeadline24Hours,
+            NotificationTypes.UclDeadline1Hour);
+
+        // Assert
+        result.Should().Be(NotificationTypes.UclDeadline1Hour);
+    }
 }
 
 [TestFixture]

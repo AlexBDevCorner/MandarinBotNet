@@ -36,6 +36,10 @@ public sealed class MandarinBotOptionsValidator(bool requireOperationalConfigura
             options.Schedules.PremierLeagueNotifications,
             failures);
         ValidateSchedule(
+            "Bot:Schedules:UclFantasyNotifications",
+            options.Schedules.UclFantasyNotifications,
+            failures);
+        ValidateSchedule(
             "Bot:Schedules:ClassicStandings",
             options.Schedules.ClassicStandings,
             failures);

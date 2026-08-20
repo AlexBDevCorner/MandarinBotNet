@@ -51,6 +51,8 @@ public sealed class JobSchedulesOptions
 
     public ScheduledJobOptions PremierLeagueNotifications { get; init; } = new();
 
+    public ScheduledJobOptions UclFantasyNotifications { get; init; } = new();
+
     public ScheduledJobOptions ClassicStandings { get; init; } = new();
 
     public ScheduledJobOptions HeadToHeadStandings { get; init; } = new();
@@ -59,6 +61,7 @@ public sealed class JobSchedulesOptions
 
     public bool HasEnabledJobs =>
         PremierLeagueNotifications.Enabled ||
+        UclFantasyNotifications.Enabled ||
         ClassicStandings.Enabled ||
         HeadToHeadStandings.Enabled ||
         BenchWarmingLeague.Enabled;

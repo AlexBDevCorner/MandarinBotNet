@@ -7,6 +7,8 @@ public sealed class FantasyPremierLeagueDeadlineProvider(
     IFantasyPremierLeagueClient premierLeagueClient,
     DeadlineSelectionService deadlineSelection) : IUpcomingDeadlineProvider
 {
+    public string CompetitionName => "FPL";
+
     public async Task<CompetitionDeadline?> GetNextAsync(
         CancellationToken cancellationToken)
     {

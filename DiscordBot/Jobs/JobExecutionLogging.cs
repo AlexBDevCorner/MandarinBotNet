@@ -3,7 +3,7 @@ using Quartz;
 
 namespace DiscordBot.Jobs;
 
-internal sealed class JobExecutionLogContext(int attempt)
+public sealed class JobExecutionLogContext(int attempt)
 {
     public int Attempt { get; } = attempt;
 
@@ -16,13 +16,13 @@ internal sealed class JobExecutionLogContext(int attempt)
     }
 }
 
-internal readonly record struct JobExecutionResult(
+public readonly record struct JobExecutionResult(
     string Outcome,
     int DeliveredCount = 0,
     int SkippedCount = 0,
     int FailedCount = 0);
 
-internal static class JobExecutionLogging
+public static class JobExecutionLogging
 {
     public static async Task RunAsync<TJob>(
         IJobExecutionContext context,

@@ -4,6 +4,8 @@ namespace DiscordBot.Notifications
     {
         public const string Deadline24Hours = "fpl-deadline-24-hours";
         public const string Deadline1Hour = "fpl-deadline-1-hour";
+        public const string UclDeadline24Hours = "ucl-deadline-24-hours";
+        public const string UclDeadline1Hour = "ucl-deadline-1-hour";
         public const string ClassicStandings = "fpl-classic-standings";
         public const string HeadToHeadStandings = "fpl-head-to-head-standings";
         public const string BenchWarmingStandings = "fpl-bench-warming-standings";
