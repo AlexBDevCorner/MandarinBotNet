@@ -1,4 +1,5 @@
 using DiscordBot;
+using DiscordBot.BenchWarming;
 using DiscordBot.Commands;
 using DiscordBot.Deadlines;
 using DiscordBot.FantasyPremierLeague;
@@ -76,6 +77,9 @@ builder.Services.AddSingleton<IUpcomingDeadlineProvider,
     FantasyPremierLeagueDeadlineProvider>();
 builder.Services.AddSingleton<IDeadlineCommandHandler, DeadlineCommandHandler>();
 builder.Services.AddSingleton<IStandingsCommandHandler, StandingsCommandHandler>();
+builder.Services.AddSingleton<IBenchLeagueCommandHandler, BenchLeagueCommandHandler>();
+builder.Services.AddSingleton<BenchWarmingMessageComposer>();
+builder.Services.AddSingleton<BenchWarmingLeagueCalculationService>();
 builder.Services.AddSingleton<WelcomeMessageTemplateRotator>();
 builder.Services.AddSingleton<
     IWelcomeMessageDestinationResolver,
@@ -92,6 +96,12 @@ var notificationDatabasePath = Path.Combine(
     "notification-state.db");
 builder.Services.AddSingleton<INotificationCheckpointStore>(
     new SqliteNotificationCheckpointStore(notificationDatabasePath));
+var benchWarmingDatabasePath = Path.Combine(
+    AppContext.BaseDirectory,
+    "data",
+    "bench-warming-league.db");
+builder.Services.AddSingleton<IBenchWarmingLeagueStore>(
+    new SqliteBenchWarmingLeagueStore(benchWarmingDatabasePath));
 builder.Services.AddSingleton<NotificationDeliveryCoordinator>();
 builder.Services.AddSingleton<
     IDiscordNotificationPublisher,
@@ -173,6 +183,22 @@ builder.Services.AddOptions<QuartzOptions>()
                 JobSchedules.PremierLeagueH2hStandingsInformationTriggerName)
             .WithCronSchedule(
                 schedules.HeadToHeadStandings.Cron,
+                schedule => schedule
+                    .InTimeZone(timeZone)
+                    .WithMisfireHandlingInstructionDoNothing()));
+    }
+
+    if (schedules.BenchWarmingLeague.Enabled)
+    {
+        q.AddJob<BenchWarmingLeagueCalculationJob>(
+            job => job.WithIdentity(
+                JobSchedules.BenchWarmingLeagueCalculationJobKey));
+        q.AddTrigger(trigger => trigger
+            .ForJob(JobSchedules.BenchWarmingLeagueCalculationJobKey)
+            .WithIdentity(
+                JobSchedules.BenchWarmingLeagueCalculationTriggerName)
+            .WithCronSchedule(
+                schedules.BenchWarmingLeague.Cron,
                 schedule => schedule
                     .InTimeZone(timeZone)
                     .WithMisfireHandlingInstructionDoNothing()));

@@ -55,10 +55,13 @@ public sealed class JobSchedulesOptions
 
     public ScheduledJobOptions HeadToHeadStandings { get; init; } = new();
 
+    public ScheduledJobOptions BenchWarmingLeague { get; init; } = new();
+
     public bool HasEnabledJobs =>
         PremierLeagueNotifications.Enabled ||
         ClassicStandings.Enabled ||
-        HeadToHeadStandings.Enabled;
+        HeadToHeadStandings.Enabled ||
+        BenchWarmingLeague.Enabled;
 }
 
 public sealed class ScheduledJobOptions

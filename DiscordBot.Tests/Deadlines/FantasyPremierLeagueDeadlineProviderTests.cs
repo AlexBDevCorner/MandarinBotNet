@@ -77,5 +77,20 @@ public sealed class FantasyPremierLeagueDeadlineProviderTests
         {
             throw new NotSupportedException();
         }
+
+        public Task<EntryEventPicksResponse> GetEntryEventPicksAsync(
+            int entryId,
+            int eventId,
+            CancellationToken cancellationToken)
+        {
+            throw new NotSupportedException();
+        }
+
+        public Task<EventLiveResponse> GetEventLiveAsync(
+            int eventId,
+            CancellationToken cancellationToken)
+        {
+            throw new NotSupportedException();
+        }
     }
 }

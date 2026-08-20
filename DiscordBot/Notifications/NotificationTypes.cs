@@ -6,5 +6,6 @@ namespace DiscordBot.Notifications
         public const string Deadline1Hour = "fpl-deadline-1-hour";
         public const string ClassicStandings = "fpl-classic-standings";
         public const string HeadToHeadStandings = "fpl-head-to-head-standings";
+        public const string BenchWarmingStandings = "fpl-bench-warming-standings";
     }
 }

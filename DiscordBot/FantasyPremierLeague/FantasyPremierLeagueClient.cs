@@ -82,6 +82,32 @@ public sealed class FantasyPremierLeagueClient(
         return standings;
     }
 
+    public Task<EntryEventPicksResponse> GetEntryEventPicksAsync(
+        int entryId,
+        int eventId,
+        CancellationToken cancellationToken)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(entryId);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(eventId);
+
+        return GetAsync<EntryEventPicksResponse>(
+            $"/api/entry/{entryId}/event/{eventId}/picks/",
+            payload => payload.Picks is not null,
+            cancellationToken);
+    }
+
+    public Task<EventLiveResponse> GetEventLiveAsync(
+        int eventId,
+        CancellationToken cancellationToken)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(eventId);
+
+        return GetAsync<EventLiveResponse>(
+            $"/api/event/{eventId}/live/",
+            payload => payload.Elements is not null,
+            cancellationToken);
+    }
+
     private async Task<T> GetAsync<T>(
         string requestPath,
         Func<T, bool> isValid,

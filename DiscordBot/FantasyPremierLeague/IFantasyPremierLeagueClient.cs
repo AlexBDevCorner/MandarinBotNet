@@ -14,4 +14,13 @@ public interface IFantasyPremierLeagueClient
     Task<HeadToHeadStandingsResponse> GetHeadToHeadStandingsAsync(
         int leagueId,
         CancellationToken cancellationToken);
+
+    Task<EntryEventPicksResponse> GetEntryEventPicksAsync(
+        int entryId,
+        int eventId,
+        CancellationToken cancellationToken);
+
+    Task<EventLiveResponse> GetEventLiveAsync(
+        int eventId,
+        CancellationToken cancellationToken);
 }

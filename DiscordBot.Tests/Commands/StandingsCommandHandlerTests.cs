@@ -292,6 +292,21 @@ public sealed class StandingsCommandHandlerTests
             HeadToHeadLeagueId = leagueId;
             return HeadToHeadTask;
         }
+
+        public Task<EntryEventPicksResponse> GetEntryEventPicksAsync(
+            int entryId,
+            int eventId,
+            CancellationToken cancellationToken)
+        {
+            throw new NotSupportedException();
+        }
+
+        public Task<EventLiveResponse> GetEventLiveAsync(
+            int eventId,
+            CancellationToken cancellationToken)
+        {
+            throw new NotSupportedException();
+        }
     }
 
     private sealed class TestSlashCommandInteraction(List<string> operations)

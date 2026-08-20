@@ -25,6 +25,11 @@ namespace DiscordBot.Tests.Jobs
             {
                 Enabled = true,
                 Cron = "0 0 17 * * ?"
+            },
+            BenchWarmingLeague = new ScheduledJobOptions
+            {
+                Enabled = true,
+                Cron = "0 0 18 * * ?"
             }
         };
 
@@ -95,6 +100,23 @@ namespace DiscordBot.Tests.Jobs
         }
 
         [Test]
+        public void CreateBenchWarmingLeagueTrigger_ConfiguredSchedule_UsesCronAndRigaTimeZone()
+        {
+            // Arrange
+            var expectedTimeZone = JobSchedules.GetTimeZone(Options);
+
+            // Act
+            var trigger = JobSchedules.CreateBenchWarmingLeagueCalculationTrigger(
+                Options);
+
+            // Assert
+            var cronTrigger = trigger.Should().BeAssignableTo<ICronTrigger>().Subject;
+            cronTrigger.CronExpressionString.Should()
+                .Be(Options.BenchWarmingLeague.Cron);
+            cronTrigger.TimeZone.Should().Be(expectedTimeZone);
+        }
+
+        [Test]
         public void CreateAllTriggers_DefaultSchedules_SkipMissedRuns()
         {
             // Arrange
@@ -111,6 +133,7 @@ namespace DiscordBot.Tests.Jobs
         [TestCase(typeof(PremierLeagueNotificationJob))]
         [TestCase(typeof(PremierLeagueClassicStandingsInformationJob))]
         [TestCase(typeof(PremierLeagueH2hStandingsInformationJob))]
+        [TestCase(typeof(BenchWarmingLeagueCalculationJob))]
         public void JobType_NetworkAndDeliveryWork_DisallowsConcurrentExecution(Type jobType)
         {
             // Arrange
