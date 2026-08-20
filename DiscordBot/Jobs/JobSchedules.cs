@@ -7,6 +7,8 @@ public static class JobSchedules
 {
     public const string PremierLeagueNotificationTriggerName =
         "PremierLeagueNotificationTrigger";
+    public const string UclDeadlineNotificationTriggerName =
+        "UclDeadlineNotificationTrigger";
     public const string PremierLeagueClassicStandingsInformationTriggerName =
         "PremierLeagueClassicStandingsInformationTrigger";
     public const string PremierLeagueH2hStandingsInformationTriggerName =
@@ -16,6 +18,9 @@ public static class JobSchedules
 
     public static readonly JobKey PremierLeagueNotificationJobKey =
         new("PremierLeagueNotification");
+
+    public static readonly JobKey UclDeadlineNotificationJobKey =
+        new("UclDeadlineNotification");
 
     public static readonly JobKey PremierLeagueClassicStandingsInformationJobKey =
         new("PremierLeagueClassicStandingsInformation");
@@ -37,6 +42,14 @@ public static class JobSchedules
             PremierLeagueNotificationJobKey,
             PremierLeagueNotificationTriggerName,
             options.PremierLeagueNotifications.Cron,
+            options.TimeZoneId);
+
+    public static ITrigger CreateUclDeadlineNotificationTrigger(
+        JobSchedulesOptions options) =>
+        CreateCronTrigger(
+            UclDeadlineNotificationJobKey,
+            UclDeadlineNotificationTriggerName,
+            options.UclFantasyNotifications.Cron,
             options.TimeZoneId);
 
     public static ITrigger CreatePremierLeagueClassicStandingsInformationTrigger(
@@ -67,6 +80,7 @@ public static class JobSchedules
         JobSchedulesOptions options) =>
     [
         CreatePremierLeagueNotificationTrigger(options),
+        CreateUclDeadlineNotificationTrigger(options),
         CreatePremierLeagueClassicStandingsInformationTrigger(options),
         CreatePremierLeagueH2hStandingsInformationTrigger(options),
         CreateBenchWarmingLeagueCalculationTrigger(options)

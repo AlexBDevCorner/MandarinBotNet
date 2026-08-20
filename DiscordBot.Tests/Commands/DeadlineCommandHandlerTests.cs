@@ -41,6 +41,41 @@ public sealed class DeadlineCommandHandlerTests
     }
 
     [Test]
+    public async Task HandleAsync_FplAndUclDeadlines_DisplaysBothCompetitions()
+    {
+        // Arrange
+        var operations = new List<string>();
+        var fplProvider = new TestDeadlineProvider(operations)
+        {
+            Result = new CompetitionDeadline(
+                "FPL",
+                "Gameweek",
+                42,
+                new DateTimeOffset(2027, 2, 2, 12, 0, 0, TimeSpan.Zero))
+        };
+        var uclProvider = new TestDeadlineProvider(operations)
+        {
+            CompetitionName = "UCL",
+            Result = new CompetitionDeadline(
+                "UCL",
+                "Matchday",
+                1,
+                new DateTimeOffset(2027, 2, 3, 12, 0, 0, TimeSpan.Zero))
+        };
+        var interaction = new TestSlashCommandInteraction(operations);
+        var handler = CreateHandler(fplProvider, uclProvider);
+
+        // Act
+        await handler.HandleAsync(interaction);
+
+        // Assert
+        operations.Should().Equal("Defer", "Fetch", "Fetch", "Modify");
+        interaction.Messages.Should().Equal(
+            "FPL Gameweek 42 deadline: Tuesday, 2 February 2027 at 14:00 (Riga, Latvia, UTC+02:00).\n" +
+            "UCL Matchday 1 deadline: Wednesday, 3 February 2027 at 14:00 (Riga, Latvia, UTC+02:00).");
+    }
+
+    [Test]
     public async Task HandleAsync_NoUpcomingDeadline_ReturnsHelpfulMessage()
     {
         // Arrange
@@ -90,14 +125,26 @@ public sealed class DeadlineCommandHandlerTests
         ILogger<DeadlineCommandHandler>? logger = null)
     {
         return new DeadlineCommandHandler(
-            provider,
+            [provider],
             DiscordBot.Tests.PremierLeague.TestTimeZones.Riga(),
             logger ?? new RecordingLogger<DeadlineCommandHandler>());
+    }
+
+    private static DeadlineCommandHandler CreateHandler(
+        IUpcomingDeadlineProvider firstProvider,
+        IUpcomingDeadlineProvider secondProvider)
+    {
+        return new DeadlineCommandHandler(
+            [firstProvider, secondProvider],
+            DiscordBot.Tests.PremierLeague.TestTimeZones.Riga(),
+            new RecordingLogger<DeadlineCommandHandler>());
     }
 
     private sealed class TestDeadlineProvider(List<string> operations)
         : IUpcomingDeadlineProvider
     {
+        public string CompetitionName { get; init; } = "FPL";
+
         public CompetitionDeadline? Result { get; init; }
 
         public Exception? Exception { get; init; }

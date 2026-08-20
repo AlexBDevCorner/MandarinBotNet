@@ -12,17 +12,19 @@ public sealed class ReminderEligibilityService
 
     public string? SelectNotificationType(
         DateTimeOffset nowUtc,
-        DateTimeOffset deadlineUtc)
+        DateTimeOffset deadlineUtc,
+        string deadline24HoursNotificationType = NotificationTypes.Deadline24Hours,
+        string deadline1HourNotificationType = NotificationTypes.Deadline1Hour)
     {
         var remaining = deadlineUtc - nowUtc;
 
         if (remaining < EarliestDayReminder && remaining > LatestDayReminder)
         {
-            return NotificationTypes.Deadline24Hours;
+            return deadline24HoursNotificationType;
         }
 
         return remaining < EarliestHourReminder && remaining > TimeSpan.Zero
-            ? NotificationTypes.Deadline1Hour
+            ? deadline1HourNotificationType
             : null;
     }
 }

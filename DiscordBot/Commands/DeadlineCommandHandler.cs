@@ -7,56 +7,86 @@ using Microsoft.Extensions.Logging;
 namespace DiscordBot.Commands;
 
 public sealed class DeadlineCommandHandler(
-    IUpcomingDeadlineProvider deadlineProvider,
+    IEnumerable<IUpcomingDeadlineProvider> deadlineProviders,
     ConfiguredTimeZone configuredTimeZone,
     ILogger<DeadlineCommandHandler> logger) : IDeadlineCommandHandler
 {
-    private const string UnavailableMessage =
-        "The FPL deadline is unavailable right now. Please try again later.";
-    private const string NoUpcomingDeadlineMessage =
-        "The next FPL deadline is not available yet.";
-
     public async Task HandleAsync(IDiscordSlashCommandInteraction interaction)
     {
         ArgumentNullException.ThrowIfNull(interaction);
 
         await interaction.DeferAsync();
 
-        CompetitionDeadline? deadline;
-        try
+        var providers = deadlineProviders.ToArray();
+        var deadlines = new List<CompetitionDeadline>();
+        var unavailableCompetitions = new List<string>();
+
+        foreach (var provider in providers)
         {
-            deadline = await deadlineProvider.GetNextAsync(CancellationToken.None);
-        }
-        catch (FantasyPremierLeagueApiException exception)
-        {
-            logger.LogWarning(
-                exception,
-                "FPL deadline command request failed with {FailureKind} and HTTP status {StatusCode}.",
-                exception.FailureKind,
-                exception.StatusCode);
-            await interaction.ModifyOriginalResponseAsync(UnavailableMessage);
-            return;
-        }
-        catch (Exception exception)
-        {
-            logger.LogError(
-                exception,
-                "FPL deadline command request failed with {FailureKind}.",
-                "Unexpected");
-            await interaction.ModifyOriginalResponseAsync(UnavailableMessage);
-            return;
+            try
+            {
+                var deadline = await provider.GetNextAsync(CancellationToken.None);
+                if (deadline is not null)
+                {
+                    deadlines.Add(deadline);
+                }
+            }
+            catch (FantasyPremierLeagueApiException exception)
+            {
+                logger.LogWarning(
+                    exception,
+                    "FPL deadline command request failed with {FailureKind} and HTTP status {StatusCode}.",
+                    exception.FailureKind,
+                    exception.StatusCode);
+                unavailableCompetitions.Add(provider.CompetitionName);
+            }
+            catch (Exception exception)
+            {
+                logger.LogError(
+                    exception,
+                    "{CompetitionName} deadline command request failed with {FailureKind}.",
+                    provider.CompetitionName,
+                    "Unexpected");
+                unavailableCompetitions.Add(provider.CompetitionName);
+            }
         }
 
-        if (deadline is null)
+        if (deadlines.Count == 0)
         {
             await interaction.ModifyOriginalResponseAsync(
-                NoUpcomingDeadlineMessage);
+                unavailableCompetitions.Count == 0
+                    ? GetNoUpcomingDeadlineMessage(providers)
+                    : string.Join(
+                        "\n",
+                        unavailableCompetitions.Select(GetUnavailableMessage)));
             return;
         }
 
-        var localDeadline = configuredTimeZone.FromUtc(deadline.DeadlineUtc);
+        var messages = deadlines
+            .OrderBy(deadline => deadline.DeadlineUtc)
+            .Select(deadline =>
+            {
+                var localDeadline = configuredTimeZone.FromUtc(deadline.DeadlineUtc);
+                return FormatDeadline(deadline, localDeadline);
+            })
+            .ToList();
+        messages.AddRange(unavailableCompetitions.Select(GetUnavailableMessage));
+
         await interaction.ModifyOriginalResponseAsync(
-            FormatDeadline(deadline, localDeadline));
+            string.Join("\n", messages));
+    }
+
+    private static string GetUnavailableMessage(string competitionName)
+    {
+        return $"The {competitionName} deadline is unavailable right now. Please try again later.";
+    }
+
+    private static string GetNoUpcomingDeadlineMessage(
+        IReadOnlyCollection<IUpcomingDeadlineProvider> providers)
+    {
+        return providers.Count == 1
+            ? $"The next {providers.Single().CompetitionName} deadline is not available yet."
+            : "No upcoming deadlines are available yet.";
     }
 
     private static string FormatDeadline(
