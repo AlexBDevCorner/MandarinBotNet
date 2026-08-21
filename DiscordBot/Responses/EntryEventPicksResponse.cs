@@ -7,6 +7,9 @@ public sealed class EntryEventPicksResponse
     [JsonPropertyName("picks")]
     public List<EntryEventPick> Picks { get; init; } = null!;
 
+    [JsonPropertyName("entry_history")]
+    public EntryEventHistory? EntryHistory { get; init; }
+
     [JsonPropertyName("automatic_subs")]
     public List<EntryAutomaticSubstitution> AutomaticSubstitutions { get; init; } = [];
 }
@@ -36,4 +39,13 @@ public sealed class EntryAutomaticSubstitution
 
     [JsonPropertyName("element_out")]
     public int ElementOut { get; init; }
+}
+
+public sealed class EntryEventHistory
+{
+    [JsonPropertyName("event_transfers")]
+    public int EventTransfers { get; init; }
+
+    [JsonPropertyName("event_transfers_cost")]
+    public int EventTransfersCost { get; init; }
 }

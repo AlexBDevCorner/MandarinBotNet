@@ -1,4 +1,5 @@
 using DiscordBot.FantasyPremierLeague.Historical;
+using DiscordBot.FantasyPremierLeague.Recognition;
 using Microsoft.Extensions.Logging;
 
 namespace DiscordBot.FantasyPremierLeague.Recap;
@@ -8,6 +9,7 @@ public sealed class FplGameweekRecapService(
     IFplStatisticsStore statisticsStore,
     FplStatisticsCollectionService collectionService,
     FplGameweekRecapCalculationService calculationService,
+    FplRecognitionService recognitionService,
     ILogger<FplGameweekRecapService> logger)
 {
     public async Task<FplGameweekRecap?> GetLatestAsync(
@@ -69,7 +71,13 @@ public sealed class FplGameweekRecapService(
                 return null;
             }
 
-            return calculationService.Calculate(snapshot);
+            var recap = calculationService.Calculate(snapshot);
+            var recognition = recognitionService.EvaluateAndPersist(snapshot);
+            return recap with
+            {
+                Achievements = recognition.Achievements,
+                Ratings = recognition.Ratings
+            };
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {

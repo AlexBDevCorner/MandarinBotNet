@@ -42,7 +42,10 @@ public sealed class FplStatisticsCollectionServiceTests
                 [
                     new FplLineupPick(1, "Haaland", 1, 0, false, false, 5),
                     new FplLineupPick(2, "Salah", 2, 2, true, false, 7)
-                ]));
+                ])
+            {
+                TransferCost = 8
+            });
         store.GetSnapshot("2026/27", 5).Should().BeEquivalentTo(snapshot);
         client.RequestedEventIds.Should().OnlyContain(eventId => eventId == 5);
     }
@@ -281,6 +284,13 @@ public sealed class FplStatisticsCollectionServiceTests
             RequestedEventIds.Add(eventId);
             return Task.FromResult(new EntryEventPicksResponse
             {
+                EntryHistory = entryId == 100
+                    ? new EntryEventHistory
+                    {
+                        EventTransfers = 2,
+                        EventTransfersCost = 8
+                    }
+                    : null,
                 Picks = entryId switch
                 {
                     100 =>

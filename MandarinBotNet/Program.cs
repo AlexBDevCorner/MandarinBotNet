@@ -6,6 +6,7 @@ using DiscordBot.FantasyPremierLeague;
 using DiscordBot.FantasyPremierLeague.Historical;
 using DiscordBot.FantasyPremierLeague.Live;
 using DiscordBot.FantasyPremierLeague.Recap;
+using DiscordBot.FantasyPremierLeague.Recognition;
 using DiscordBot.Health;
 using DiscordBot.Jobs;
 using DiscordBot.Notifications;
@@ -92,6 +93,9 @@ builder.Services.AddSingleton<BenchWarmingLeagueCalculationService>();
 builder.Services.AddSingleton<FplStatisticsCollectionService>();
 builder.Services.AddSingleton<FplGameweekRecapCalculationService>();
 builder.Services.AddSingleton<FplGameweekRecapService>();
+builder.Services.AddSingleton<FplAchievementCalculationService>();
+builder.Services.AddSingleton<FplRatingCalculationService>();
+builder.Services.AddSingleton<FplRecognitionService>();
 builder.Services.AddSingleton<FplLiveInsightsCalculationService>();
 builder.Services.AddSingleton<FplLiveInsightsService>();
 builder.Services.AddSingleton<FplLiveInsightsMessageComposer>();
@@ -124,6 +128,12 @@ var fplStatisticsDatabasePath = Path.Combine(
     "fpl-statistics.db");
 builder.Services.AddSingleton<IFplStatisticsStore>(
     new SqliteFplStatisticsStore(fplStatisticsDatabasePath));
+var fplRecognitionDatabasePath = Path.Combine(
+    AppContext.BaseDirectory,
+    "data",
+    "fpl-recognition.db");
+builder.Services.AddSingleton<IFplRecognitionStore>(
+    new SqliteFplRecognitionStore(fplRecognitionDatabasePath));
 builder.Services.AddSingleton<NotificationDeliveryCoordinator>();
 builder.Services.AddSingleton<
     IDiscordNotificationPublisher,
@@ -145,6 +155,10 @@ builder.Services.AddHealthChecks()
     .AddCheck(
         "fpl_statistics_storage",
         new SqliteStorageHealthCheck(fplStatisticsDatabasePath),
+        tags: ["ready"])
+    .AddCheck(
+        "fpl_recognition_storage",
+        new SqliteStorageHealthCheck(fplRecognitionDatabasePath),
         tags: ["ready"]);
 builder.Services.AddSingleton<IHealthCheckPublisher>(services =>
     new FileHealthCheckPublisher(

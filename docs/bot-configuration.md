@@ -38,10 +38,12 @@ Bot__FantasyPremierLeague__ClassicLeagueId=<CLASSIC-LEAGUE-ID>
 Bot__FantasyPremierLeague__HeadToHeadLeagueId=<HEAD-TO-HEAD-LEAGUE-ID>
 Bot__FantasyPremierLeague__MaxStandingsPages=10
 Bot__FantasyPremierLeague__LiveDataMaxAge=00:20:00
+Bot__FantasyPremierLeague__RecognitionRuleVersion=v1
 Bot__FantasyPremierLeague__LargeBenchPointsThreshold=8
 Bot__FantasyPremierLeague__CaptainSuccessEffectivePointsThreshold=20
 Bot__FantasyPremierLeague__CaptainDisasterPointsThreshold=2
 Bot__FantasyPremierLeague__CaptainDisasterViceCaptainPointsThreshold=8
+Bot__FantasyPremierLeague__TransferCostAchievementThreshold=8
 Bot__Schedules__TimeZoneId=Europe/Riga
 Bot__Schedules__PremierLeagueNotifications__Enabled=true
 Bot__Schedules__PremierLeagueNotifications__Cron=0 0 * * * ?
@@ -84,8 +86,8 @@ The `FplStatisticsCollection` job is disabled by default. When enabled, it
 records the latest completed gameweek, if it is not already stored, from the
 configured classic league into `data/fpl-statistics.db`. Each snapshot is
 keyed by season and gameweek and includes manager standings, rank changes,
-lineup picks, captaincy, live player points, bench points, deadlines, and
-capture metadata. Older gameweeks are not backfilled because the current FPL
+lineup picks, captaincy, live player points, bench points, transfer-hit costs,
+deadlines, and capture metadata. Older gameweeks are not backfilled because the current FPL
 standings endpoint returns the current table; collection starts with the
 latest completed gameweek available after the feature is enabled. The
 collection job does not publish a Discord message and therefore does not
@@ -103,6 +105,41 @@ checkpointed by season, gameweek, guild, and channel, so retries do not publish
 the same target twice. Ties are ordered by current rank, team name, and entry ID;
 only the five largest rank movements are listed. Incomplete or unavailable source
 data is logged and skipped rather than turned into a misleading message.
+
+Each completed gameweek also evaluates the configured achievement rules and persists
+the resulting awards and manager ratings in `data/fpl-recognition.db`. Awards are
+keyed by league, season, manager, achievement, and occurrence. Repeatable awards
+can occur once per gameweek, while one-time awards are retained for the season and
+are not duplicated when the recap job is retried. The first completed recognition
+evaluation is also marked for each league, season, and gameweek, so retries return
+the persisted result—including an empty award set—instead of applying newer rules
+to an already recorded gameweek. Ratings and awards are therefore immutable after
+their first write.
+
+The initial rule set is:
+
+- **First Blood** is a one-time award for each manager tied for the highest score in
+  the first recorded gameweek of a season.
+- **Bench Warmer** is repeatable when a manager leaves at least
+  `LargeBenchPointsThreshold` points on the bench.
+- **Captain Disaster** is repeatable when the captain scores at most
+  `CaptainDisasterPointsThreshold` raw points and the vice-captain scores at least
+  `CaptainDisasterViceCaptainPointsThreshold` raw points.
+- **Differential Merchant** is repeatable when only one manager in the configured
+  league captains that player in the gameweek.
+- **-8 Enjoyer** is repeatable when the FPL entry history reports at least
+  `TransferCostAchievementThreshold` points in transfer hits.
+
+The Fraud Rating is a deterministic 0-100 score calculated from bench points,
+captain versus vice-captain failure gap, transfer-hit cost, and rank falls. Its
+component weights are 40, 30, 20, and 10 points respectively, with caps of 10 bench
+points, a 10-point captain gap, an 8-point transfer cost, and a five-place rank fall.
+The Maguire Index is a deliberately opaque but deterministic 0-100 modulo score
+seeded by the league snapshot's entry, event, total score, bench points, transfer
+cost, and captaincy points. Both results and their `RecognitionRuleVersion` are
+stored so changing thresholds or formulas affects future records without rewriting
+historical awards or ratings. The recap publishes the current gameweek's persisted
+achievements and ratings.
 
 ## Bench warming league
 

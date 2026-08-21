@@ -124,6 +124,12 @@ public sealed class MandarinBotOptionsValidator(bool requireOperationalConfigura
                 "Bot:FantasyPremierLeague:LiveDataMaxAge must be greater than zero.");
         }
 
+        if (string.IsNullOrWhiteSpace(options.FantasyPremierLeague.RecognitionRuleVersion))
+        {
+            failures.Add(
+                "Bot:FantasyPremierLeague:RecognitionRuleVersion is required.");
+        }
+
         if (options.FantasyPremierLeague.LargeBenchPointsThreshold <= 0)
         {
             failures.Add(
@@ -147,6 +153,12 @@ public sealed class MandarinBotOptionsValidator(bool requireOperationalConfigura
         {
             failures.Add(
                 "Bot:FantasyPremierLeague:CaptainDisasterViceCaptainPointsThreshold must be greater than CaptainDisasterPointsThreshold.");
+        }
+
+        if (options.FantasyPremierLeague.TransferCostAchievementThreshold <= 0)
+        {
+            failures.Add(
+                "Bot:FantasyPremierLeague:TransferCostAchievementThreshold must be greater than zero.");
         }
 
         ValidateTargets(options, failures);

@@ -183,7 +183,8 @@ public sealed class SqliteFplStatisticsStore : IFplStatisticsStore
                 rank,
                 last_rank,
                 rank_change,
-                bench_points
+                bench_points,
+                transfer_cost
             )
             VALUES (
                 $season,
@@ -196,7 +197,8 @@ public sealed class SqliteFplStatisticsStore : IFplStatisticsStore
                 $rank,
                 $last_rank,
                 $rank_change,
-                $bench_points
+                $bench_points,
+                $transfer_cost
             );
             """;
         managerCommand.Parameters.AddWithValue("$season", snapshot.Season);
@@ -212,6 +214,7 @@ public sealed class SqliteFplStatisticsStore : IFplStatisticsStore
         var lastRankParameter = managerCommand.Parameters.AddWithValue("$last_rank", 0);
         var rankChangeParameter = managerCommand.Parameters.AddWithValue("$rank_change", 0);
         var benchPointsParameter = managerCommand.Parameters.AddWithValue("$bench_points", 0);
+        var transferCostParameter = managerCommand.Parameters.AddWithValue("$transfer_cost", 0);
 
         using var lineupCommand = connection.CreateCommand();
         lineupCommand.Transaction = transaction;
@@ -267,6 +270,7 @@ public sealed class SqliteFplStatisticsStore : IFplStatisticsStore
             lastRankParameter.Value = manager.LastRank;
             rankChangeParameter.Value = manager.RankChange;
             benchPointsParameter.Value = manager.BenchPoints;
+            transferCostParameter.Value = manager.TransferCost;
             managerCommand.ExecuteNonQuery();
 
             foreach (var pick in manager.Lineup)
@@ -359,7 +363,8 @@ public sealed class SqliteFplStatisticsStore : IFplStatisticsStore
                    rank,
                    last_rank,
                    rank_change,
-                   bench_points
+                   bench_points,
+                   transfer_cost
             FROM fpl_manager_gameweek_stats
             WHERE season = $season
               AND event_id = $event_id
@@ -389,7 +394,10 @@ public sealed class SqliteFplStatisticsStore : IFplStatisticsStore
                 Convert.ToInt32(reader.GetInt64(6)),
                 Convert.ToInt32(reader.GetInt64(7)),
                 Convert.ToInt32(reader.GetInt64(8)),
-                picks.GetValueOrDefault(entryId) ?? []));
+                picks.GetValueOrDefault(entryId) ?? [])
+            {
+                TransferCost = Convert.ToInt32(reader.GetInt64(9))
+            });
         }
 
         return managers;
@@ -506,6 +514,8 @@ public sealed class SqliteFplStatisticsStore : IFplStatisticsStore
             managerCommand.ExecuteNonQuery();
         }
 
+        EnsureManagerTransferCostColumn(connection);
+
         using (var managerIndexCommand = connection.CreateCommand())
         {
             managerIndexCommand.CommandTimeout = CommandTimeoutSeconds;
@@ -541,6 +551,40 @@ public sealed class SqliteFplStatisticsStore : IFplStatisticsStore
         lineupCommand.ExecuteNonQuery();
     }
 
+    private static void EnsureManagerTransferCostColumn(SqliteConnection connection)
+    {
+        var hasTransferCostColumn = false;
+        using (var infoCommand = connection.CreateCommand())
+        {
+            infoCommand.CommandTimeout = CommandTimeoutSeconds;
+            infoCommand.CommandText = "PRAGMA table_info(fpl_manager_gameweek_stats);";
+            using var reader = infoCommand.ExecuteReader();
+            while (reader.Read())
+            {
+                if (string.Equals(
+                        reader.GetString(1),
+                        "transfer_cost",
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    hasTransferCostColumn = true;
+                    break;
+                }
+            }
+        }
+
+        if (hasTransferCostColumn)
+        {
+            return;
+        }
+
+        using var alterCommand = connection.CreateCommand();
+        alterCommand.CommandTimeout = CommandTimeoutSeconds;
+        alterCommand.CommandText =
+            "ALTER TABLE fpl_manager_gameweek_stats " +
+            "ADD COLUMN transfer_cost INTEGER NOT NULL DEFAULT 0;";
+        alterCommand.ExecuteNonQuery();
+    }
+
     private SqliteConnection OpenConnection()
     {
         var connection = new SqliteConnection(_connectionString)
@@ -574,6 +618,7 @@ public sealed class SqliteFplStatisticsStore : IFplStatisticsStore
             ArgumentOutOfRangeException.ThrowIfNegativeOrZero(manager.EntryId);
             ArgumentException.ThrowIfNullOrWhiteSpace(manager.EntryName);
             ArgumentException.ThrowIfNullOrWhiteSpace(manager.ManagerName);
+            ArgumentOutOfRangeException.ThrowIfNegative(manager.TransferCost);
             ArgumentNullException.ThrowIfNull(manager.Lineup);
             if (manager.Lineup.Count == 0)
             {
