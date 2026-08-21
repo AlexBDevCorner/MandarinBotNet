@@ -3,6 +3,7 @@ using DiscordBot.BenchWarming;
 using DiscordBot.Commands;
 using DiscordBot.Deadlines;
 using DiscordBot.FantasyPremierLeague;
+using DiscordBot.FantasyPremierLeague.Historical;
 using DiscordBot.Health;
 using DiscordBot.Jobs;
 using DiscordBot.Notifications;
@@ -86,6 +87,7 @@ builder.Services.AddSingleton<IStandingsCommandHandler, StandingsCommandHandler>
 builder.Services.AddSingleton<IBenchLeagueCommandHandler, BenchLeagueCommandHandler>();
 builder.Services.AddSingleton<BenchWarmingMessageComposer>();
 builder.Services.AddSingleton<BenchWarmingLeagueCalculationService>();
+builder.Services.AddSingleton<FplStatisticsCollectionService>();
 builder.Services.AddSingleton<WelcomeMessageTemplateRotator>();
 builder.Services.AddSingleton<
     IWelcomeMessageDestinationResolver,
@@ -108,6 +110,12 @@ var benchWarmingDatabasePath = Path.Combine(
     "bench-warming-league.db");
 builder.Services.AddSingleton<IBenchWarmingLeagueStore>(
     new SqliteBenchWarmingLeagueStore(benchWarmingDatabasePath));
+var fplStatisticsDatabasePath = Path.Combine(
+    AppContext.BaseDirectory,
+    "data",
+    "fpl-statistics.db");
+builder.Services.AddSingleton<IFplStatisticsStore>(
+    new SqliteFplStatisticsStore(fplStatisticsDatabasePath));
 builder.Services.AddSingleton<NotificationDeliveryCoordinator>();
 builder.Services.AddSingleton<
     IDiscordNotificationPublisher,
@@ -118,13 +126,17 @@ var healthStatePath = Path.Combine(
     "data",
     "health-state.json");
 builder.Services.AddSingleton<DiscordReadinessHealthCheck>();
-builder.Services.AddSingleton(new SqliteStorageHealthCheck(notificationDatabasePath));
 builder.Services.AddHealthChecks()
     .AddCheck<DiscordReadinessHealthCheck>(
         "discord_gateway",
         tags: ["ready"])
-    .AddCheck<SqliteStorageHealthCheck>(
+    .AddCheck(
         "sqlite_storage",
+        new SqliteStorageHealthCheck(notificationDatabasePath),
+        tags: ["ready"])
+    .AddCheck(
+        "fpl_statistics_storage",
+        new SqliteStorageHealthCheck(fplStatisticsDatabasePath),
         tags: ["ready"]);
 builder.Services.AddSingleton<IHealthCheckPublisher>(services =>
     new FileHealthCheckPublisher(
@@ -219,6 +231,20 @@ builder.Services.AddOptions<QuartzOptions>()
                 JobSchedules.BenchWarmingLeagueCalculationTriggerName)
             .WithCronSchedule(
                 schedules.BenchWarmingLeague.Cron,
+                schedule => schedule
+                    .InTimeZone(timeZone)
+                    .WithMisfireHandlingInstructionDoNothing()));
+    }
+
+    if (schedules.FplStatisticsCollection.Enabled)
+    {
+        q.AddJob<FplStatisticsCollectionJob>(
+            job => job.WithIdentity(JobSchedules.FplStatisticsCollectionJobKey));
+        q.AddTrigger(trigger => trigger
+            .ForJob(JobSchedules.FplStatisticsCollectionJobKey)
+            .WithIdentity(JobSchedules.FplStatisticsCollectionTriggerName)
+            .WithCronSchedule(
+                schedules.FplStatisticsCollection.Cron,
                 schedule => schedule
                     .InTimeZone(timeZone)
                     .WithMisfireHandlingInstructionDoNothing()));

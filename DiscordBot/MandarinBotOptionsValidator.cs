@@ -51,6 +51,10 @@ public sealed class MandarinBotOptionsValidator(bool requireOperationalConfigura
             "Bot:Schedules:BenchWarmingLeague",
             options.Schedules.BenchWarmingLeague,
             failures);
+        ValidateSchedule(
+            "Bot:Schedules:FplStatisticsCollection",
+            options.Schedules.FplStatisticsCollection,
+            failures);
 
         if (requireOperationalConfiguration && !options.Schedules.HasEnabledJobs)
         {
@@ -77,6 +81,13 @@ public sealed class MandarinBotOptionsValidator(bool requireOperationalConfigura
         {
             failures.Add(
                 "Bot:FantasyPremierLeague:ClassicLeagueId is required when the bench warming league job is enabled.");
+        }
+
+        if (options.Schedules.FplStatisticsCollection.Enabled &&
+            options.FantasyPremierLeague.ClassicLeagueId <= 0)
+        {
+            failures.Add(
+                "Bot:FantasyPremierLeague:ClassicLeagueId is required when the historical FPL statistics collection job is enabled.");
         }
 
         if (options.FantasyPremierLeague.MaxStandingsPages <= 0)
@@ -132,7 +143,7 @@ public sealed class MandarinBotOptionsValidator(bool requireOperationalConfigura
         MandarinBotOptions options,
         List<string> failures)
     {
-        if (options.Schedules.HasEnabledJobs && options.Notifications.Targets.Count == 0)
+        if (options.Schedules.HasEnabledNotificationJobs && options.Notifications.Targets.Count == 0)
         {
             failures.Add(
                 "Bot:Notifications:Targets must contain at least one explicit guild/channel target when a job is enabled.");
