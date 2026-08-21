@@ -40,7 +40,7 @@ public sealed class SqliteFplStatisticsStoreTests
         var snapshot = CreateSnapshot(
             "2026/27",
             5,
-            CreateManager(100, "Team A", "Alice", benchPoints: 4));
+            CreateManager(100, "Team A", "Alice", benchPoints: 4, transferCost: 8));
 
         // Act
         store.SaveSnapshot(snapshot);
@@ -48,7 +48,8 @@ public sealed class SqliteFplStatisticsStoreTests
 
         // Assert
         savedSnapshot.Should().BeEquivalentTo(snapshot);
-        savedSnapshot!.Managers[0].Lineup[0].IsBench.Should().BeTrue();
+        savedSnapshot!.Managers[0].TransferCost.Should().Be(8);
+        savedSnapshot.Managers[0].Lineup[0].IsBench.Should().BeTrue();
         store.IsSnapshotStored("2026/27", 5).Should().BeTrue();
     }
 
@@ -73,6 +74,103 @@ public sealed class SqliteFplStatisticsStoreTests
 
         // Assert
         snapshots.Should().ContainSingle().Which.Should().BeEquivalentTo(replacement);
+    }
+
+    [Test]
+    public void Constructor_ExistingDatabaseWithoutTransferCost_MigratesAndPreservesRows()
+    {
+        // Arrange
+        Directory.CreateDirectory(_testDirectory);
+        var connectionString = new SqliteConnectionStringBuilder
+        {
+            DataSource = _databasePath
+        }.ToString();
+        using (var connection = new SqliteConnection(connectionString))
+        {
+            connection.Open();
+            using var command = connection.CreateCommand();
+            command.CommandText =
+                """
+                CREATE TABLE fpl_gameweek_snapshots (
+                    season TEXT NOT NULL,
+                    event_id INTEGER NOT NULL,
+                    deadline_utc TEXT NOT NULL,
+                    standings_updated_at_utc TEXT NOT NULL,
+                    captured_at_utc TEXT NOT NULL,
+                    PRIMARY KEY (season, event_id)
+                );
+                CREATE TABLE fpl_manager_gameweek_stats (
+                    season TEXT NOT NULL,
+                    event_id INTEGER NOT NULL,
+                    entry_id INTEGER NOT NULL,
+                    entry_name TEXT NOT NULL,
+                    manager_name TEXT NOT NULL,
+                    event_score INTEGER NOT NULL,
+                    total_score INTEGER NOT NULL,
+                    rank INTEGER NOT NULL,
+                    last_rank INTEGER NOT NULL,
+                    rank_change INTEGER NOT NULL,
+                    bench_points INTEGER NOT NULL,
+                    PRIMARY KEY (season, event_id, entry_id),
+                    FOREIGN KEY (season, event_id)
+                        REFERENCES fpl_gameweek_snapshots (season, event_id)
+                        ON DELETE CASCADE
+                );
+                CREATE TABLE fpl_lineup_picks (
+                    season TEXT NOT NULL,
+                    event_id INTEGER NOT NULL,
+                    entry_id INTEGER NOT NULL,
+                    player_id INTEGER NOT NULL,
+                    player_name TEXT NOT NULL,
+                    position INTEGER NOT NULL,
+                    multiplier INTEGER NOT NULL,
+                    is_captain INTEGER NOT NULL,
+                    is_vice_captain INTEGER NOT NULL,
+                    points INTEGER NOT NULL,
+                    PRIMARY KEY (season, event_id, entry_id, player_id),
+                    FOREIGN KEY (season, event_id, entry_id)
+                        REFERENCES fpl_manager_gameweek_stats (season, event_id, entry_id)
+                        ON DELETE CASCADE
+                );
+                INSERT INTO fpl_gameweek_snapshots
+                    (season, event_id, deadline_utc, standings_updated_at_utc, captured_at_utc)
+                VALUES
+                    ('2026/27', 5, '2026-08-15T14:00:00.0000000+00:00',
+                     '2026-08-16T15:00:00.0000000+00:00',
+                     '2026-08-17T16:00:00.0000000+00:00');
+                INSERT INTO fpl_manager_gameweek_stats
+                    (season, event_id, entry_id, entry_name, manager_name, event_score,
+                     total_score, rank, last_rank, rank_change, bench_points)
+                VALUES
+                    ('2026/27', 5, 100, 'Team A', 'Alice', 12, 100, 1, 2, 1, 3);
+                INSERT INTO fpl_lineup_picks
+                    (season, event_id, entry_id, player_id, player_name, position,
+                     multiplier, is_captain, is_vice_captain, points)
+                VALUES
+                    ('2026/27', 5, 100, 1, 'Player One', 1, 0, 0, 0, 3),
+                    ('2026/27', 5, 100, 2, 'Player Two', 2, 2, 1, 0, 12);
+                """;
+            command.ExecuteNonQuery();
+        }
+
+        // Act
+        var store = CreateStore();
+        var migratedSnapshot = store.GetSnapshot("2026/27", 5);
+
+        // Assert
+        migratedSnapshot.Should().NotBeNull();
+        migratedSnapshot!.Managers.Should().ContainSingle();
+        migratedSnapshot.Managers[0].TransferCost.Should().Be(0);
+
+        var rewrittenSnapshot = migratedSnapshot with
+        {
+            Managers =
+            [
+                migratedSnapshot.Managers[0] with { TransferCost = 8 }
+            ]
+        };
+        store.SaveSnapshot(rewrittenSnapshot);
+        store.GetSnapshot("2026/27", 5)!.Managers[0].TransferCost.Should().Be(8);
     }
 
     [Test]
@@ -193,7 +291,8 @@ public sealed class SqliteFplStatisticsStoreTests
         string entryName,
         string managerName,
         int eventScore = 12,
-        int benchPoints = 3)
+        int benchPoints = 3,
+        int transferCost = 0)
     {
         return new FplManagerGameweekStatistics(
             entryId,
@@ -222,7 +321,10 @@ public sealed class SqliteFplStatisticsStoreTests
                     Multiplier: 2,
                     IsCaptain: true,
                     IsViceCaptain: false,
-                    Points: eventScore)
-            ]);
+                Points: eventScore)
+            ])
+        {
+            TransferCost = transferCost
+        };
     }
 }

@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text;
 using DiscordBot.FantasyPremierLeague.Historical;
 using DiscordBot.FantasyPremierLeague.Recap;
+using DiscordBot.FantasyPremierLeague.Recognition;
 using DiscordBot.Notifications;
 using DiscordBot.Responses;
 
@@ -167,6 +168,12 @@ public sealed class PremierLeagueMessageCompositionService(
         summary.Append("\nCaptain Genius: ");
         summary.Append(FormatCaptainPerformances(recap.CaptainGeniuses));
 
+        summary.Append("\n\nAchievements:");
+        AppendAchievements(summary, recap.Achievements);
+
+        summary.Append("\n\nRatings:");
+        AppendRatings(summary, recap.Ratings);
+
         return summary.ToString();
     }
 
@@ -300,6 +307,49 @@ public sealed class PremierLeagueMessageCompositionService(
         return formattedPerformances.Length == 0
             ? "(нет данных)"
             : string.Join(", ", formattedPerformances);
+    }
+
+    private static void AppendAchievements(
+        StringBuilder summary,
+        IEnumerable<FplAchievementAward> achievements)
+    {
+        var awards = achievements.ToArray();
+        if (awards.Length == 0)
+        {
+            summary.Append("\n(none)");
+            return;
+        }
+
+        foreach (var award in awards)
+        {
+            summary.Append("\n");
+            summary.Append(DiscordTextSafety.SanitizeExternalName(award.EntryName));
+            summary.Append(" — ");
+            summary.Append(DiscordTextSafety.SanitizeExternalName(award.AchievementName));
+        }
+    }
+
+    private static void AppendRatings(
+        StringBuilder summary,
+        IEnumerable<FplManagerRating> ratings)
+    {
+        var managerRatings = ratings.ToArray();
+        if (managerRatings.Length == 0)
+        {
+            summary.Append("\n(none)");
+            return;
+        }
+
+        foreach (var rating in managerRatings)
+        {
+            summary.Append("\n");
+            summary.Append(DiscordTextSafety.SanitizeExternalName(rating.EntryName));
+            summary.Append(" — Fraud Rating ");
+            summary.Append(rating.FraudRating.ToString(CultureInfo.InvariantCulture));
+            summary.Append("/100; Maguire Index ");
+            summary.Append(rating.MaguireIndex.ToString(CultureInfo.InvariantCulture));
+            summary.Append("/100");
+        }
     }
 
     private static string FormatSignedNumber(int value)

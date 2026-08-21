@@ -1,4 +1,5 @@
 using DiscordBot.FantasyPremierLeague.Historical;
+using DiscordBot.FantasyPremierLeague.Recognition;
 
 namespace DiscordBot.FantasyPremierLeague.Recap;
 
@@ -16,7 +17,12 @@ public sealed record FplGameweekRecap(
     IReadOnlyList<FplManagerGameweekStatistics> BiggestFallers,
     IReadOnlyList<FplManagerGameweekStatistics> NotableRankChanges,
     IReadOnlyList<FplManagerGameweekStatistics> Benchmasters,
-    IReadOnlyList<FplCaptainPerformance> CaptainGeniuses);
+    IReadOnlyList<FplCaptainPerformance> CaptainGeniuses)
+{
+    public IReadOnlyList<FplAchievementAward> Achievements { get; init; } = [];
+
+    public IReadOnlyList<FplManagerRating> Ratings { get; init; } = [];
+}
 
 public sealed record FplCaptainPerformance(
     FplManagerGameweekStatistics Manager,

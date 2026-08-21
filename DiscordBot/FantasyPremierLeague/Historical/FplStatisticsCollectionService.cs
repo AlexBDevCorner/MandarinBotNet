@@ -76,7 +76,7 @@ public sealed class FplStatisticsCollectionService(
                     finishedEvent.Id,
                     result.Entry))
                 .ToList();
-            managers.Add(new FplManagerGameweekStatistics(
+            var manager = new FplManagerGameweekStatistics(
                 result.Entry,
                 result.EntryName,
                 result.PlayerName,
@@ -86,7 +86,11 @@ public sealed class FplStatisticsCollectionService(
                 result.LastRank,
                 result.LastRank - result.Rank,
                 lineup.Where(pick => pick.IsBench).Sum(pick => pick.Points),
-                lineup));
+                lineup)
+            {
+                TransferCost = GetTransferCost(picks, season, finishedEvent.Id, result.Entry)
+            };
+            managers.Add(manager);
         }
 
         var snapshot = new FplGameweekSnapshot(
@@ -196,5 +200,22 @@ public sealed class FplStatisticsCollectionService(
             pick.IsCaptain,
             pick.IsViceCaptain,
             points);
+    }
+
+    private static int GetTransferCost(
+        EntryEventPicksResponse picks,
+        string season,
+        int eventId,
+        int entryId)
+    {
+        var transferCost = picks.EntryHistory?.EventTransfersCost ?? 0;
+        if (transferCost < 0)
+        {
+            throw new InvalidDataException(
+                $"The FPL picks response contained a negative transfer cost for entry " +
+                $"{entryId} in season {season} event {eventId}.");
+        }
+
+        return transferCost;
     }
 }

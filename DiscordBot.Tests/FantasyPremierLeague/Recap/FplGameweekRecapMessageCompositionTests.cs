@@ -1,6 +1,7 @@
 using AwesomeAssertions;
 using DiscordBot.FantasyPremierLeague.Historical;
 using DiscordBot.FantasyPremierLeague.Recap;
+using DiscordBot.FantasyPremierLeague.Recognition;
 using DiscordBot.PremierLeague;
 using NUnit.Framework;
 
@@ -24,6 +25,39 @@ public sealed class FplGameweekRecapMessageCompositionTests
                 CreateManager(20, "Beta", 40, 2, 2, 0, "Son", 8)
             ]);
         var recap = new FplGameweekRecapCalculationService().Calculate(snapshot);
+        recap = recap with
+        {
+            Achievements =
+            [
+                new FplAchievementAward(
+                    123,
+                    "2026/27",
+                    5,
+                    10,
+                    "Alpha",
+                    "bench-warmer",
+                    "Bench Warmer",
+                    "Left points on the bench.",
+                    IsRepeatable: true,
+                    "v1",
+                    DateTimeOffset.UtcNow)
+            ],
+            Ratings =
+            [
+                new FplManagerRating(
+                    123,
+                    "2026/27",
+                    5,
+                    10,
+                    "Alpha",
+                    "Manager Alpha",
+                    1,
+                    64,
+                    42,
+                    "v1",
+                    DateTimeOffset.UtcNow)
+            ]
+        };
         var composer = new PremierLeagueMessageCompositionService(
             new ConfiguredTimeZone(new JobSchedulesOptions { TimeZoneId = "Europe/Riga" }));
 
@@ -42,6 +76,10 @@ public sealed class FplGameweekRecapMessageCompositionTests
         message.Should().Contain("Fraud of the Week: Beta — 40 очков");
         message.Should().Contain("Benchmaster: Alpha — 8 очков");
         message.Should().Contain("Captain Genius: Alpha (Salah, 30 очков)");
+        message.Should().Contain("Achievements:");
+        message.Should().Contain("Alpha — Bench Warmer");
+        message.Should().Contain("Ratings:");
+        message.Should().Contain("Alpha — Fraud Rating 64/100; Maguire Index 42/100");
     }
 
     [Test]

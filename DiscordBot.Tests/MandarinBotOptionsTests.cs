@@ -32,6 +32,10 @@ public sealed class MandarinBotOptionsTests
         options.Schedules.FplLiveInsights.Enabled.Should().BeFalse();
         options.FantasyPremierLeague.MaxStandingsPages.Should().Be(
             FantasyPremierLeagueOptions.DefaultMaxStandingsPages);
+        options.FantasyPremierLeague.RecognitionRuleVersion.Should().Be(
+            FantasyPremierLeagueOptions.DefaultRecognitionRuleVersion);
+        options.FantasyPremierLeague.TransferCostAchievementThreshold.Should().Be(
+            FantasyPremierLeagueOptions.DefaultTransferCostAchievementThreshold);
     }
 
     [Test]
@@ -214,7 +218,8 @@ public sealed class MandarinBotOptionsTests
                 LargeBenchPointsThreshold = 0,
                 CaptainSuccessEffectivePointsThreshold = 0,
                 CaptainDisasterPointsThreshold = 10,
-                CaptainDisasterViceCaptainPointsThreshold = 10
+                CaptainDisasterViceCaptainPointsThreshold = 10,
+                TransferCostAchievementThreshold = 0
             });
         var validator = new MandarinBotOptionsValidator(
             requireOperationalConfiguration: true);
@@ -230,6 +235,8 @@ public sealed class MandarinBotOptionsTests
             failure.Contains("CaptainSuccessEffectivePointsThreshold"));
         result.Failures.Should().Contain(failure =>
             failure.Contains("CaptainDisasterViceCaptainPointsThreshold"));
+        result.Failures.Should().Contain(failure =>
+            failure.Contains("TransferCostAchievementThreshold"));
     }
 
     [Test]

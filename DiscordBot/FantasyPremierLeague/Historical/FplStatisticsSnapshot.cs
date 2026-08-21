@@ -18,7 +18,10 @@ public sealed record FplManagerGameweekStatistics(
     int LastRank,
     int RankChange,
     int BenchPoints,
-    IReadOnlyList<FplLineupPick> Lineup);
+    IReadOnlyList<FplLineupPick> Lineup)
+{
+    public int TransferCost { get; init; }
+}
 
 public sealed record FplLineupPick(
     int PlayerId,

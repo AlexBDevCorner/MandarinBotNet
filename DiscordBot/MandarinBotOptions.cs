@@ -38,10 +38,12 @@ public sealed class FantasyPremierLeagueOptions
 {
     public const int DefaultMaxStandingsPages = 10;
     public static readonly TimeSpan DefaultLiveDataMaxAge = TimeSpan.FromMinutes(20);
+    public const string DefaultRecognitionRuleVersion = "v1";
     public const int DefaultLargeBenchPointsThreshold = 8;
     public const int DefaultCaptainSuccessEffectivePointsThreshold = 20;
     public const int DefaultCaptainDisasterPointsThreshold = 2;
     public const int DefaultCaptainDisasterViceCaptainPointsThreshold = 8;
+    public const int DefaultTransferCostAchievementThreshold = 8;
 
     public int ClassicLeagueId { get; init; }
 
@@ -50,6 +52,8 @@ public sealed class FantasyPremierLeagueOptions
     public int MaxStandingsPages { get; init; } = DefaultMaxStandingsPages;
 
     public TimeSpan LiveDataMaxAge { get; init; } = DefaultLiveDataMaxAge;
+
+    public string RecognitionRuleVersion { get; init; } = DefaultRecognitionRuleVersion;
 
     public int LargeBenchPointsThreshold { get; init; } =
         DefaultLargeBenchPointsThreshold;
@@ -62,6 +66,9 @@ public sealed class FantasyPremierLeagueOptions
 
     public int CaptainDisasterViceCaptainPointsThreshold { get; init; } =
         DefaultCaptainDisasterViceCaptainPointsThreshold;
+
+    public int TransferCostAchievementThreshold { get; init; } =
+        DefaultTransferCostAchievementThreshold;
 }
 
 public sealed class JobSchedulesOptions
