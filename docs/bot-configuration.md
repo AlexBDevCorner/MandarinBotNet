@@ -2,7 +2,7 @@
 
 Bot behavior is bound from the `Bot` configuration section and validated when
 the host starts. Production refuses to start when credentials are missing, no
-job is enabled, an enabled standings job lacks its league ID, a schedule is
+job is enabled, an enabled league job lacks its league ID, a schedule is
 invalid, or an enabled notification job has no explicit notification target. This prevents a
 partially configured deployment from appearing healthy while doing the wrong
 work.
@@ -37,6 +37,11 @@ Bot__WelcomeMessages__ChannelId=<WELCOME-CHANNEL-ID>
 Bot__FantasyPremierLeague__ClassicLeagueId=<CLASSIC-LEAGUE-ID>
 Bot__FantasyPremierLeague__HeadToHeadLeagueId=<HEAD-TO-HEAD-LEAGUE-ID>
 Bot__FantasyPremierLeague__MaxStandingsPages=10
+Bot__FantasyPremierLeague__LiveDataMaxAge=00:20:00
+Bot__FantasyPremierLeague__LargeBenchPointsThreshold=8
+Bot__FantasyPremierLeague__CaptainSuccessEffectivePointsThreshold=20
+Bot__FantasyPremierLeague__CaptainDisasterPointsThreshold=2
+Bot__FantasyPremierLeague__CaptainDisasterViceCaptainPointsThreshold=8
 Bot__Schedules__TimeZoneId=Europe/Riga
 Bot__Schedules__PremierLeagueNotifications__Enabled=true
 Bot__Schedules__PremierLeagueNotifications__Cron=0 0 * * * ?
@@ -52,6 +57,8 @@ Bot__Schedules__FplStatisticsCollection__Enabled=true
 Bot__Schedules__FplStatisticsCollection__Cron=0 0 19 * * ?
 Bot__Schedules__FplGameweekRecap__Enabled=true
 Bot__Schedules__FplGameweekRecap__Cron=0 0 20 * * ?
+Bot__Schedules__FplLiveInsights__Enabled=true
+Bot__Schedules__FplLiveInsights__Cron=0 0/15 * * * ?
 Bot__Notifications__Targets__0__GuildId=<FIRST-GUILD-ID>
 Bot__Notifications__Targets__0__ChannelId=<FIRST-CHANNEL-ID>
 Bot__Notifications__Targets__0__MentionEveryone=false
@@ -112,6 +119,33 @@ The job requires `Bot:FantasyPremierLeague:ClassicLeagueId` and posts a round
 summary to every notification target after calculating a new round. The
 `/benchleague` slash command shows the current season standings on demand.
 Historical rounds are not backfilled; tracking starts when the feature ships.
+
+## Live FPL insights
+
+The `/live` slash command calculates the current gameweek view for every entry in
+the configured classic league. It combines the active gameweek, current standings,
+entry picks, and live player data to show live points and players remaining to play.
+The message includes all managers meeting the configured bench threshold, captain
+disasters, captain successes, and automatic-substitution salvations. Ties are not
+discarded.
+
+`LiveDataMaxAge` defaults to 20 minutes. Stale standings data is reported as stale
+and is not used to publish misleading live points. The FPL HTTP client already
+classifies rate limits and transient upstream failures for retry; the live service
+turns an exhausted failure into a safe command response and skips the scheduled
+publication.
+
+The optional `FplLiveInsights` job is disabled by default. When enabled, it runs at
+the configured cron interval and publishes only once for each event/source update
+timestamp per target. Repeated executions with the same source timestamp therefore
+do not spam the channel. Configure the alert thresholds explicitly when changing
+the defaults:
+
+- `LargeBenchPointsThreshold` is the total raw points left on a manager's bench.
+- `CaptainSuccessEffectivePointsThreshold` is the captain's multiplied points.
+- `CaptainDisasterPointsThreshold` is the maximum raw captain points for a disaster.
+- `CaptainDisasterViceCaptainPointsThreshold` is the minimum raw vice-captain points
+  required for the same alert.
 
 ## Multiple targets and mentions
 

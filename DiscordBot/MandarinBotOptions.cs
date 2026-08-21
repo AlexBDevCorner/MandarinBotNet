@@ -37,12 +37,31 @@ public sealed class DiscordCommandOptions
 public sealed class FantasyPremierLeagueOptions
 {
     public const int DefaultMaxStandingsPages = 10;
+    public static readonly TimeSpan DefaultLiveDataMaxAge = TimeSpan.FromMinutes(20);
+    public const int DefaultLargeBenchPointsThreshold = 8;
+    public const int DefaultCaptainSuccessEffectivePointsThreshold = 20;
+    public const int DefaultCaptainDisasterPointsThreshold = 2;
+    public const int DefaultCaptainDisasterViceCaptainPointsThreshold = 8;
 
     public int ClassicLeagueId { get; init; }
 
     public int HeadToHeadLeagueId { get; init; }
 
     public int MaxStandingsPages { get; init; } = DefaultMaxStandingsPages;
+
+    public TimeSpan LiveDataMaxAge { get; init; } = DefaultLiveDataMaxAge;
+
+    public int LargeBenchPointsThreshold { get; init; } =
+        DefaultLargeBenchPointsThreshold;
+
+    public int CaptainSuccessEffectivePointsThreshold { get; init; } =
+        DefaultCaptainSuccessEffectivePointsThreshold;
+
+    public int CaptainDisasterPointsThreshold { get; init; } =
+        DefaultCaptainDisasterPointsThreshold;
+
+    public int CaptainDisasterViceCaptainPointsThreshold { get; init; } =
+        DefaultCaptainDisasterViceCaptainPointsThreshold;
 }
 
 public sealed class JobSchedulesOptions
@@ -63,6 +82,8 @@ public sealed class JobSchedulesOptions
 
     public ScheduledJobOptions FplGameweekRecap { get; init; } = new();
 
+    public ScheduledJobOptions FplLiveInsights { get; init; } = new();
+
     public bool HasEnabledJobs =>
         PremierLeagueNotifications.Enabled ||
         UclFantasyNotifications.Enabled ||
@@ -70,7 +91,8 @@ public sealed class JobSchedulesOptions
         HeadToHeadStandings.Enabled ||
         BenchWarmingLeague.Enabled ||
         FplStatisticsCollection.Enabled ||
-        FplGameweekRecap.Enabled;
+        FplGameweekRecap.Enabled ||
+        FplLiveInsights.Enabled;
 
     public bool HasEnabledNotificationJobs =>
         PremierLeagueNotifications.Enabled ||
@@ -78,7 +100,8 @@ public sealed class JobSchedulesOptions
         ClassicStandings.Enabled ||
         HeadToHeadStandings.Enabled ||
         BenchWarmingLeague.Enabled ||
-        FplGameweekRecap.Enabled;
+        FplGameweekRecap.Enabled ||
+        FplLiveInsights.Enabled;
 }
 
 public sealed class ScheduledJobOptions

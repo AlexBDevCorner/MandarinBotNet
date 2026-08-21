@@ -59,6 +59,10 @@ public sealed class MandarinBotOptionsValidator(bool requireOperationalConfigura
             "Bot:Schedules:FplGameweekRecap",
             options.Schedules.FplGameweekRecap,
             failures);
+        ValidateSchedule(
+            "Bot:Schedules:FplLiveInsights",
+            options.Schedules.FplLiveInsights,
+            failures);
 
         if (requireOperationalConfiguration && !options.Schedules.HasEnabledJobs)
         {
@@ -101,10 +105,48 @@ public sealed class MandarinBotOptionsValidator(bool requireOperationalConfigura
                 "Bot:FantasyPremierLeague:ClassicLeagueId is required when the FPL gameweek recap job is enabled.");
         }
 
+        if (options.Schedules.FplLiveInsights.Enabled &&
+            options.FantasyPremierLeague.ClassicLeagueId <= 0)
+        {
+            failures.Add(
+                "Bot:FantasyPremierLeague:ClassicLeagueId is required when the FPL live insights job is enabled.");
+        }
+
         if (options.FantasyPremierLeague.MaxStandingsPages <= 0)
         {
             failures.Add(
                 "Bot:FantasyPremierLeague:MaxStandingsPages must be greater than zero.");
+        }
+
+        if (options.FantasyPremierLeague.LiveDataMaxAge <= TimeSpan.Zero)
+        {
+            failures.Add(
+                "Bot:FantasyPremierLeague:LiveDataMaxAge must be greater than zero.");
+        }
+
+        if (options.FantasyPremierLeague.LargeBenchPointsThreshold <= 0)
+        {
+            failures.Add(
+                "Bot:FantasyPremierLeague:LargeBenchPointsThreshold must be greater than zero.");
+        }
+
+        if (options.FantasyPremierLeague.CaptainSuccessEffectivePointsThreshold <= 0)
+        {
+            failures.Add(
+                "Bot:FantasyPremierLeague:CaptainSuccessEffectivePointsThreshold must be greater than zero.");
+        }
+
+        if (options.FantasyPremierLeague.CaptainDisasterPointsThreshold < 0)
+        {
+            failures.Add(
+                "Bot:FantasyPremierLeague:CaptainDisasterPointsThreshold cannot be negative.");
+        }
+
+        if (options.FantasyPremierLeague.CaptainDisasterViceCaptainPointsThreshold <=
+            options.FantasyPremierLeague.CaptainDisasterPointsThreshold)
+        {
+            failures.Add(
+                "Bot:FantasyPremierLeague:CaptainDisasterViceCaptainPointsThreshold must be greater than CaptainDisasterPointsThreshold.");
         }
 
         ValidateTargets(options, failures);

@@ -2,6 +2,7 @@ using System.Net;
 using System.Text;
 using AwesomeAssertions;
 using DiscordBot.FantasyPremierLeague;
+using DiscordBot.Responses;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using NUnit.Framework;
@@ -24,6 +25,7 @@ public sealed class FantasyPremierLeagueClientTests
                       "events": [
                         {
                           "id": 42,
+                          "is_current": true,
                           "is_next": true,
                           "deadline_time_epoch": 1770000000
                         }
@@ -39,6 +41,7 @@ public sealed class FantasyPremierLeagueClientTests
         // Assert
         result.Events.Should().ContainSingle();
         result.Events[0].Id.Should().Be(42);
+        result.Events[0].IsCurrent.Should().BeTrue();
         handler.AttemptCount.Should().Be(2);
         handler.RequestUris.Should().OnlyContain(
             uri => uri.AbsolutePath == "/api/bootstrap-static/");
@@ -305,6 +308,12 @@ public sealed class FantasyPremierLeagueClientTests
                       "is_captain": true,
                       "is_vice_captain": false
                     }
+                  ],
+                  "automatic_subs": [
+                    {
+                      "element_in": 2,
+                      "element_out": 1
+                    }
                   ]
                 }
                 """)));
@@ -324,6 +333,12 @@ public sealed class FantasyPremierLeagueClientTests
         result.Picks[1].Element.Should().Be(2);
         result.Picks[1].Multiplier.Should().Be(2);
         result.Picks[1].IsCaptain.Should().BeTrue();
+        result.AutomaticSubstitutions.Should().ContainSingle().Which.Should()
+            .BeEquivalentTo(new EntryAutomaticSubstitution
+            {
+                ElementIn = 2,
+                ElementOut = 1
+            });
         handler.RequestUris.Should().OnlyContain(
             uri => uri.PathAndQuery == "/api/entry/4791912/event/8/picks/");
     }
@@ -339,12 +354,12 @@ public sealed class FantasyPremierLeagueClientTests
                   "elements": [
                     {
                       "id": 1,
-                      "stats": { "total_points": 15, "goals_scored": 2 },
+                      "stats": { "total_points": 15, "minutes": 90, "goals_scored": 2 },
                       "explain": []
                     },
                     {
                       "id": 2,
-                      "stats": { "total_points": -1 },
+                      "stats": { "total_points": -1, "minutes": 0 },
                       "explain": []
                     }
                   ]
@@ -359,6 +374,8 @@ public sealed class FantasyPremierLeagueClientTests
         // Assert
         result.Elements.Select(element => (element.Id, element.Stats.TotalPoints))
             .Should().BeEquivalentTo([(1, 15), (2, -1)]);
+        result.Elements.Select(element => element.Stats.Minutes)
+            .Should().BeEquivalentTo([90, 0]);
         handler.RequestUris.Should().OnlyContain(
             uri => uri.PathAndQuery == "/api/event/8/live/");
     }
