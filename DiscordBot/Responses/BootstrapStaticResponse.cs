@@ -25,6 +25,9 @@ public sealed class PremierLeagueEvent
     [JsonPropertyName("is_finished")]
     public bool IsFinished { get; init; }
 
+    [JsonPropertyName("is_current")]
+    public bool IsCurrent { get; init; }
+
     [JsonPropertyName("deadline_time_epoch")]
     public long DeadlineTimeEpoch { get; init; }
 }

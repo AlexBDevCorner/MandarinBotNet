@@ -4,6 +4,7 @@ using DiscordBot.Commands;
 using DiscordBot.Deadlines;
 using DiscordBot.FantasyPremierLeague;
 using DiscordBot.FantasyPremierLeague.Historical;
+using DiscordBot.FantasyPremierLeague.Live;
 using DiscordBot.FantasyPremierLeague.Recap;
 using DiscordBot.Health;
 using DiscordBot.Jobs;
@@ -91,6 +92,10 @@ builder.Services.AddSingleton<BenchWarmingLeagueCalculationService>();
 builder.Services.AddSingleton<FplStatisticsCollectionService>();
 builder.Services.AddSingleton<FplGameweekRecapCalculationService>();
 builder.Services.AddSingleton<FplGameweekRecapService>();
+builder.Services.AddSingleton<FplLiveInsightsCalculationService>();
+builder.Services.AddSingleton<FplLiveInsightsService>();
+builder.Services.AddSingleton<FplLiveInsightsMessageComposer>();
+builder.Services.AddSingleton<ILiveInsightsCommandHandler, LiveInsightsCommandHandler>();
 builder.Services.AddSingleton<WelcomeMessageTemplateRotator>();
 builder.Services.AddSingleton<
     IWelcomeMessageDestinationResolver,
@@ -262,6 +267,20 @@ builder.Services.AddOptions<QuartzOptions>()
             .WithIdentity(JobSchedules.FplGameweekRecapTriggerName)
             .WithCronSchedule(
                 schedules.FplGameweekRecap.Cron,
+                schedule => schedule
+                    .InTimeZone(timeZone)
+                     .WithMisfireHandlingInstructionDoNothing()));
+    }
+
+    if (schedules.FplLiveInsights.Enabled)
+    {
+        q.AddJob<FplLiveInsightsJob>(
+            job => job.WithIdentity(JobSchedules.FplLiveInsightsJobKey));
+        q.AddTrigger(trigger => trigger
+            .ForJob(JobSchedules.FplLiveInsightsJobKey)
+            .WithIdentity(JobSchedules.FplLiveInsightsTriggerName)
+            .WithCronSchedule(
+                schedules.FplLiveInsights.Cron,
                 schedule => schedule
                     .InTimeZone(timeZone)
                     .WithMisfireHandlingInstructionDoNothing()));

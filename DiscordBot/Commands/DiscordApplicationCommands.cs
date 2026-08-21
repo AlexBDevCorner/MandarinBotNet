@@ -8,6 +8,7 @@ public static class DiscordApplicationCommands
     public const string HugMeName = "hugme";
     public const string StandingsName = "standings";
     public const string BenchLeagueName = "benchleague";
+    public const string LiveInsightsName = "live";
 
     public static ApplicationCommandProperties[] BuildDesiredSet()
     {
@@ -28,6 +29,10 @@ public static class DiscordApplicationCommands
             new SlashCommandBuilder()
                 .WithName(BenchLeagueName)
                 .WithDescription("Shows the current bench warming league standings.")
+                .Build(),
+            new SlashCommandBuilder()
+                .WithName(LiveInsightsName)
+                .WithDescription("Shows live insights for the configured FPL league.")
                 .Build()
         ];
     }

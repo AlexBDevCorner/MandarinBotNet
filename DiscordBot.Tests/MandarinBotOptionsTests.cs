@@ -29,6 +29,7 @@ public sealed class MandarinBotOptionsTests
         options.WelcomeMessages.Enabled.Should().BeFalse();
         new NotificationTargetOptions().MentionEveryone.Should().BeFalse();
         options.Schedules.FplGameweekRecap.Enabled.Should().BeFalse();
+        options.Schedules.FplLiveInsights.Enabled.Should().BeFalse();
         options.FantasyPremierLeague.MaxStandingsPages.Should().Be(
             FantasyPremierLeagueOptions.DefaultMaxStandingsPages);
     }
@@ -49,7 +50,8 @@ public sealed class MandarinBotOptionsTests
             ["Bot:Schedules:HeadToHeadStandings:Cron"] = "0 0 17 * * ?",
             ["Bot:Schedules:BenchWarmingLeague:Cron"] = "0 0 18 * * ?",
             ["Bot:Schedules:FplStatisticsCollection:Cron"] = "0 0 19 * * ?",
-            ["Bot:Schedules:FplGameweekRecap:Cron"] = "0 0 20 * * ?"
+            ["Bot:Schedules:FplGameweekRecap:Cron"] = "0 0 20 * * ?",
+            ["Bot:Schedules:FplLiveInsights:Cron"] = "0 0/15 * * * ?"
         });
         builder.Services.AddMandarinBotConfiguration(
             builder.Configuration,
@@ -82,7 +84,8 @@ public sealed class MandarinBotOptionsTests
                 HeadToHeadStandings = ValidSchedule(enabled: false, "0 0 17 * * ?"),
                 BenchWarmingLeague = ValidSchedule(enabled: false, "0 0 18 * * ?"),
                 FplStatisticsCollection = ValidSchedule(enabled: false, "0 0 19 * * ?"),
-                FplGameweekRecap = ValidSchedule(enabled: false, "0 0 20 * * ?")
+                FplGameweekRecap = ValidSchedule(enabled: false, "0 0 20 * * ?"),
+                FplLiveInsights = ValidSchedule(enabled: false, "0 0/15 * * * ?")
             },
             targets: []);
         var validator = new MandarinBotOptionsValidator(
@@ -118,7 +121,8 @@ public sealed class MandarinBotOptionsTests
                 HeadToHeadStandings = ValidSchedule(enabled: false, "0 0 17 * * ?"),
                 BenchWarmingLeague = ValidSchedule(enabled: true, "0 0 18 * * ?"),
                 FplStatisticsCollection = ValidSchedule(enabled: false, "0 0 19 * * ?"),
-                FplGameweekRecap = ValidSchedule(enabled: false, "0 0 20 * * ?")
+                FplGameweekRecap = ValidSchedule(enabled: false, "0 0 20 * * ?"),
+                FplLiveInsights = ValidSchedule(enabled: false, "0 0/15 * * * ?")
             });
         var validator = new MandarinBotOptionsValidator(
             requireOperationalConfiguration: true);
@@ -151,7 +155,8 @@ public sealed class MandarinBotOptionsTests
                 HeadToHeadStandings = ValidSchedule(enabled: false, "0 0 17 * * ?"),
                 BenchWarmingLeague = ValidSchedule(enabled: false, "0 0 18 * * ?"),
                 FplStatisticsCollection = ValidSchedule(enabled: false, "0 0 19 * * ?"),
-                FplGameweekRecap = ValidSchedule(enabled: true, "0 0 20 * * ?")
+                FplGameweekRecap = ValidSchedule(enabled: true, "0 0 20 * * ?"),
+                FplLiveInsights = ValidSchedule(enabled: false, "0 0/15 * * * ?")
             });
         var validator = new MandarinBotOptionsValidator(
             requireOperationalConfiguration: true);
@@ -163,6 +168,68 @@ public sealed class MandarinBotOptionsTests
         result.Failed.Should().BeTrue();
         result.Failures.Should().Contain(failure =>
             failure.Contains("FPL gameweek recap job is enabled"));
+    }
+
+    [Test]
+    public void Validate_EnabledLiveInsightsWithoutClassicLeague_ReturnsFailure()
+    {
+        // Arrange
+        var options = CreateValidOptions(
+            leagueOptions: new FantasyPremierLeagueOptions
+            {
+                ClassicLeagueId = 0,
+                HeadToHeadLeagueId = 456
+            },
+            schedules: new JobSchedulesOptions
+            {
+                TimeZoneId = "Europe/Riga",
+                PremierLeagueNotifications = ValidSchedule(enabled: false, "0 0 * * * ?"),
+                UclFantasyNotifications = ValidSchedule(enabled: false, "0 0 * * * ?"),
+                ClassicStandings = ValidSchedule(enabled: false, "0 0 17 * * ?"),
+                HeadToHeadStandings = ValidSchedule(enabled: false, "0 0 17 * * ?"),
+                BenchWarmingLeague = ValidSchedule(enabled: false, "0 0 18 * * ?"),
+                FplStatisticsCollection = ValidSchedule(enabled: false, "0 0 19 * * ?"),
+                FplGameweekRecap = ValidSchedule(enabled: false, "0 0 20 * * ?"),
+                FplLiveInsights = ValidSchedule(enabled: true, "0 0/15 * * * ?")
+            });
+        var validator = new MandarinBotOptionsValidator(
+            requireOperationalConfiguration: true);
+
+        // Act
+        var result = validator.Validate(null, options);
+
+        // Assert
+        result.Failed.Should().BeTrue();
+        result.Failures.Should().Contain(failure =>
+            failure.Contains("FPL live insights job is enabled"));
+    }
+
+    [Test]
+    public void Validate_InvalidLiveInsightThresholds_ReturnsActionableFailures()
+    {
+        // Arrange
+        var options = CreateValidOptions(
+            leagueOptions: new FantasyPremierLeagueOptions
+            {
+                LargeBenchPointsThreshold = 0,
+                CaptainSuccessEffectivePointsThreshold = 0,
+                CaptainDisasterPointsThreshold = 10,
+                CaptainDisasterViceCaptainPointsThreshold = 10
+            });
+        var validator = new MandarinBotOptionsValidator(
+            requireOperationalConfiguration: true);
+
+        // Act
+        var result = validator.Validate(null, options);
+
+        // Assert
+        result.Failed.Should().BeTrue();
+        result.Failures.Should().Contain(failure =>
+            failure.Contains("LargeBenchPointsThreshold"));
+        result.Failures.Should().Contain(failure =>
+            failure.Contains("CaptainSuccessEffectivePointsThreshold"));
+        result.Failures.Should().Contain(failure =>
+            failure.Contains("CaptainDisasterViceCaptainPointsThreshold"));
     }
 
     [Test]
@@ -208,7 +275,8 @@ public sealed class MandarinBotOptionsTests
                 HeadToHeadStandings = ValidSchedule(enabled: false, "0 0 17 * * ?"),
                 BenchWarmingLeague = ValidSchedule(enabled: false, "0 0 18 * * ?"),
                 FplStatisticsCollection = ValidSchedule(enabled: true, "0 0 19 * * ?"),
-                FplGameweekRecap = ValidSchedule(enabled: false, "0 0 20 * * ?")
+                FplGameweekRecap = ValidSchedule(enabled: false, "0 0 20 * * ?"),
+                FplLiveInsights = ValidSchedule(enabled: false, "0 0/15 * * * ?")
             },
             targets: []);
         var validator = new MandarinBotOptionsValidator(
@@ -349,7 +417,8 @@ public sealed class MandarinBotOptionsTests
                 HeadToHeadStandings = ValidSchedule(enabled: true, "0 0 17 * * ?"),
                 BenchWarmingLeague = ValidSchedule(enabled: true, "0 0 18 * * ?"),
                 FplStatisticsCollection = ValidSchedule(enabled: false, "0 0 19 * * ?"),
-                FplGameweekRecap = ValidSchedule(enabled: false, "0 0 20 * * ?")
+                FplGameweekRecap = ValidSchedule(enabled: false, "0 0 20 * * ?"),
+                FplLiveInsights = ValidSchedule(enabled: false, "0 0/15 * * * ?")
             },
             Notifications = new NotificationOptions
             {

@@ -46,6 +46,11 @@ namespace DiscordBot.Tests.Jobs
             {
                 Enabled = true,
                 Cron = "0 0 20 * * ?"
+            },
+            FplLiveInsights = new ScheduledJobOptions
+            {
+                Enabled = true,
+                Cron = "0 0/15 * * * ?"
             }
         };
 
@@ -181,6 +186,22 @@ namespace DiscordBot.Tests.Jobs
         }
 
         [Test]
+        public void CreateFplLiveInsightsTrigger_ConfiguredSchedule_UsesCronAndRigaTimeZone()
+        {
+            // Arrange
+            var expectedTimeZone = JobSchedules.GetTimeZone(Options);
+
+            // Act
+            var trigger = JobSchedules.CreateFplLiveInsightsTrigger(Options);
+
+            // Assert
+            var cronTrigger = trigger.Should().BeAssignableTo<ICronTrigger>().Subject;
+            cronTrigger.CronExpressionString.Should()
+                .Be(Options.FplLiveInsights.Cron);
+            cronTrigger.TimeZone.Should().Be(expectedTimeZone);
+        }
+
+        [Test]
         public void CreateAllTriggers_DefaultSchedules_SkipMissedRuns()
         {
             // Arrange
@@ -201,6 +222,7 @@ namespace DiscordBot.Tests.Jobs
         [TestCase(typeof(BenchWarmingLeagueCalculationJob))]
         [TestCase(typeof(FplStatisticsCollectionJob))]
         [TestCase(typeof(FplGameweekRecapJob))]
+        [TestCase(typeof(FplLiveInsightsJob))]
         public void JobType_ScheduledWork_DisallowsConcurrentExecution(Type jobType)
         {
             // Arrange

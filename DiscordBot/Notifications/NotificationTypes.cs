@@ -10,5 +10,6 @@ namespace DiscordBot.Notifications
         public const string HeadToHeadStandings = "fpl-head-to-head-standings";
         public const string BenchWarmingStandings = "fpl-bench-warming-standings";
         public const string FplGameweekRecap = "fpl-gameweek-recap";
+        public const string FplLiveInsights = "fpl-live-insights";
     }
 }
