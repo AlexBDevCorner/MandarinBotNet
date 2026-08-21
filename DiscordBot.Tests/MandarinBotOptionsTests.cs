@@ -46,7 +46,8 @@ public sealed class MandarinBotOptionsTests
             ["Bot:Schedules:UclFantasyNotifications:Cron"] = "0 0 * * * ?",
             ["Bot:Schedules:ClassicStandings:Cron"] = "0 0 17 * * ?",
             ["Bot:Schedules:HeadToHeadStandings:Cron"] = "0 0 17 * * ?",
-            ["Bot:Schedules:BenchWarmingLeague:Cron"] = "0 0 18 * * ?"
+            ["Bot:Schedules:BenchWarmingLeague:Cron"] = "0 0 18 * * ?",
+            ["Bot:Schedules:FplStatisticsCollection:Cron"] = "0 0 19 * * ?"
         });
         builder.Services.AddMandarinBotConfiguration(
             builder.Configuration,
@@ -77,7 +78,8 @@ public sealed class MandarinBotOptionsTests
                 UclFantasyNotifications = ValidSchedule(enabled: false, "0 0 * * * ?"),
                 ClassicStandings = ValidSchedule(enabled: true, "0 0 17 * * ?"),
                 HeadToHeadStandings = ValidSchedule(enabled: false, "0 0 17 * * ?"),
-                BenchWarmingLeague = ValidSchedule(enabled: false, "0 0 18 * * ?")
+                BenchWarmingLeague = ValidSchedule(enabled: false, "0 0 18 * * ?"),
+                FplStatisticsCollection = ValidSchedule(enabled: false, "0 0 19 * * ?")
             },
             targets: []);
         var validator = new MandarinBotOptionsValidator(
@@ -111,7 +113,8 @@ public sealed class MandarinBotOptionsTests
                 UclFantasyNotifications = ValidSchedule(enabled: false, "0 0 * * * ?"),
                 ClassicStandings = ValidSchedule(enabled: false, "0 0 17 * * ?"),
                 HeadToHeadStandings = ValidSchedule(enabled: false, "0 0 17 * * ?"),
-                BenchWarmingLeague = ValidSchedule(enabled: true, "0 0 18 * * ?")
+                BenchWarmingLeague = ValidSchedule(enabled: true, "0 0 18 * * ?"),
+                FplStatisticsCollection = ValidSchedule(enabled: false, "0 0 19 * * ?")
             });
         var validator = new MandarinBotOptionsValidator(
             requireOperationalConfiguration: true);
@@ -152,6 +155,34 @@ public sealed class MandarinBotOptionsTests
 
         // Assert
         result.Succeeded.Should().BeTrue();
+    }
+
+    [Test]
+    public void Validate_EnabledHistoricalCollectionWithoutNotificationTarget_ReturnsSuccess()
+    {
+        // Arrange
+        var options = CreateValidOptions(
+            schedules: new JobSchedulesOptions
+            {
+                TimeZoneId = "Europe/Riga",
+                PremierLeagueNotifications = ValidSchedule(enabled: false, "0 0 * * * ?"),
+                UclFantasyNotifications = ValidSchedule(enabled: false, "0 0 * * * ?"),
+                ClassicStandings = ValidSchedule(enabled: false, "0 0 17 * * ?"),
+                HeadToHeadStandings = ValidSchedule(enabled: false, "0 0 17 * * ?"),
+                BenchWarmingLeague = ValidSchedule(enabled: false, "0 0 18 * * ?"),
+                FplStatisticsCollection = ValidSchedule(enabled: true, "0 0 19 * * ?")
+            },
+            targets: []);
+        var validator = new MandarinBotOptionsValidator(
+            requireOperationalConfiguration: true);
+
+        // Act
+        var result = validator.Validate(null, options);
+
+        // Assert
+        result.Succeeded.Should().BeTrue();
+        options.Schedules.HasEnabledJobs.Should().BeTrue();
+        options.Schedules.HasEnabledNotificationJobs.Should().BeFalse();
     }
 
     [Test]
@@ -278,7 +309,8 @@ public sealed class MandarinBotOptionsTests
                 UclFantasyNotifications = ValidSchedule(enabled: true, "0 0 * * * ?"),
                 ClassicStandings = ValidSchedule(enabled: true, "0 0 17 * * ?"),
                 HeadToHeadStandings = ValidSchedule(enabled: true, "0 0 17 * * ?"),
-                BenchWarmingLeague = ValidSchedule(enabled: true, "0 0 18 * * ?")
+                BenchWarmingLeague = ValidSchedule(enabled: true, "0 0 18 * * ?"),
+                FplStatisticsCollection = ValidSchedule(enabled: false, "0 0 19 * * ?")
             },
             Notifications = new NotificationOptions
             {

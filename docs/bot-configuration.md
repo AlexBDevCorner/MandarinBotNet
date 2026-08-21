@@ -48,6 +48,8 @@ Bot__Schedules__HeadToHeadStandings__Enabled=true
 Bot__Schedules__HeadToHeadStandings__Cron=0 0 17 * * ?
 Bot__Schedules__BenchWarmingLeague__Enabled=true
 Bot__Schedules__BenchWarmingLeague__Cron=0 0 18 * * ?
+Bot__Schedules__FplStatisticsCollection__Enabled=true
+Bot__Schedules__FplStatisticsCollection__Cron=0 0 19 * * ?
 Bot__Notifications__Targets__0__GuildId=<FIRST-GUILD-ID>
 Bot__Notifications__Targets__0__ChannelId=<FIRST-CHANNEL-ID>
 Bot__Notifications__Targets__0__MentionEveryone=false
@@ -66,6 +68,20 @@ are logged and skipped without disconnecting the bot.
 `MaxStandingsPages` bounds the number of FPL standings pages fetched by each
 job. The default of 10 represents up to 500 league entries while preventing a
 bad or unexpectedly large upstream pagination sequence from running forever.
+
+## Historical FPL statistics
+
+The `FplStatisticsCollection` job is disabled by default. When enabled, it
+records the latest completed gameweek, if it is not already stored, from the
+configured classic league into `data/fpl-statistics.db`. Each snapshot is
+keyed by season and gameweek and includes manager standings, rank changes,
+lineup picks, captaincy, live player points, bench points, deadlines, and
+capture metadata. Older gameweeks are not backfilled because the current FPL
+standings endpoint returns the current table; collection starts with the
+latest completed gameweek available after the feature is enabled. The
+collection job does not publish a Discord message and therefore does not
+require a notification target. A failed write is logged and rolled back so a
+partial snapshot is never exposed to later features.
 
 ## Bench warming league
 
