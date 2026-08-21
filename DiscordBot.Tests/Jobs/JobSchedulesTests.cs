@@ -149,7 +149,7 @@ namespace DiscordBot.Tests.Jobs
         }
 
         [Test]
-    public void CreateFplStatisticsCollectionTrigger_ConfiguredSchedule_UsesCronAndRigaTimeZone()
+        public void CreateFplStatisticsCollectionTrigger_ConfiguredSchedule_UsesCronAndRigaTimeZone()
         {
             // Arrange
             var expectedTimeZone = JobSchedules.GetTimeZone(Options);
@@ -161,24 +161,24 @@ namespace DiscordBot.Tests.Jobs
             var cronTrigger = trigger.Should().BeAssignableTo<ICronTrigger>().Subject;
             cronTrigger.CronExpressionString.Should()
                 .Be(Options.FplStatisticsCollection.Cron);
-        cronTrigger.TimeZone.Should().Be(expectedTimeZone);
-    }
+            cronTrigger.TimeZone.Should().Be(expectedTimeZone);
+        }
 
-    [Test]
-    public void CreateFplGameweekRecapTrigger_ConfiguredSchedule_UsesCronAndRigaTimeZone()
-    {
-        // Arrange
-        var expectedTimeZone = JobSchedules.GetTimeZone(Options);
+        [Test]
+        public void CreateFplGameweekRecapTrigger_ConfiguredSchedule_UsesCronAndRigaTimeZone()
+        {
+            // Arrange
+            var expectedTimeZone = JobSchedules.GetTimeZone(Options);
 
-        // Act
-        var trigger = JobSchedules.CreateFplGameweekRecapTrigger(Options);
+            // Act
+            var trigger = JobSchedules.CreateFplGameweekRecapTrigger(Options);
 
-        // Assert
-        var cronTrigger = trigger.Should().BeAssignableTo<ICronTrigger>().Subject;
-        cronTrigger.CronExpressionString.Should()
-            .Be(Options.FplGameweekRecap.Cron);
-        cronTrigger.TimeZone.Should().Be(expectedTimeZone);
-    }
+            // Assert
+            var cronTrigger = trigger.Should().BeAssignableTo<ICronTrigger>().Subject;
+            cronTrigger.CronExpressionString.Should()
+                .Be(Options.FplGameweekRecap.Cron);
+            cronTrigger.TimeZone.Should().Be(expectedTimeZone);
+        }
 
         [Test]
         public void CreateAllTriggers_DefaultSchedules_SkipMissedRuns()
