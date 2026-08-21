@@ -61,20 +61,24 @@ public sealed class JobSchedulesOptions
 
     public ScheduledJobOptions FplStatisticsCollection { get; init; } = new();
 
+    public ScheduledJobOptions FplGameweekRecap { get; init; } = new();
+
     public bool HasEnabledJobs =>
         PremierLeagueNotifications.Enabled ||
         UclFantasyNotifications.Enabled ||
         ClassicStandings.Enabled ||
         HeadToHeadStandings.Enabled ||
         BenchWarmingLeague.Enabled ||
-        FplStatisticsCollection.Enabled;
+        FplStatisticsCollection.Enabled ||
+        FplGameweekRecap.Enabled;
 
     public bool HasEnabledNotificationJobs =>
         PremierLeagueNotifications.Enabled ||
         UclFantasyNotifications.Enabled ||
         ClassicStandings.Enabled ||
         HeadToHeadStandings.Enabled ||
-        BenchWarmingLeague.Enabled;
+        BenchWarmingLeague.Enabled ||
+        FplGameweekRecap.Enabled;
 }
 
 public sealed class ScheduledJobOptions
