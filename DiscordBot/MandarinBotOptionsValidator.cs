@@ -55,6 +55,10 @@ public sealed class MandarinBotOptionsValidator(bool requireOperationalConfigura
             "Bot:Schedules:FplStatisticsCollection",
             options.Schedules.FplStatisticsCollection,
             failures);
+        ValidateSchedule(
+            "Bot:Schedules:FplGameweekRecap",
+            options.Schedules.FplGameweekRecap,
+            failures);
 
         if (requireOperationalConfiguration && !options.Schedules.HasEnabledJobs)
         {
@@ -88,6 +92,13 @@ public sealed class MandarinBotOptionsValidator(bool requireOperationalConfigura
         {
             failures.Add(
                 "Bot:FantasyPremierLeague:ClassicLeagueId is required when the historical FPL statistics collection job is enabled.");
+        }
+
+        if (options.Schedules.FplGameweekRecap.Enabled &&
+            options.FantasyPremierLeague.ClassicLeagueId <= 0)
+        {
+            failures.Add(
+                "Bot:FantasyPremierLeague:ClassicLeagueId is required when the FPL gameweek recap job is enabled.");
         }
 
         if (options.FantasyPremierLeague.MaxStandingsPages <= 0)

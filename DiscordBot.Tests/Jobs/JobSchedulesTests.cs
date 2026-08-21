@@ -41,6 +41,11 @@ namespace DiscordBot.Tests.Jobs
             {
                 Enabled = true,
                 Cron = "0 0 19 * * ?"
+            },
+            FplGameweekRecap = new ScheduledJobOptions
+            {
+                Enabled = true,
+                Cron = "0 0 20 * * ?"
             }
         };
 
@@ -144,7 +149,7 @@ namespace DiscordBot.Tests.Jobs
         }
 
         [Test]
-        public void CreateFplStatisticsCollectionTrigger_ConfiguredSchedule_UsesCronAndRigaTimeZone()
+    public void CreateFplStatisticsCollectionTrigger_ConfiguredSchedule_UsesCronAndRigaTimeZone()
         {
             // Arrange
             var expectedTimeZone = JobSchedules.GetTimeZone(Options);
@@ -156,8 +161,24 @@ namespace DiscordBot.Tests.Jobs
             var cronTrigger = trigger.Should().BeAssignableTo<ICronTrigger>().Subject;
             cronTrigger.CronExpressionString.Should()
                 .Be(Options.FplStatisticsCollection.Cron);
-            cronTrigger.TimeZone.Should().Be(expectedTimeZone);
-        }
+        cronTrigger.TimeZone.Should().Be(expectedTimeZone);
+    }
+
+    [Test]
+    public void CreateFplGameweekRecapTrigger_ConfiguredSchedule_UsesCronAndRigaTimeZone()
+    {
+        // Arrange
+        var expectedTimeZone = JobSchedules.GetTimeZone(Options);
+
+        // Act
+        var trigger = JobSchedules.CreateFplGameweekRecapTrigger(Options);
+
+        // Assert
+        var cronTrigger = trigger.Should().BeAssignableTo<ICronTrigger>().Subject;
+        cronTrigger.CronExpressionString.Should()
+            .Be(Options.FplGameweekRecap.Cron);
+        cronTrigger.TimeZone.Should().Be(expectedTimeZone);
+    }
 
         [Test]
         public void CreateAllTriggers_DefaultSchedules_SkipMissedRuns()
@@ -179,6 +200,7 @@ namespace DiscordBot.Tests.Jobs
         [TestCase(typeof(PremierLeagueH2hStandingsInformationJob))]
         [TestCase(typeof(BenchWarmingLeagueCalculationJob))]
         [TestCase(typeof(FplStatisticsCollectionJob))]
+        [TestCase(typeof(FplGameweekRecapJob))]
         public void JobType_ScheduledWork_DisallowsConcurrentExecution(Type jobType)
         {
             // Arrange

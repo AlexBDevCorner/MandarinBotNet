@@ -3,7 +3,7 @@
 Bot behavior is bound from the `Bot` configuration section and validated when
 the host starts. Production refuses to start when credentials are missing, no
 job is enabled, an enabled standings job lacks its league ID, a schedule is
-invalid, or an enabled job has no explicit notification target. This prevents a
+invalid, or an enabled notification job has no explicit notification target. This prevents a
 partially configured deployment from appearing healthy while doing the wrong
 work.
 
@@ -50,6 +50,8 @@ Bot__Schedules__BenchWarmingLeague__Enabled=true
 Bot__Schedules__BenchWarmingLeague__Cron=0 0 18 * * ?
 Bot__Schedules__FplStatisticsCollection__Enabled=true
 Bot__Schedules__FplStatisticsCollection__Cron=0 0 19 * * ?
+Bot__Schedules__FplGameweekRecap__Enabled=true
+Bot__Schedules__FplGameweekRecap__Cron=0 0 20 * * ?
 Bot__Notifications__Targets__0__GuildId=<FIRST-GUILD-ID>
 Bot__Notifications__Targets__0__ChannelId=<FIRST-CHANNEL-ID>
 Bot__Notifications__Targets__0__MentionEveryone=false
@@ -82,6 +84,18 @@ latest completed gameweek available after the feature is enabled. The
 collection job does not publish a Discord message and therefore does not
 require a notification target. A failed write is logged and rolled back so a
 partial snapshot is never exposed to later features.
+
+## FPL gameweek recap
+
+The `FplGameweekRecap` job is disabled by default. When enabled, it makes sure
+the latest completed gameweek has a complete historical snapshot, calculates
+the winner, score range, average, rank movement, and deterministic awards, then
+publishes the recap to every notification target. It can run after the separate
+`FplStatisticsCollection` job or collect the missing snapshot itself. Recaps are
+checkpointed by season, gameweek, guild, and channel, so retries do not publish
+the same target twice. Ties are ordered by current rank, team name, and entry ID;
+only the five largest rank movements are listed. Incomplete or unavailable source
+data is logged and skipped rather than turned into a misleading message.
 
 ## Bench warming league
 

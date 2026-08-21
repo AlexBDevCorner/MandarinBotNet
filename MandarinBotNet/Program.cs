@@ -4,6 +4,7 @@ using DiscordBot.Commands;
 using DiscordBot.Deadlines;
 using DiscordBot.FantasyPremierLeague;
 using DiscordBot.FantasyPremierLeague.Historical;
+using DiscordBot.FantasyPremierLeague.Recap;
 using DiscordBot.Health;
 using DiscordBot.Jobs;
 using DiscordBot.Notifications;
@@ -88,6 +89,8 @@ builder.Services.AddSingleton<IBenchLeagueCommandHandler, BenchLeagueCommandHand
 builder.Services.AddSingleton<BenchWarmingMessageComposer>();
 builder.Services.AddSingleton<BenchWarmingLeagueCalculationService>();
 builder.Services.AddSingleton<FplStatisticsCollectionService>();
+builder.Services.AddSingleton<FplGameweekRecapCalculationService>();
+builder.Services.AddSingleton<FplGameweekRecapService>();
 builder.Services.AddSingleton<WelcomeMessageTemplateRotator>();
 builder.Services.AddSingleton<
     IWelcomeMessageDestinationResolver,
@@ -245,6 +248,20 @@ builder.Services.AddOptions<QuartzOptions>()
             .WithIdentity(JobSchedules.FplStatisticsCollectionTriggerName)
             .WithCronSchedule(
                 schedules.FplStatisticsCollection.Cron,
+                schedule => schedule
+                    .InTimeZone(timeZone)
+                    .WithMisfireHandlingInstructionDoNothing()));
+    }
+
+    if (schedules.FplGameweekRecap.Enabled)
+    {
+        q.AddJob<FplGameweekRecapJob>(
+            job => job.WithIdentity(JobSchedules.FplGameweekRecapJobKey));
+        q.AddTrigger(trigger => trigger
+            .ForJob(JobSchedules.FplGameweekRecapJobKey)
+            .WithIdentity(JobSchedules.FplGameweekRecapTriggerName)
+            .WithCronSchedule(
+                schedules.FplGameweekRecap.Cron,
                 schedule => schedule
                     .InTimeZone(timeZone)
                     .WithMisfireHandlingInstructionDoNothing()));
