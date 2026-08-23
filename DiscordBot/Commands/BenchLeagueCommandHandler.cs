@@ -9,7 +9,7 @@ public sealed class BenchLeagueCommandHandler(
 {
     private const int DiscordMessageLimit = 2_000;
     private const string NoDataMessage =
-        "The bench warming league is unavailable right now. Please try again later.";
+        "🔥 Лига обогревателей скамейки пока недоступна. Попробуйте ещё раз позже.";
 
     public async Task HandleAsync(IDiscordSlashCommandInteraction interaction)
     {

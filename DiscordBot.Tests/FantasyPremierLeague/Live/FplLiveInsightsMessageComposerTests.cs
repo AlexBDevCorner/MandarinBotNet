@@ -45,17 +45,18 @@ public sealed class FplLiveInsightsMessageComposerTests
         var message = composer.Compose(FplLiveInsightsResult.Available(gameweek));
 
         // Assert
-        message.Should().Contain("Gameweek 5 (season 2026/27)");
-        message.Should().Contain("Source updated: 2026-08-21 18:45:00 UTC");
-        message.Should().Contain("captured: 2026-08-21 18:50:00 UTC");
+        message.Should().Contain("⚡ FPL в прямом эфире — тур 5 (сезон 2026/27)");
+        message.Should().Contain("Данные источника обновлены: 2026-08-21 18:45:00 UTC");
+        message.Should().Contain("отчёт собран: 2026-08-21 18:50:00 UTC");
         message.Should().Contain("@\u200Beveryone Alpha");
         message.Should().Contain("@\u200Bhere Alice");
-        message.Should().Contain("64 live points; 2 players remaining");
-        message.Should().Contain("Bench alerts (>= 8 points):");
-        message.Should().Contain("Automatic-substitution salvation:");
-        message.Should().Contain("Bench In (9) replaced Starter Out (0); +9 points saved");
-        message.Should().Contain("Captain disasters (captain <= 2, vice-captain >= 8):");
-        message.Should().Contain("Captain successes (effective points >= 20):");
+        message.Should().Contain("64 очков в лайве; игроков осталось: 2");
+        message.Should().Contain("🪑 Очки на скамейке (от 8):");
+        message.Should().Contain("🛟 Спасение автозаменой:");
+        message.Should().Contain("Bench In (9) заменил Starter Out (0); +9 очков спасено");
+        message.Should().Contain("💥 Капитанские провалы (капитан ≤ 2, вице-капитан ≥ 8):");
+        message.Should().Contain(
+            "🧠 Удачный выбор капитана (с учётом множителя от 20 очков):");
         message.Should().NotContain("@everyone");
         message.Should().NotContain("@here");
     }
@@ -84,10 +85,31 @@ public sealed class FplLiveInsightsMessageComposerTests
         var message = composer.Compose(FplLiveInsightsResult.Stale(gameweek));
 
         // Assert
-        message.Should().Contain("Gameweek 5");
-        message.Should().Contain("Source updated: 2026-08-21 18:00:00 UTC");
-        message.Should().Contain("maximum age: 20 minutes");
-        message.Should().Contain("stale");
+        message.Should().Contain("тура 5");
+        message.Should().Contain("Данные источника обновлены: 2026-08-21 18:00:00 UTC");
+        message.Should().Contain("допустимый возраст: 20 мин");
+        message.Should().Contain("устарели");
+    }
+
+    [Test]
+    public void Compose_UnavailableStates_ReturnsRussianMessagesWithEmojis()
+    {
+        // Arrange
+        var composer = new FplLiveInsightsMessageComposer(
+            new FantasyPremierLeagueOptions());
+
+        // Act
+        var noGameweek = composer.Compose(FplLiveInsightsResult.NoActiveGameweek());
+        var transient = composer.Compose(FplLiveInsightsResult.Unavailable(
+            FantasyPremierLeagueFailureKind.Transient));
+        var unavailable = composer.Compose(FplLiveInsightsResult.Unavailable());
+
+        // Assert
+        noGameweek.Should().Be(
+            "⏸️ Сейчас нет активного тура FPL, поэтому лайв-отчёт недоступен.");
+        transient.Should().StartWith("⚠️ Лайв-отчёт FPL временно недоступен:");
+        unavailable.Should().Be(
+            "⚠️ Лайв-отчёт FPL сейчас недоступен. Попробуйте ещё раз позже.");
     }
 
     [Test]

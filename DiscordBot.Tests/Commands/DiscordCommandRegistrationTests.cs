@@ -77,6 +77,14 @@ public sealed class DiscordCommandRegistrationTests
                 DiscordApplicationCommands.DeadlineName,
                 DiscordApplicationCommands.BenchLeagueName,
                 DiscordApplicationCommands.LiveInsightsName);
+        commandClient.Commands.Cast<SlashCommandProperties>()
+            .Select(command => command.Description.Value)
+            .Should().Equal(
+                "Обнимает вас! 🤗",
+                "Показывает текущие таблицы лиг FPL. 🏆",
+                "Показывает ближайшие дедлайны FPL и ЛЧ по рижскому времени. ⏰",
+                "Показывает таблицу Лиги обогревателей скамейки. 🔥",
+                "Показывает результаты лиги FPL в реальном времени. ⚡");
     }
 
     [Test]

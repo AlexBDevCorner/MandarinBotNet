@@ -36,7 +36,7 @@ public sealed class LiveInsightsCommandHandlerTests
         // Assert
         interaction.Operations.Should().Equal("Defer", "Modify");
         interaction.Messages.Should().ContainSingle();
-        interaction.Messages[0].Should().Contain("Gameweek 5");
+        interaction.Messages[0].Should().Contain("FPL в прямом эфире — тур 5");
         interaction.Messages[0].Should().Contain("Configured Team");
     }
 

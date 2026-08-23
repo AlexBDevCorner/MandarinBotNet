@@ -13,7 +13,7 @@ public sealed class StandingsCommandHandler(
 {
     private const int DiscordMessageLimit = 2_000;
     private const string RetryLaterMessage =
-        "The FPL standings are unavailable right now. Please try again later.";
+        "⚠️ Таблицы FPL сейчас недоступны. Попробуйте ещё раз позже.";
 
     public async Task HandleAsync(IDiscordSlashCommandInteraction interaction)
     {

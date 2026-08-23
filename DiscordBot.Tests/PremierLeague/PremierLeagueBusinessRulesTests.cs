@@ -337,7 +337,7 @@ public sealed class PremierLeagueMessageCompositionServiceTests
 
         // Assert
         result.Should().StartWith(
-            "Лига Пельменных Обнимашек:\n:one: Пельмени 100\n4. Обнимашки 80");
+            "🏆 Лига Пельменных Обнимашек:\n:one: Пельмени 100\n4. Обнимашки 80");
         result.Should().Contain(
             "В последнем туре больше всех баллов набрала команда Пельмени - 72");
         result.Should().Contain(
@@ -361,7 +361,7 @@ public sealed class PremierLeagueMessageCompositionServiceTests
 
         // Assert
         result.Should().Be(
-            "Лига Пельменных Обнимашек-К-Обнимашкам:\n:one: A 9\n12. B 6");
+            "⚔️ Лига Пельменных Обнимашек-К-Обнимашкам:\n:one: A 9\n12. B 6");
     }
 
     [Test]

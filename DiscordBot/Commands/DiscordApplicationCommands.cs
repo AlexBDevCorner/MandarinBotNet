@@ -16,23 +16,23 @@ public static class DiscordApplicationCommands
         [
             new SlashCommandBuilder()
                 .WithName(HugMeName)
-                .WithDescription("Hugs you!")
+                .WithDescription("Обнимает вас! 🤗")
                 .Build(),
             new SlashCommandBuilder()
                 .WithName(StandingsName)
-                .WithDescription("Shows the current configured FPL league standings.")
+                .WithDescription("Показывает текущие таблицы лиг FPL. 🏆")
                 .Build(),
             new SlashCommandBuilder()
                 .WithName(DeadlineName)
-                .WithDescription("Shows the next FPL Gameweek deadline in Riga time.")
+                .WithDescription("Показывает ближайшие дедлайны FPL и ЛЧ по рижскому времени. ⏰")
                 .Build(),
             new SlashCommandBuilder()
                 .WithName(BenchLeagueName)
-                .WithDescription("Shows the current bench warming league standings.")
+                .WithDescription("Показывает таблицу Лиги обогревателей скамейки. 🔥")
                 .Build(),
             new SlashCommandBuilder()
                 .WithName(LiveInsightsName)
-                .WithDescription("Shows live insights for the configured FPL league.")
+                .WithDescription("Показывает результаты лиги FPL в реальном времени. ⚡")
                 .Build()
         ];
     }
