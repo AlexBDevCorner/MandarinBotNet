@@ -10,8 +10,6 @@ public sealed class BootstrapStaticResponse
     [JsonPropertyName("elements")]
     public List<PremierLeagueElement> Elements { get; init; } = [];
 
-    [JsonPropertyName("season_name")]
-    public string? SeasonName { get; init; }
 }
 
 public sealed class PremierLeagueEvent
@@ -22,7 +20,7 @@ public sealed class PremierLeagueEvent
     [JsonPropertyName("is_next")]
     public bool IsNext { get; init; }
 
-    [JsonPropertyName("is_finished")]
+    [JsonPropertyName("finished")]
     public bool IsFinished { get; init; }
 
     [JsonPropertyName("is_current")]

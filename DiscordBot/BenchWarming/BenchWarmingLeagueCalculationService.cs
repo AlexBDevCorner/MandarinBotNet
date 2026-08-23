@@ -97,9 +97,7 @@ public sealed class BenchWarmingLeagueCalculationService(
 
     private static string GetSeason(BootstrapStaticResponse bootstrap)
     {
-        return string.IsNullOrWhiteSpace(bootstrap.SeasonName)
-            ? "unknown"
-            : bootstrap.SeasonName;
+        return FplSeasonName.FromEvents(bootstrap.Events);
     }
 
     private static IReadOnlyList<BenchWarmingEntryStanding> Summarize(

@@ -104,14 +104,13 @@ public sealed class FplGameweekRecapServiceTests
         {
             return Task.FromResult(new BootstrapStaticResponse
             {
-                SeasonName = "2026/27",
                 Events =
                 [
                     new PremierLeagueEvent
                     {
                         Id = 5,
                         IsFinished = true,
-                        DeadlineTimeEpoch = 1_700_000_000
+                        DeadlineTimeEpoch = 1_787_333_400
                     }
                 ],
                 Elements =

@@ -25,6 +25,7 @@ public sealed class FantasyPremierLeagueClientTests
                       "events": [
                         {
                           "id": 42,
+                          "finished": true,
                           "is_current": true,
                           "is_next": true,
                           "deadline_time_epoch": 1770000000
@@ -41,6 +42,7 @@ public sealed class FantasyPremierLeagueClientTests
         // Assert
         result.Events.Should().ContainSingle();
         result.Events[0].Id.Should().Be(42);
+        result.Events[0].IsFinished.Should().BeTrue();
         result.Events[0].IsCurrent.Should().BeTrue();
         handler.AttemptCount.Should().Be(2);
         handler.RequestUris.Should().OnlyContain(

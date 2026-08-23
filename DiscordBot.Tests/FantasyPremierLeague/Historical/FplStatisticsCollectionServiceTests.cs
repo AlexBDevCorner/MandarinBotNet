@@ -26,7 +26,8 @@ public sealed class FplStatisticsCollectionServiceTests
         snapshot.Should().NotBeNull();
         snapshot!.Season.Should().Be("2026/27");
         snapshot.EventId.Should().Be(5);
-        snapshot.DeadlineUtc.Should().Be(DateTimeOffset.FromUnixTimeSeconds(1_700_000_000));
+        snapshot.DeadlineUtc.Should().Be(
+            DateTimeOffset.FromUnixTimeSeconds(1_787_333_400));
         snapshot.Managers.Should().HaveCount(2);
         snapshot.Managers[0].Should().BeEquivalentTo(
             new FplManagerGameweekStatistics(
@@ -71,25 +72,25 @@ public sealed class FplStatisticsCollectionServiceTests
     }
 
     [Test]
-    public async Task CollectLatestMissingGameweekAsync_MissingSeasonName_RefusesToPersistSeasonlessData()
+    public async Task CollectLatestMissingGameweekAsync_CurrentPayload_DerivesSeasonAndPersists()
     {
         // Arrange
         var client = new TestFantasyPremierLeagueClient
         {
             Bootstrap = CreateBootstrap(
-                season: null,
                 events: [CreateEvent(5, isFinished: true)])
         };
         var store = new InMemoryFplStatisticsStore();
         var service = CreateService(client, store);
 
         // Act
-        Func<Task> act = () => service.CollectLatestMissingGameweekAsync(
+        var snapshot = await service.CollectLatestMissingGameweekAsync(
             CancellationToken.None);
 
         // Assert
-        await act.Should().ThrowAsync<InvalidDataException>();
-        store.Snapshots.Should().BeEmpty();
+        snapshot.Should().NotBeNull();
+        snapshot!.Season.Should().Be("2026/27");
+        store.Snapshots.Should().ContainSingle();
     }
 
     [Test]
@@ -157,12 +158,10 @@ public sealed class FplStatisticsCollectionServiceTests
     }
 
     private static BootstrapStaticResponse CreateBootstrap(
-        string? season,
         List<PremierLeagueEvent> events)
     {
         return new BootstrapStaticResponse
         {
-            SeasonName = season,
             Elements =
             [
                 new PremierLeagueElement { Id = 1, WebName = "Haaland" },
@@ -180,7 +179,7 @@ public sealed class FplStatisticsCollectionServiceTests
             Id = id,
             IsFinished = isFinished,
             IsNext = !isFinished,
-            DeadlineTimeEpoch = 1_700_000_000
+            DeadlineTimeEpoch = 1_787_333_400
         };
     }
 
@@ -201,7 +200,6 @@ public sealed class FplStatisticsCollectionServiceTests
     private sealed class TestFantasyPremierLeagueClient : IFantasyPremierLeagueClient
     {
         public BootstrapStaticResponse Bootstrap { get; init; } = CreateBootstrap(
-            "2026/27",
             [
                 CreateEvent(4, isFinished: true),
                 CreateEvent(5, isFinished: true),

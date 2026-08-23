@@ -47,8 +47,15 @@ public sealed class LiveInsightsCommandHandlerTests
         {
             return Task.FromResult(new BootstrapStaticResponse
             {
-                SeasonName = "2026/27",
-                Events = [new PremierLeagueEvent { Id = 5, IsCurrent = true }],
+                Events =
+                [
+                    new PremierLeagueEvent
+                    {
+                        Id = 5,
+                        IsCurrent = true,
+                        DeadlineTimeEpoch = 1_787_333_400
+                    }
+                ],
                 Elements =
                 [
                     new PremierLeagueElement { Id = 1, WebName = "Captain" },
