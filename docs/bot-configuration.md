@@ -46,9 +46,9 @@ Bot__FantasyPremierLeague__CaptainDisasterViceCaptainPointsThreshold=8
 Bot__FantasyPremierLeague__TransferCostAchievementThreshold=8
 Bot__Schedules__TimeZoneId=Europe/Riga
 Bot__Schedules__PremierLeagueNotifications__Enabled=true
-Bot__Schedules__PremierLeagueNotifications__Cron=0 0 * * * ?
+Bot__Schedules__PremierLeagueNotifications__Cron=0 0/15 * * * ?
 Bot__Schedules__UclFantasyNotifications__Enabled=true
-Bot__Schedules__UclFantasyNotifications__Cron=0 0 * * * ?
+Bot__Schedules__UclFantasyNotifications__Cron=0 0/15 * * * ?
 Bot__Schedules__ClassicStandings__Enabled=true
 Bot__Schedules__ClassicStandings__Cron=0 0 17 * * ?
 Bot__Schedules__HeadToHeadStandings__Enabled=true
@@ -65,6 +65,13 @@ Bot__Notifications__Targets__0__GuildId=<FIRST-GUILD-ID>
 Bot__Notifications__Targets__0__ChannelId=<FIRST-CHANNEL-ID>
 Bot__Notifications__Targets__0__MentionEveryone=false
 ```
+
+Deadline notification jobs run every 15 minutes by default. This provides four
+delivery attempts during the final 70-minute reminder window if an upstream API,
+Discord, or the application is briefly unavailable. Delivery checkpoints still
+ensure that each reminder is published only once per event and target. Existing
+deployments with hourly `PremierLeagueNotifications` or `UclFantasyNotifications`
+cron overrides must remove those overrides or change them to `0 0/15 * * * ?`.
 
 Keep `Bot__Discord__Token` only in the VM env file or the deployment platform's
 secret provider. Never put it in `appsettings.json`, source control, logs, or a
