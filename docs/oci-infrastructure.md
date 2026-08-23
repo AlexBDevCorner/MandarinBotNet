@@ -154,6 +154,7 @@ Register the runner as follows:
    Bot__FantasyPremierLeague__ClassicLeagueId=<CLASSIC-LEAGUE-ID>
    Bot__FantasyPremierLeague__HeadToHeadLeagueId=<HEAD-TO-HEAD-LEAGUE-ID>
    Bot__Schedules__PremierLeagueNotifications__Enabled=true
+   Bot__Schedules__PremierLeagueNotifications__Cron=0 0/15 * * * ?
    Bot__Schedules__ClassicStandings__Enabled=true
    Bot__Schedules__HeadToHeadStandings__Enabled=true
    Bot__Schedules__FplLiveInsights__Enabled=true

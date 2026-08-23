@@ -15,12 +15,12 @@ namespace DiscordBot.Tests.Jobs
             PremierLeagueNotifications = new ScheduledJobOptions
             {
                 Enabled = true,
-                Cron = "0 0 * * * ?"
+                Cron = "0 0/15 * * * ?"
             },
             UclFantasyNotifications = new ScheduledJobOptions
             {
                 Enabled = true,
-                Cron = "0 0 * * * ?"
+                Cron = "0 0/15 * * * ?"
             },
             ClassicStandings = new ScheduledJobOptions
             {
@@ -55,7 +55,7 @@ namespace DiscordBot.Tests.Jobs
         };
 
         [Test]
-        public void CreatePremierLeagueNotificationTrigger_DefaultSchedule_RunsHourlyInRiga()
+        public void CreatePremierLeagueNotificationTrigger_DefaultSchedule_RunsEvery15MinutesInRiga()
         {
             // Arrange
             var expectedTimeZone = JobSchedules.GetTimeZone(Options);
@@ -71,7 +71,7 @@ namespace DiscordBot.Tests.Jobs
         }
 
         [Test]
-        public void CreateUclDeadlineNotificationTrigger_DefaultSchedule_UsesCronAndRigaTimeZone()
+        public void CreateUclDeadlineNotificationTrigger_DefaultSchedule_RunsEvery15MinutesInRiga()
         {
             // Arrange
             var expectedTimeZone = JobSchedules.GetTimeZone(Options);
@@ -84,6 +84,45 @@ namespace DiscordBot.Tests.Jobs
             cronTrigger.CronExpressionString.Should()
                 .Be(Options.UclFantasyNotifications.Cron);
             cronTrigger.TimeZone.Should().Be(expectedTimeZone);
+        }
+
+        [Test]
+        public void CreateDeadlineNotificationTriggers_FinalReminderWindow_ProvideFourAttempts()
+        {
+            // Arrange
+            var deadline = new DateTimeOffset(
+                2027,
+                8,
+                21,
+                17,
+                30,
+                0,
+                TimeSpan.Zero);
+            var windowStart = deadline.AddMinutes(-70);
+            var triggers = new[]
+            {
+                JobSchedules.CreatePremierLeagueNotificationTrigger(Options),
+                JobSchedules.CreateUclDeadlineNotificationTrigger(Options)
+            };
+
+            // Act
+            var eligibleFireTimes = triggers.Select(trigger =>
+            {
+                var fireTimes = new List<DateTimeOffset>();
+                var fireTime = trigger.GetFireTimeAfter(windowStart);
+
+                while (fireTime is not null && fireTime < deadline)
+                {
+                    fireTimes.Add(fireTime.Value);
+                    fireTime = trigger.GetFireTimeAfter(fireTime.Value);
+                }
+
+                return fireTimes;
+            });
+
+            // Assert
+            eligibleFireTimes.Should().AllSatisfy(
+                fireTimes => fireTimes.Should().HaveCount(4));
         }
 
         [Test]
