@@ -32,7 +32,7 @@ public sealed class BenchLeagueCommandHandlerTests
         // Assert
         interaction.Operations.Should().Equal("Defer", "Modify");
         interaction.Messages.Should().Equal(
-            "Лига Обогревателей Скамейки (сезон 2026/27):" +
+            "🔥 Лига Обогревателей Скамейки (сезон 2026/27):" +
             "\n:one: Team A — 42" +
             "\n:two: Team B — 7");
     }
@@ -52,7 +52,7 @@ public sealed class BenchLeagueCommandHandlerTests
 
         // Assert
         interaction.Messages.Should().Equal(
-            "The bench warming league is unavailable right now. Please try again later.");
+            "🔥 Лига обогревателей скамейки пока недоступна. Попробуйте ещё раз позже.");
     }
 
     private sealed class TestBenchWarmingLeagueStore : IBenchWarmingLeagueStore

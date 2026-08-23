@@ -55,14 +55,16 @@ public sealed class StandingsCommandHandlerTests
         await handling;
 
         interaction.Messages.Should().ContainSingle();
-        interaction.Messages[0].Should().StartWith("Classic league standings:");
+        interaction.Messages[0].Should().StartWith(
+            "🏆 Турнирная таблица классической лиги:");
         interaction.Messages[0].Should().Contain(":one: Classic Team 99");
-        interaction.Messages[0].Should().Contain("Head-to-head league standings:");
+        interaction.Messages[0].Should().Contain(
+            "⚔️ Турнирная таблица лиги один на один:");
         interaction.Messages[0].Should().Contain(":two: H2H Team 7");
-        interaction.Messages[0].IndexOf("Classic league", StringComparison.Ordinal)
+        interaction.Messages[0].IndexOf("классической лиги", StringComparison.Ordinal)
             .Should().BeLessThan(
                 interaction.Messages[0].IndexOf(
-                    "Head-to-head league",
+                    "лиги один на один",
                     StringComparison.Ordinal));
     }
 
@@ -92,7 +94,7 @@ public sealed class StandingsCommandHandlerTests
         // Assert
         interaction.Messages.Should().ContainSingle();
         interaction.Messages[0].Should().Contain(
-            "Classic league standings:\nThis league is currently unavailable.");
+            "🏆 Турнирная таблица классической лиги:\n⚠️ Эта лига сейчас недоступна.");
         interaction.Messages[0].Should().Contain(":one: Available Team 12");
         var logEntry = logger.Entries.Should().ContainSingle().Which;
         logEntry.Level.Should().Be(LogLevel.Warning);
@@ -123,7 +125,7 @@ public sealed class StandingsCommandHandlerTests
 
         // Assert
         interaction.Messages.Should().Equal(
-            "The FPL standings are unavailable right now. Please try again later.");
+            "⚠️ Таблицы FPL сейчас недоступны. Попробуйте ещё раз позже.");
         interaction.FollowupCount.Should().Be(0);
         logger.Entries.Should().HaveCount(2);
         logger.Entries.Should().Contain(entry =>
@@ -149,7 +151,7 @@ public sealed class StandingsCommandHandlerTests
 
         // Assert
         interaction.Messages.Should().ContainSingle();
-        interaction.Messages[0].Split("(No standings returned.)")
+        interaction.Messages[0].Split("🤷 Данные о позициях не получены.")
             .Should().HaveCount(3);
     }
 

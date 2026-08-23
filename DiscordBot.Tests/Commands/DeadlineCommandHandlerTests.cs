@@ -14,10 +14,10 @@ public sealed class DeadlineCommandHandlerTests
 {
     [TestCase(
         "2027-02-02T12:00:00+00:00",
-        "FPL Gameweek 42 deadline: Tuesday, 2 February 2027 at 14:00 (Riga, Latvia, UTC+02:00).")]
+        "⏰ FPL — тур 42: вторник, 2 февраля 2027 в 14:00 (Рига, Латвия, UTC+02:00).")]
     [TestCase(
         "2027-08-02T12:00:00+00:00",
-        "FPL Gameweek 42 deadline: Monday, 2 August 2027 at 15:00 (Riga, Latvia, UTC+03:00).")]
+        "⏰ FPL — тур 42: понедельник, 2 августа 2027 в 15:00 (Рига, Латвия, UTC+03:00).")]
     public async Task HandleAsync_UpcomingDeadline_DisplaysRigaCivilTime(
         string deadlineText,
         string expectedMessage)
@@ -71,8 +71,8 @@ public sealed class DeadlineCommandHandlerTests
         // Assert
         operations.Should().Equal("Defer", "Fetch", "Fetch", "Modify");
         interaction.Messages.Should().Equal(
-            "FPL Gameweek 42 deadline: Tuesday, 2 February 2027 at 14:00 (Riga, Latvia, UTC+02:00).\n" +
-            "UCL Matchday 1 deadline: Wednesday, 3 February 2027 at 14:00 (Riga, Latvia, UTC+02:00).");
+            "⏰ FPL — тур 42: вторник, 2 февраля 2027 в 14:00 (Рига, Латвия, UTC+02:00).\n" +
+            "⏰ UCL — игровой день 1: среда, 3 февраля 2027 в 14:00 (Рига, Латвия, UTC+02:00).");
     }
 
     [Test]
@@ -88,7 +88,7 @@ public sealed class DeadlineCommandHandlerTests
 
         // Assert
         interaction.Messages.Should().Equal(
-            "The next FPL deadline is not available yet.");
+            "⏳ Информация о следующем дедлайне FPL пока не появилась.");
     }
 
     [Test]
@@ -111,7 +111,7 @@ public sealed class DeadlineCommandHandlerTests
 
         // Assert
         interaction.Messages.Should().Equal(
-            "The FPL deadline is unavailable right now. Please try again later.");
+            "⚠️ Дедлайн FPL сейчас недоступен. Попробуйте ещё раз позже.");
         var logEntry = logger.Entries.Should().ContainSingle().Which;
         logEntry.Level.Should().Be(LogLevel.Warning);
         logEntry.Properties["FailureKind"].Should()

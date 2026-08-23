@@ -211,6 +211,33 @@ public sealed class DiscordBotHostedServiceIntegrationTests
     }
 
     [Test]
+    public async Task HandleSlashCommandAsync_UnknownCommand_RespondsInRussian()
+    {
+        // Arrange
+        var options = new DiscordOptions
+        {
+            Token = "test-token",
+            ReadinessTimeout = TimeSpan.FromSeconds(5)
+        };
+        var readiness = new DiscordConnectionReadiness(options);
+        var gateway = new TestDiscordGatewayConnection();
+        using var provider = CreateServiceProvider(options, readiness, gateway);
+        var service = provider.GetRequiredService<DiscordBotHostedService>();
+        var interaction = new TestSlashCommandInteraction("unknown");
+        var startTask = service.StartAsync(CancellationToken.None);
+        await gateway.RaiseReadyAsync();
+        await startTask;
+
+        // Act
+        await service.HandleSlashCommandAsync(interaction);
+
+        // Assert
+        interaction.Messages.Should().Equal("🤷 Неизвестная команда.");
+
+        await service.StopAsync(CancellationToken.None);
+    }
+
+    [Test]
     public async Task StartAsync_MemberJoins_ForwardsToWelcomeMessageHandler()
     {
         // Arrange
@@ -536,13 +563,26 @@ public sealed class DiscordBotHostedServiceIntegrationTests
 
         public string UserMention => "<@123>";
 
-        public Task RespondAsync(string content) => Task.CompletedTask;
+        public List<string> Messages { get; } = [];
+
+        public Task RespondAsync(string content)
+        {
+            Messages.Add(content);
+            return Task.CompletedTask;
+        }
 
         public Task DeferAsync() => Task.CompletedTask;
 
-        public Task ModifyOriginalResponseAsync(string content) =>
-            Task.CompletedTask;
+        public Task ModifyOriginalResponseAsync(string content)
+        {
+            Messages.Add(content);
+            return Task.CompletedTask;
+        }
 
-        public Task FollowupAsync(string content) => Task.CompletedTask;
+        public Task FollowupAsync(string content)
+        {
+            Messages.Add(content);
+            return Task.CompletedTask;
+        }
     }
 }

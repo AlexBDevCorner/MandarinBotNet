@@ -160,7 +160,7 @@ namespace DiscordBot
             }
             else
             {
-                await command.RespondAsync("Unknown command");
+                await command.RespondAsync("🤷 Неизвестная команда.");
             }
         }
 

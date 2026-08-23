@@ -13,12 +13,14 @@ public sealed class PremierLeagueMessageCompositionService(
 {
     public const int ClassicCongratulationsVariantCount = 31;
 
-    private const string ClassicSnapshotHeading = "Classic league standings:";
+    private const string ClassicSnapshotHeading =
+        "🏆 Турнирная таблица классической лиги:";
     private const string HeadToHeadSnapshotHeading =
-        "Head-to-head league standings:";
-    private const string EmptyStandingsMessage = "(No standings returned.)";
+        "⚔️ Турнирная таблица лиги один на один:";
+    private const string EmptyStandingsMessage =
+        "🤷 Данные о позициях не получены.";
     private const string UnavailableStandingsMessage =
-        "This league is currently unavailable.";
+        "⚠️ Эта лига сейчас недоступна.";
 
     private static readonly CultureInfo RussianCulture = new("ru-RU");
 
@@ -45,7 +47,7 @@ public sealed class PremierLeagueMessageCompositionService(
         ArgumentNullException.ThrowIfNull(changes);
 
         var winners = eventWinners.ToArray();
-        var summary = new StringBuilder("Лига Пельменных Обнимашек:");
+        var summary = new StringBuilder("🏆 Лига Пельменных Обнимашек:");
 
         AppendStandings(
             summary,
@@ -98,7 +100,7 @@ public sealed class PremierLeagueMessageCompositionService(
         ArgumentNullException.ThrowIfNull(standings);
 
         var summary = new StringBuilder(
-            "Лига Пельменных Обнимашек-К-Обнимашкам:");
+            "⚔️ Лига Пельменных Обнимашек-К-Обнимашкам:");
 
         AppendStandings(
             summary,
@@ -115,33 +117,33 @@ public sealed class PremierLeagueMessageCompositionService(
         ArgumentNullException.ThrowIfNull(recap);
 
         var summary = new StringBuilder(
-            $"Лига Пельменных Обнимашек — итоги тура " +
+            $"📊 Лига Пельменных Обнимашек — итоги тура " +
             $"{recap.EventId.ToString(CultureInfo.InvariantCulture)} " +
             $"(сезон {DiscordTextSafety.SanitizeExternalName(recap.Season)}):");
 
-        summary.Append("\n\nGameweek Winner: ");
+        summary.Append("\n\n👑 Победитель тура: ");
         summary.Append(FormatManagersWithScore(
             recap.HighestScorers,
             recap.HighestScore));
-        summary.Append("\nHighest score: ");
+        summary.Append("\n🚀 Лучший результат: ");
         summary.Append(FormatManagersWithScore(
             recap.HighestScorers,
             recap.HighestScore));
-        summary.Append("\nLowest score: ");
+        summary.Append("\n🫣 Худший результат: ");
         summary.Append(FormatManagersWithScore(
             recap.LowestScorers,
             recap.LowestScore));
-        summary.Append("\nLeague average: ");
+        summary.Append("\n📈 Средний балл лиги: ");
         summary.Append(recap.AverageScore.ToString("0.0", CultureInfo.InvariantCulture));
-        summary.Append("\nBiggest climber: ");
+        summary.Append("\n🧗 Главный взлёт: ");
         summary.Append(FormatRankChanges(recap.BiggestClimbers, recap.BiggestClimb));
-        summary.Append("\nBiggest faller: ");
+        summary.Append("\n🪂 Главное падение: ");
         summary.Append(FormatRankChanges(recap.BiggestFallers, recap.BiggestFall));
 
-        summary.Append("\n\nNotable rank changes:");
+        summary.Append("\n\n🔄 Заметные изменения позиций:");
         if (recap.NotableRankChanges.Count == 0)
         {
-            summary.Append("\n(no notable changes)");
+            summary.Append("\n(нет заметных изменений)");
         }
         else
         {
@@ -152,26 +154,26 @@ public sealed class PremierLeagueMessageCompositionService(
             }
         }
 
-        summary.Append("\n\nAwards:");
-        summary.Append("\nGameweek Winner: ");
+        summary.Append("\n\n🏆 Номинации:");
+        summary.Append("\n👑 Победитель тура: ");
         summary.Append(FormatManagersWithScore(
             recap.HighestScorers,
             recap.HighestScore));
-        summary.Append("\nFraud of the Week: ");
+        summary.Append("\n🤡 Фрод тура: ");
         summary.Append(FormatManagersWithScore(
             recap.LowestScorers,
             recap.LowestScore));
-        summary.Append("\nBenchmaster: ");
+        summary.Append("\n🪑 Повелитель скамейки: ");
         summary.Append(FormatManagersWithScore(
             recap.Benchmasters,
             manager => manager.BenchPoints));
-        summary.Append("\nCaptain Genius: ");
+        summary.Append("\n🧠 Капитанский гений: ");
         summary.Append(FormatCaptainPerformances(recap.CaptainGeniuses));
 
-        summary.Append("\n\nAchievements:");
+        summary.Append("\n\n🎖️ Достижения:");
         AppendAchievements(summary, recap.Achievements);
 
-        summary.Append("\n\nRatings:");
+        summary.Append("\n\n📊 Рейтинги:");
         AppendRatings(summary, recap.Ratings);
 
         return summary.ToString();
@@ -316,7 +318,7 @@ public sealed class PremierLeagueMessageCompositionService(
         var awards = achievements.ToArray();
         if (awards.Length == 0)
         {
-            summary.Append("\n(none)");
+            summary.Append("\n(пока нет)");
             return;
         }
 
@@ -325,7 +327,7 @@ public sealed class PremierLeagueMessageCompositionService(
             summary.Append("\n");
             summary.Append(DiscordTextSafety.SanitizeExternalName(award.EntryName));
             summary.Append(" — ");
-            summary.Append(DiscordTextSafety.SanitizeExternalName(award.AchievementName));
+            summary.Append(GetLocalizedAchievementName(award));
         }
     }
 
@@ -336,7 +338,7 @@ public sealed class PremierLeagueMessageCompositionService(
         var managerRatings = ratings.ToArray();
         if (managerRatings.Length == 0)
         {
-            summary.Append("\n(none)");
+            summary.Append("\n(пока нет)");
             return;
         }
 
@@ -344,12 +346,25 @@ public sealed class PremierLeagueMessageCompositionService(
         {
             summary.Append("\n");
             summary.Append(DiscordTextSafety.SanitizeExternalName(rating.EntryName));
-            summary.Append(" — Fraud Rating ");
+            summary.Append(" — 🤡 Рейтинг фрода ");
             summary.Append(rating.FraudRating.ToString(CultureInfo.InvariantCulture));
-            summary.Append("/100; Maguire Index ");
+            summary.Append("/100; 🗿 Индекс Магуайра ");
             summary.Append(rating.MaguireIndex.ToString(CultureInfo.InvariantCulture));
             summary.Append("/100");
         }
+    }
+
+    private static string GetLocalizedAchievementName(FplAchievementAward award)
+    {
+        return award.AchievementKey switch
+        {
+            "first-blood" => "🩸 Первая кровь",
+            "bench-warmer" => "🔥 Обогреватель скамейки",
+            "captain-disaster" => "💥 Капитанская катастрофа",
+            "differential-merchant" => "💎 Повелитель дифференциалов",
+            "minus-eight-enjoyer" => "💸 Любитель минус восьми",
+            _ => DiscordTextSafety.SanitizeExternalName(award.AchievementName)
+        };
     }
 
     private static string FormatSignedNumber(int value)

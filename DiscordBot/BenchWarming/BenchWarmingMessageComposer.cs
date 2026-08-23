@@ -7,7 +7,7 @@ namespace DiscordBot.BenchWarming;
 public sealed class BenchWarmingMessageComposer
 {
     private const int TopRoundStandingsCount = 3;
-    private const string LeagueTitle = "Лига Обогревателей Скамейки";
+    private const string LeagueTitle = "🔥 Лига Обогревателей Скамейки";
 
     public string ComposeRoundSummary(BenchWarmingRoundResult round)
     {
@@ -19,7 +19,7 @@ public sealed class BenchWarmingMessageComposer
 
         if (round.RoundStandings.Count > 0)
         {
-            summary.Append("\n\nБольше всех очков оставили на скамейке в этом туре:");
+            summary.Append("\n\n🪑 Больше всех очков оставили на скамейке в этом туре:");
             AppendStandings(summary, round.RoundStandings.Take(TopRoundStandingsCount));
 
             var topBenchPlayer = round.BenchPoints
@@ -29,13 +29,13 @@ public sealed class BenchWarmingMessageComposer
             if (topBenchPlayer is not null)
             {
                 summary.Append(
-                    $"\n\nГлавный обогреватель скамейки тура: {DiscordTextSafety.SanitizeExternalName(topBenchPlayer.PlayerWebName)} — " +
+                    $"\n\n🏅 Главный обогреватель скамейки тура: {DiscordTextSafety.SanitizeExternalName(topBenchPlayer.PlayerWebName)} — " +
                     $"{topBenchPlayer.Points.ToString(CultureInfo.InvariantCulture)} очков, греющих лавку команды " +
                     $"{DiscordTextSafety.SanitizeExternalName(topBenchPlayer.EntryName)}!");
             }
         }
 
-        summary.Append($"\n\nОбщий зачёт сезона {round.Season}:");
+        summary.Append($"\n\n📊 Общий зачёт сезона {round.Season}:");
         AppendStandings(summary, round.SeasonStandings);
 
         return summary.ToString();
@@ -52,7 +52,7 @@ public sealed class BenchWarmingMessageComposer
         if (count == 0)
         {
             summary.Append(
-                "\nПока никто не греет скамейку — очки на лавке ещё не потеряны.");
+                "\n✨ Пока никто не греет скамейку — очки на лавке ещё не потеряны.");
         }
 
         return summary.ToString();

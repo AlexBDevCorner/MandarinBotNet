@@ -6,6 +6,8 @@ namespace DiscordBot.UclFantasy;
 public sealed class UclFantasyMessageCompositionService(
     ConfiguredTimeZone configuredTimeZone)
 {
+    private static readonly CultureInfo RussianCulture = new("ru-RU");
+
     public string ComposeDeadlineReminder(
         DateTimeOffset deadlineUtc,
         DateTimeOffset utcNow)
@@ -16,9 +18,10 @@ public sealed class UclFantasyMessageCompositionService(
         var remainingHours = remainingMinutes / 60;
         var minutes = remainingMinutes % 60;
 
-        return string.Create(
-            CultureInfo.InvariantCulture,
-            $"UCL Matchday deadline: {localDeadline:dd MMMM yyyy, HH:mm} " +
-            $"(Riga, Latvia). Time remaining: {remainingHours}h {minutes}m.");
+        return $"⚽ Дедлайн игрового дня ЛЧ: " +
+            $"{localDeadline.ToString("dd MMMM yyyy, HH:mm", RussianCulture)} " +
+            $"(Рига, Латвия). Осталось: " +
+            $"{remainingHours.ToString(CultureInfo.InvariantCulture)} ч " +
+            $"{minutes.ToString(CultureInfo.InvariantCulture)} мин. ⏳";
     }
 }

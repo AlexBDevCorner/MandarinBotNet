@@ -11,6 +11,8 @@ public sealed class DeadlineCommandHandler(
     ConfiguredTimeZone configuredTimeZone,
     ILogger<DeadlineCommandHandler> logger) : IDeadlineCommandHandler
 {
+    private static readonly CultureInfo RussianCulture = new("ru-RU");
+
     public async Task HandleAsync(IDiscordSlashCommandInteraction interaction)
     {
         ArgumentNullException.ThrowIfNull(interaction);
@@ -78,15 +80,15 @@ public sealed class DeadlineCommandHandler(
 
     private static string GetUnavailableMessage(string competitionName)
     {
-        return $"The {competitionName} deadline is unavailable right now. Please try again later.";
+        return $"⚠️ Дедлайн {competitionName} сейчас недоступен. Попробуйте ещё раз позже.";
     }
 
     private static string GetNoUpcomingDeadlineMessage(
         IReadOnlyCollection<IUpcomingDeadlineProvider> providers)
     {
         return providers.Count == 1
-            ? $"The next {providers.Single().CompetitionName} deadline is not available yet."
-            : "No upcoming deadlines are available yet.";
+            ? $"⏳ Информация о следующем дедлайне {providers.Single().CompetitionName} пока не появилась."
+            : "⏳ Информация о ближайших дедлайнах пока не появилась.";
     }
 
     private static string FormatDeadline(
@@ -98,11 +100,16 @@ public sealed class DeadlineCommandHandler(
         var offset = string.Create(
             CultureInfo.InvariantCulture,
             $"UTC{offsetSign}{absoluteOffset:hh\\:mm}");
+        var roundName = deadline.RoundName switch
+        {
+            "Gameweek" => "тур",
+            "Matchday" => "игровой день",
+            _ => deadline.RoundName
+        };
 
-        return string.Create(
-            CultureInfo.InvariantCulture,
-            $"{deadline.CompetitionName} {deadline.RoundName} {deadline.RoundNumber} deadline: " +
-            $"{localDeadline:dddd, d MMMM yyyy 'at' HH:mm} " +
-            $"(Riga, Latvia, {offset}).");
+        return $"⏰ {deadline.CompetitionName} — {roundName} " +
+            $"{deadline.RoundNumber.ToString(CultureInfo.InvariantCulture)}: " +
+            $"{localDeadline.ToString("dddd, d MMMM yyyy 'в' HH:mm", RussianCulture)} " +
+            $"(Рига, Латвия, {offset}).";
     }
 }
