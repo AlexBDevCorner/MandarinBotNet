@@ -15,7 +15,7 @@ public sealed class FplLiveInsightsServiceTests
         new(2026, 8, 21, 18, 50, 0, TimeSpan.Zero);
 
     [Test]
-    public async Task GetCurrentAsync_ActiveGameweek_UsesConfiguredLeagueAndReturnsInsights()
+    public async Task GetCurrentAsync_CurrentPayloadWithoutSeasonName_DerivesSeasonAndReturnsInsights()
     {
         // Arrange
         var client = CreateClient();
@@ -28,6 +28,7 @@ public sealed class FplLiveInsightsServiceTests
         // Assert
         result.Availability.Should().Be(FplLiveInsightsAvailability.Available);
         result.Gameweek.Should().NotBeNull();
+        result.Gameweek!.Season.Should().Be("2026/27");
         result.Gameweek!.EventId.Should().Be(5);
         result.Gameweek.Managers.Should().ContainSingle().Which.EntryName.Should()
             .Be("Configured Team");
@@ -148,11 +149,20 @@ public sealed class FplLiveInsightsServiceTests
             return BootstrapException is null
                 ? Task.FromResult(new BootstrapStaticResponse
                 {
-                    SeasonName = "2026/27",
                     Events =
                     [
-                        new PremierLeagueEvent { Id = 4, IsFinished = true },
-                        new PremierLeagueEvent { Id = 5, IsCurrent = true }
+                        new PremierLeagueEvent
+                        {
+                            Id = 4,
+                            IsFinished = true,
+                            DeadlineTimeEpoch = 1_787_333_400
+                        },
+                        new PremierLeagueEvent
+                        {
+                            Id = 5,
+                            IsCurrent = true,
+                            DeadlineTimeEpoch = 1_787_938_200
+                        }
                     ],
                     Elements =
                     [

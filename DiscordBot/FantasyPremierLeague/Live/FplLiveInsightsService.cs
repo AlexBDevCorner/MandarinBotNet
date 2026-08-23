@@ -200,12 +200,6 @@ public sealed class FplLiveInsightsService(
 
     private static string GetSeason(BootstrapStaticResponse bootstrap)
     {
-        if (string.IsNullOrWhiteSpace(bootstrap.SeasonName))
-        {
-            throw new InvalidDataException(
-                "The FPL bootstrap response did not include a season name.");
-        }
-
         if (bootstrap.Events is null || bootstrap.Events.Count == 0)
         {
             throw new InvalidDataException(
@@ -218,6 +212,6 @@ public sealed class FplLiveInsightsService(
                 "The FPL bootstrap response did not include players.");
         }
 
-        return bootstrap.SeasonName;
+        return FplSeasonName.FromEvents(bootstrap.Events);
     }
 }

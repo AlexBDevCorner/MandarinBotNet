@@ -22,12 +22,7 @@ public sealed class FplGameweekRecapService(
         {
             var bootstrap = await premierLeagueClient.GetBootstrapStaticAsync(
                 cancellationToken);
-            season = bootstrap.SeasonName;
-            if (string.IsNullOrWhiteSpace(season))
-            {
-                throw new InvalidDataException(
-                    "The FPL bootstrap response did not include a season name.");
-            }
+            season = FplSeasonName.FromEvents(bootstrap.Events);
 
             var finishedEvent = bootstrap.Events
                 .Where(item => item.IsFinished)

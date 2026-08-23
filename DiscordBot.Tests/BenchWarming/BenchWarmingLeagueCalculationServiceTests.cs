@@ -92,7 +92,6 @@ public sealed class BenchWarmingLeagueCalculationServiceTests
         var client = new TestFantasyPremierLeagueClient
         {
             Bootstrap = CreateBootstrap(
-                season: "2026/27",
                 elements: [],
                 events:
                 [
@@ -112,13 +111,12 @@ public sealed class BenchWarmingLeagueCalculationServiceTests
     }
 
     [Test]
-    public async Task CalculateLatestFinishedRoundAsync_MissingSeasonName_FallsBackToUnknownSeason()
+    public async Task CalculateLatestFinishedRoundAsync_CurrentPayload_DerivesSeasonFromDeadlines()
     {
         // Arrange
         var client = new TestFantasyPremierLeagueClient
         {
             Bootstrap = CreateBootstrap(
-                season: null,
                 elements: [],
                 events: [CreateEvent(id: 5, isFinished: true)])
         };
@@ -130,8 +128,8 @@ public sealed class BenchWarmingLeagueCalculationServiceTests
             CancellationToken.None);
 
         // Assert
-        round!.Season.Should().Be("unknown");
-        store.GetLatestSeason().Should().Be("unknown");
+        round!.Season.Should().Be("2026/27");
+        store.GetLatestSeason().Should().Be("2026/27");
     }
 
     [Test]
@@ -141,7 +139,6 @@ public sealed class BenchWarmingLeagueCalculationServiceTests
         var client = new TestFantasyPremierLeagueClient
         {
             Bootstrap = CreateBootstrap(
-                season: "2026/27",
                 elements: [CreateElement(1, "Haaland")],
                 events:
                 [
@@ -176,13 +173,11 @@ public sealed class BenchWarmingLeagueCalculationServiceTests
     }
 
     private static BootstrapStaticResponse CreateBootstrap(
-        string? season,
         List<PremierLeagueElement> elements,
         List<PremierLeagueEvent> events)
     {
         return new BootstrapStaticResponse
         {
-            SeasonName = season,
             Elements = elements,
             Events = events
         };
@@ -195,7 +190,7 @@ public sealed class BenchWarmingLeagueCalculationServiceTests
             Id = id,
             IsFinished = isFinished,
             IsNext = !isFinished,
-            DeadlineTimeEpoch = 1_700_000_000
+            DeadlineTimeEpoch = 1_787_333_400
         };
     }
 
@@ -252,7 +247,6 @@ public sealed class BenchWarmingLeagueCalculationServiceTests
     {
         public BootstrapStaticResponse Bootstrap { get; init; } = new()
         {
-            SeasonName = "2026/27",
             Elements =
             [
                 CreateElement(1, "Haaland"),

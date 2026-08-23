@@ -159,14 +159,7 @@ public sealed class FplStatisticsCollectionService(
 
     private static string GetSeason(BootstrapStaticResponse bootstrap)
     {
-        if (string.IsNullOrWhiteSpace(bootstrap.SeasonName))
-        {
-            throw new InvalidDataException(
-                "The FPL bootstrap response did not include a season name; refusing to " +
-                "persist seasonless historical data.");
-        }
-
-        return bootstrap.SeasonName;
+        return FplSeasonName.FromEvents(bootstrap.Events);
     }
 
     private static FplLineupPick CreateLineupPick(
