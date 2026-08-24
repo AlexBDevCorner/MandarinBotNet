@@ -63,6 +63,10 @@ public sealed class MandarinBotOptionsValidator(bool requireOperationalConfigura
             "Bot:Schedules:FplLiveInsights",
             options.Schedules.FplLiveInsights,
             failures);
+        ValidateSchedule(
+            "Bot:Schedules:FplPriceChanges",
+            options.Schedules.FplPriceChanges,
+            failures);
 
         if (requireOperationalConfiguration && !options.Schedules.HasEnabledJobs)
         {

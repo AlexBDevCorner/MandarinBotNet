@@ -30,6 +30,8 @@ public sealed class MandarinBotOptionsTests
         new NotificationTargetOptions().MentionEveryone.Should().BeFalse();
         options.Schedules.FplGameweekRecap.Enabled.Should().BeFalse();
         options.Schedules.FplLiveInsights.Enabled.Should().BeFalse();
+        options.Schedules.FplPriceChanges.Enabled.Should().BeFalse();
+        options.Schedules.FplPriceChanges.Cron.Should().Be("0 0 12-22 * * ?");
         options.FantasyPremierLeague.MaxStandingsPages.Should().Be(
             FantasyPremierLeagueOptions.DefaultMaxStandingsPages);
         options.FantasyPremierLeague.RecognitionRuleVersion.Should().Be(
@@ -89,7 +91,8 @@ public sealed class MandarinBotOptionsTests
                 BenchWarmingLeague = ValidSchedule(enabled: false, "0 0 18 * * ?"),
                 FplStatisticsCollection = ValidSchedule(enabled: false, "0 0 19 * * ?"),
                 FplGameweekRecap = ValidSchedule(enabled: false, "0 0 20 * * ?"),
-                FplLiveInsights = ValidSchedule(enabled: false, "0 0/15 * * * ?")
+                FplLiveInsights = ValidSchedule(enabled: false, "0 0/15 * * * ?"),
+                FplPriceChanges = ValidSchedule(enabled: false, "0 0 12-22 * * ?")
             },
             targets: []);
         var validator = new MandarinBotOptionsValidator(
@@ -206,6 +209,37 @@ public sealed class MandarinBotOptionsTests
         result.Failed.Should().BeTrue();
         result.Failures.Should().Contain(failure =>
             failure.Contains("FPL live insights job is enabled"));
+    }
+
+    [Test]
+    public void Validate_EnabledPriceChangesWithoutNotificationTarget_ReturnsFailure()
+    {
+        // Arrange
+        var options = CreateValidOptions(
+            schedules: new JobSchedulesOptions
+            {
+                TimeZoneId = "Europe/Riga",
+                PremierLeagueNotifications = ValidSchedule(enabled: false, "0 0 * * * ?"),
+                UclFantasyNotifications = ValidSchedule(enabled: false, "0 0 * * * ?"),
+                ClassicStandings = ValidSchedule(enabled: false, "0 0 17 * * ?"),
+                HeadToHeadStandings = ValidSchedule(enabled: false, "0 0 17 * * ?"),
+                BenchWarmingLeague = ValidSchedule(enabled: false, "0 0 18 * * ?"),
+                FplStatisticsCollection = ValidSchedule(enabled: false, "0 0 19 * * ?"),
+                FplGameweekRecap = ValidSchedule(enabled: false, "0 0 20 * * ?"),
+                FplLiveInsights = ValidSchedule(enabled: false, "0 0/15 * * * ?"),
+                FplPriceChanges = ValidSchedule(enabled: true, "0 0 12-22 * * ?")
+            },
+            targets: []);
+        var validator = new MandarinBotOptionsValidator(
+            requireOperationalConfiguration: true);
+
+        // Act
+        var result = validator.Validate(null, options);
+
+        // Assert
+        result.Failed.Should().BeTrue();
+        result.Failures.Should().ContainSingle(failure =>
+            failure.Contains("Bot:Notifications:Targets"));
     }
 
     [Test]

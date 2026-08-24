@@ -5,6 +5,7 @@ using DiscordBot.Deadlines;
 using DiscordBot.FantasyPremierLeague;
 using DiscordBot.FantasyPremierLeague.Historical;
 using DiscordBot.FantasyPremierLeague.Live;
+using DiscordBot.FantasyPremierLeague.PriceChanges;
 using DiscordBot.FantasyPremierLeague.Recap;
 using DiscordBot.FantasyPremierLeague.Recognition;
 using DiscordBot.Notifications;
@@ -94,6 +95,8 @@ public static class MandarinBotServiceCollectionExtensions
         services.AddSingleton<FplLiveInsightsCalculationService>();
         services.AddSingleton<FplLiveInsightsService>();
         services.AddSingleton<FplLiveInsightsMessageComposer>();
+        services.AddSingleton<FplPriceChangeService>();
+        services.AddSingleton<FplPriceChangeMessageCompositionService>();
         services.AddSingleton<ILiveInsightsCommandHandler, LiveInsightsCommandHandler>();
         services.AddSingleton<WelcomeMessageTemplateRotator>();
         services.AddSingleton<
@@ -125,6 +128,9 @@ public static class MandarinBotServiceCollectionExtensions
         services.AddSingleton<IFplRecognitionStore>(
             new SqliteFplRecognitionStore(
                 MandarinBotDataPaths.FplRecognitionDatabasePath));
+        services.AddSingleton<IFplPriceSnapshotStore>(
+            new SqliteFplPriceSnapshotStore(
+                MandarinBotDataPaths.FplPriceSnapshotDatabasePath));
         services.AddSingleton<NotificationDeliveryCoordinator>();
         services.AddSingleton<
             IDiscordNotificationPublisher,

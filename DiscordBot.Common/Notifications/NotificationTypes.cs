@@ -11,5 +11,6 @@ namespace DiscordBot.Notifications
         public const string BenchWarmingStandings = "fpl-bench-warming-standings";
         public const string FplGameweekRecap = "fpl-gameweek-recap";
         public const string FplLiveInsights = "fpl-live-insights";
+        public const string FplPriceChanges = "fpl-price-changes";
     }
 }

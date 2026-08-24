@@ -91,6 +91,11 @@ public sealed class JobSchedulesOptions
 
     public ScheduledJobOptions FplLiveInsights { get; init; } = new();
 
+    public ScheduledJobOptions FplPriceChanges { get; init; } = new()
+    {
+        Cron = "0 0 12-22 * * ?"
+    };
+
     public bool HasEnabledJobs =>
         PremierLeagueNotifications.Enabled ||
         UclFantasyNotifications.Enabled ||
@@ -99,7 +104,8 @@ public sealed class JobSchedulesOptions
         BenchWarmingLeague.Enabled ||
         FplStatisticsCollection.Enabled ||
         FplGameweekRecap.Enabled ||
-        FplLiveInsights.Enabled;
+        FplLiveInsights.Enabled ||
+        FplPriceChanges.Enabled;
 
     public bool HasEnabledNotificationJobs =>
         PremierLeagueNotifications.Enabled ||
@@ -108,7 +114,8 @@ public sealed class JobSchedulesOptions
         HeadToHeadStandings.Enabled ||
         BenchWarmingLeague.Enabled ||
         FplGameweekRecap.Enabled ||
-        FplLiveInsights.Enabled;
+        FplLiveInsights.Enabled ||
+        FplPriceChanges.Enabled;
 }
 
 public sealed class ScheduledJobOptions
