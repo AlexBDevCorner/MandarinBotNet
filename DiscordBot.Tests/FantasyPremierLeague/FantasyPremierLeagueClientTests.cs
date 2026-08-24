@@ -29,6 +29,13 @@ public sealed class FantasyPremierLeagueClientTests
                           "is_current": true,
                           "is_next": true,
                           "deadline_time_epoch": 1770000000
+                      }
+                      ],
+                      "elements": [
+                        {
+                          "id": 7,
+                          "web_name": "Player",
+                          "now_cost": 85
                         }
                       ]
                     }
@@ -44,6 +51,7 @@ public sealed class FantasyPremierLeagueClientTests
         result.Events[0].Id.Should().Be(42);
         result.Events[0].IsFinished.Should().BeTrue();
         result.Events[0].IsCurrent.Should().BeTrue();
+        result.Elements.Should().ContainSingle().Which.NowCost.Should().Be(85);
         handler.AttemptCount.Should().Be(2);
         handler.RequestUris.Should().OnlyContain(
             uri => uri.AbsolutePath == "/api/bootstrap-static/");

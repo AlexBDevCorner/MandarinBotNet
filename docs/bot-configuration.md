@@ -61,6 +61,8 @@ Bot__Schedules__FplGameweekRecap__Enabled=true
 Bot__Schedules__FplGameweekRecap__Cron=0 0 20 * * ?
 Bot__Schedules__FplLiveInsights__Enabled=true
 Bot__Schedules__FplLiveInsights__Cron=0 0/15 * * * ?
+Bot__Schedules__FplPriceChanges__Enabled=true
+Bot__Schedules__FplPriceChanges__Cron=0 0 12-22 * * ?
 Bot__Notifications__Targets__0__GuildId=<FIRST-GUILD-ID>
 Bot__Notifications__Targets__0__ChannelId=<FIRST-CHANNEL-ID>
 Bot__Notifications__Targets__0__MentionEveryone=false
@@ -190,6 +192,15 @@ the defaults:
 - `CaptainDisasterPointsThreshold` is the maximum raw captain points for a disaster.
 - `CaptainDisasterViceCaptainPointsThreshold` is the minimum raw vice-captain points
   required for the same alert.
+
+## FPL player price changes
+
+The optional `FplPriceChanges` job is disabled by default. When enabled, it checks
+the current price of every FPL player at the top of each hour from 12:00 through
+22:00 in `Europe/Riga`. It stores the latest successful snapshot in
+`data/fpl-price-snapshot.db` and publishes only the players whose prices changed
+since the previous notification. The first run establishes the baseline and does
+not publish a message.
 
 ## Multiple targets and mentions
 

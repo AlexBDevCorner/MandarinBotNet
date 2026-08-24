@@ -29,6 +29,11 @@ public static class MandarinBotHealthCheckExtensions
                 "fpl_recognition_storage",
                 new SqliteStorageHealthCheck(
                     MandarinBotDataPaths.FplRecognitionDatabasePath),
+                tags: ["ready"])
+            .AddCheck(
+                "fpl_price_snapshot_storage",
+                new SqliteStorageHealthCheck(
+                    MandarinBotDataPaths.FplPriceSnapshotDatabasePath),
                 tags: ["ready"]);
         services.AddSingleton<IHealthCheckPublisher>(serviceProvider =>
             new FileHealthCheckPublisher(

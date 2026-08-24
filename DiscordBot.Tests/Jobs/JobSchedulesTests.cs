@@ -51,6 +51,11 @@ namespace DiscordBot.Tests.Jobs
             {
                 Enabled = true,
                 Cron = "0 0/15 * * * ?"
+            },
+            FplPriceChanges = new ScheduledJobOptions
+            {
+                Enabled = true,
+                Cron = "0 0 12-22 * * ?"
             }
         };
 
@@ -241,6 +246,44 @@ namespace DiscordBot.Tests.Jobs
         }
 
         [Test]
+        public void CreateFplPriceChangesTrigger_DefaultSchedule_FiresHourlyDuringRigaDay()
+        {
+            // Arrange
+            var trigger = JobSchedules.CreateFplPriceChangesTrigger(Options);
+            var reference = new DateTimeOffset(
+                2027,
+                1,
+                15,
+                9,
+                0,
+                0,
+                TimeSpan.Zero);
+
+            // Act
+            var fireTimes = new List<DateTimeOffset>();
+            var fireTime = trigger.GetFireTimeAfter(reference);
+            while (fireTime is not null && fireTimes.Count < 11)
+            {
+                fireTimes.Add(fireTime.Value);
+                fireTime = trigger.GetFireTimeAfter(fireTime.Value);
+            }
+            var localFireTimes = fireTimes
+                .Select(time => TimeZoneInfo.ConvertTime(
+                    time,
+                    JobSchedules.GetTimeZone(Options)))
+                .ToArray();
+
+            // Assert
+            var cronTrigger = trigger.Should().BeAssignableTo<ICronTrigger>().Subject;
+            cronTrigger.CronExpressionString.Should().Be("0 0 12-22 * * ?");
+            localFireTimes.Should().HaveCount(11);
+            localFireTimes.Select(time => time.Hour).Should()
+                .BeEquivalentTo(
+                    Enumerable.Range(12, 11),
+                    options => options.WithStrictOrdering());
+        }
+
+        [Test]
         public void CreateAllTriggers_DefaultSchedules_SkipMissedRuns()
         {
             // Arrange
@@ -262,6 +305,7 @@ namespace DiscordBot.Tests.Jobs
         [TestCase(typeof(FplStatisticsCollectionJob))]
         [TestCase(typeof(FplGameweekRecapJob))]
         [TestCase(typeof(FplLiveInsightsJob))]
+        [TestCase(typeof(FplPriceChangeJob))]
         public void JobType_ScheduledWork_DisallowsConcurrentExecution(Type jobType)
         {
             // Arrange

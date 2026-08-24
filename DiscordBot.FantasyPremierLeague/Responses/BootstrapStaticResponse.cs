@@ -37,4 +37,7 @@ public sealed class PremierLeagueElement
 
     [JsonPropertyName("web_name")]
     public string WebName { get; init; } = string.Empty;
+
+    [JsonPropertyName("now_cost")]
+    public int NowCost { get; init; }
 }
