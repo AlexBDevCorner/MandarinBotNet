@@ -15,7 +15,9 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\DiscordBot.Common\DiscordBot.Common.csproj" />
     <ProjectReference Include="..\DiscordBot\DiscordBot.csproj" />
+    <ProjectReference Include="..\DiscordBot.FantasyPremierLeague\DiscordBot.FantasyPremierLeague.csproj" />
     <ProjectReference Include="..\DiscordBot.UclFantasy\DiscordBot.UclFantasy.csproj" />
   </ItemGroup>
 
