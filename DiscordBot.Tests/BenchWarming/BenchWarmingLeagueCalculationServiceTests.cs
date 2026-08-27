@@ -313,6 +313,13 @@ public sealed class BenchWarmingLeagueCalculationServiceTests
             RequestedEventId = eventId;
             return Task.FromResult(Live);
         }
+
+        public Task<IReadOnlyList<PremierLeagueFixture>> GetFixturesAsync(
+            int eventId,
+            CancellationToken cancellationToken)
+        {
+            throw new NotSupportedException();
+        }
     }
 
     private sealed class FixedTimeProvider(DateTimeOffset utcNow) : TimeProvider

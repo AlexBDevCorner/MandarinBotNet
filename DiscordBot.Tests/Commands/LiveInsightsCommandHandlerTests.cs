@@ -58,9 +58,9 @@ public sealed class LiveInsightsCommandHandlerTests
                 ],
                 Elements =
                 [
-                    new PremierLeagueElement { Id = 1, WebName = "Captain" },
-                    new PremierLeagueElement { Id = 2, WebName = "Vice" },
-                    new PremierLeagueElement { Id = 3, WebName = "Bench" }
+                    new PremierLeagueElement { Id = 1, TeamId = 1, WebName = "Captain" },
+                    new PremierLeagueElement { Id = 2, TeamId = 2, WebName = "Vice" },
+                    new PremierLeagueElement { Id = 3, TeamId = 3, WebName = "Bench" }
                 ]
             });
         }
@@ -109,6 +109,7 @@ public sealed class LiveInsightsCommandHandlerTests
         {
             return Task.FromResult(new EntryEventPicksResponse
             {
+                EntryHistory = new EntryEventHistory(),
                 Picks =
                 [
                     new EntryEventPick
@@ -133,6 +134,42 @@ public sealed class LiveInsightsCommandHandlerTests
                     }
                 ]
             });
+        }
+
+        public Task<IReadOnlyList<PremierLeagueFixture>> GetFixturesAsync(
+            int eventId,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult<IReadOnlyList<PremierLeagueFixture>>(
+            [
+                new PremierLeagueFixture
+                {
+                    Id = 1,
+                    EventId = eventId,
+                    HomeTeamId = 1,
+                    AwayTeamId = 101,
+                    Started = true,
+                    Finished = true
+                },
+                new PremierLeagueFixture
+                {
+                    Id = 2,
+                    EventId = eventId,
+                    HomeTeamId = 2,
+                    AwayTeamId = 102,
+                    Started = true,
+                    Finished = true
+                },
+                new PremierLeagueFixture
+                {
+                    Id = 3,
+                    EventId = eventId,
+                    HomeTeamId = 3,
+                    AwayTeamId = 103,
+                    Started = true,
+                    Finished = true
+                }
+            ]);
         }
 
         public Task<EventLiveResponse> GetEventLiveAsync(

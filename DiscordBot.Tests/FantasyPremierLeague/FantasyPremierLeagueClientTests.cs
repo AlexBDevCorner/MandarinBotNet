@@ -34,6 +34,7 @@ public sealed class FantasyPremierLeagueClientTests
                       "elements": [
                         {
                           "id": 7,
+                          "team": 14,
                           "web_name": "Player",
                           "now_cost": 85
                         }
@@ -51,7 +52,14 @@ public sealed class FantasyPremierLeagueClientTests
         result.Events[0].Id.Should().Be(42);
         result.Events[0].IsFinished.Should().BeTrue();
         result.Events[0].IsCurrent.Should().BeTrue();
-        result.Elements.Should().ContainSingle().Which.NowCost.Should().Be(85);
+        result.Elements.Should().ContainSingle().Which.Should().BeEquivalentTo(
+            new PremierLeagueElement
+            {
+                Id = 7,
+                TeamId = 14,
+                WebName = "Player",
+                NowCost = 85
+            });
         handler.AttemptCount.Should().Be(2);
         handler.RequestUris.Should().OnlyContain(
             uri => uri.AbsolutePath == "/api/bootstrap-static/");
@@ -391,6 +399,54 @@ public sealed class FantasyPremierLeagueClientTests
     }
 
     [Test]
+    public async Task GetFixturesAsync_ValidPayload_ReturnsFixtureStateAndTeamIds()
+    {
+        // Arrange
+        var handler = new StubHttpMessageHandler((_, _) =>
+            Task.FromResult(CreateJsonResponse(
+                """
+                [
+                  {
+                    "id": 99,
+                    "event": 8,
+                    "team_h": 14,
+                    "team_a": 21,
+                    "kickoff_time": "2027-02-02T12:00:00Z",
+                    "started": true,
+                    "finished": false
+                  }
+                ]
+                """)));
+        using var provider = CreateProvider(handler);
+        var client = provider.GetRequiredService<IFantasyPremierLeagueClient>();
+
+        // Act
+        var result = await client.GetFixturesAsync(8, CancellationToken.None);
+
+        // Assert
+        result.Should().ContainSingle().Which.Should().BeEquivalentTo(
+            new PremierLeagueFixture
+            {
+                Id = 99,
+                EventId = 8,
+                HomeTeamId = 14,
+                AwayTeamId = 21,
+                KickoffTimeUtc = new DateTimeOffset(
+                    2027,
+                    2,
+                    2,
+                    12,
+                    0,
+                    0,
+                    TimeSpan.Zero),
+                Started = true,
+                Finished = false
+            });
+        handler.RequestUris.Should().OnlyContain(
+            uri => uri.PathAndQuery == "/api/fixtures/?event=8");
+    }
+
+    [Test]
     public async Task GetEntryEventPicksAsync_MissingPicksPayload_ClassifiesInvalidPayload()
     {
         // Arrange
@@ -485,10 +541,13 @@ public sealed class FantasyPremierLeagueClientTests
             {
               "standings": {
                 "page": {{page}},
-                "has_next": {{hasNext.ToString().ToLowerInvariant()}},
-                "results": [
+                  "has_next": {{hasNext.ToString().ToLowerInvariant()}},
+                  "results": [
                   {
+                    "event_total": 0,
+                    "last_rank": {{rank}},
                     "rank": {{rank}},
+                    "total": 100,
                     "entry_name": "Team {{rank}}"
                   }
                 ]

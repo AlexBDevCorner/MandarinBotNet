@@ -47,5 +47,6 @@ public sealed class EntryEventHistory
     public int EventTransfers { get; init; }
 
     [JsonPropertyName("event_transfers_cost")]
+    [JsonRequired]
     public int EventTransfersCost { get; init; }
 }

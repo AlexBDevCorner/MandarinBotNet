@@ -108,6 +108,18 @@ public sealed class FantasyPremierLeagueClient(
             cancellationToken);
     }
 
+    public async Task<IReadOnlyList<PremierLeagueFixture>> GetFixturesAsync(
+        int eventId,
+        CancellationToken cancellationToken)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(eventId);
+
+        return await GetAsync<List<PremierLeagueFixture>>(
+            $"/api/fixtures/?event={eventId}",
+            _ => true,
+            cancellationToken);
+    }
+
     private async Task<T> GetAsync<T>(
         string requestPath,
         Func<T, bool> isValid,

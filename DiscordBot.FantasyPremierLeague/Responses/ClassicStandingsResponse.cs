@@ -25,14 +25,17 @@ namespace DiscordBot.Responses
         [JsonPropertyName("id")]
         public int Id { get; set; }
         [JsonPropertyName("event_total")]
+        [JsonRequired]
         public int EventTotal { get; set; }
         [JsonPropertyName("player_name")]
         public string PlayerName { get; set; } = string.Empty;
         [JsonPropertyName("rank")]
         public int Rank { get; set; }
         [JsonPropertyName("last_rank")]
+        [JsonRequired]
         public int LastRank { get; set; }
         [JsonPropertyName("total")]
+        [JsonRequired]
         public int Total { get; set; }
         [JsonPropertyName("entry")]
         public int Entry { get; set; }

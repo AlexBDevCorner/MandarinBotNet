@@ -35,6 +35,9 @@ public sealed class PremierLeagueElement
     [JsonPropertyName("id")]
     public int Id { get; init; }
 
+    [JsonPropertyName("team")]
+    public int TeamId { get; init; }
+
     [JsonPropertyName("web_name")]
     public string WebName { get; init; } = string.Empty;
 

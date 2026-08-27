@@ -192,6 +192,13 @@ public sealed class FplPriceChangeServiceTests
         {
             throw new NotSupportedException();
         }
+
+        public Task<IReadOnlyList<PremierLeagueFixture>> GetFixturesAsync(
+            int eventId,
+            CancellationToken cancellationToken)
+        {
+            throw new NotSupportedException();
+        }
     }
 
     private sealed class InMemoryFplPriceSnapshotStore : IFplPriceSnapshotStore

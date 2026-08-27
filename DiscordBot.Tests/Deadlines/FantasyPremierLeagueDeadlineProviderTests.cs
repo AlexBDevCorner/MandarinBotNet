@@ -92,5 +92,12 @@ public sealed class FantasyPremierLeagueDeadlineProviderTests
         {
             throw new NotSupportedException();
         }
+
+        public Task<IReadOnlyList<PremierLeagueFixture>> GetFixturesAsync(
+            int eventId,
+            CancellationToken cancellationToken)
+        {
+            throw new NotSupportedException();
+        }
     }
 }

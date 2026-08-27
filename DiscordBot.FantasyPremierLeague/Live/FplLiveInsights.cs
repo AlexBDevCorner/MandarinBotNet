@@ -48,18 +48,58 @@ public sealed record FplLiveGameweek(
     IReadOnlyList<FplLiveManagerInsights> BenchAlerts,
     IReadOnlyList<FplLiveManagerInsights> CaptainDisasters,
     IReadOnlyList<FplLiveManagerInsights> CaptainSuccesses,
-    IReadOnlyList<FplAutomaticSubstitutionSalvation> AutomaticSubstitutionSalvations);
+    IReadOnlyList<FplAutomaticSubstitutionSalvation> AutomaticSubstitutionSalvations,
+    IReadOnlyList<FplLiveSwingInsight> SwingInsights);
 
 public sealed record FplLiveManagerInsights(
     int EntryId,
     string EntryName,
     string ManagerName,
-    int Rank,
-    int LivePoints,
-    int PlayersRemainingToPlay,
+    int OfficialRank,
+    int PreviousRank,
+    int LiveRank,
+    int RankChange,
+    int PreviousTotalPoints,
+    int OfficialTotalPoints,
+    int RawLiveGameweekPoints,
+    int TransferCost,
+    int LiveGameweekPoints,
+    int LiveTotalPoints,
+    int GapToLeader,
+    FplLivePlayerProgress PlayerProgress,
     int BenchPoints,
     FplLiveCaptainInsights Captain,
     IReadOnlyList<FplAutomaticSubstitutionSalvation> AutomaticSubstitutionSalvations);
+
+public sealed record FplLivePlayerProgress(
+    int Playing,
+    int YetToPlay)
+{
+    public int Active => checked(Playing + YetToPlay);
+}
+
+public sealed record FplLivePlayerExposure(
+    int PlayerId,
+    string PlayerName,
+    int EntryId,
+    string EntryName,
+    int Multiplier,
+    bool IsCaptain);
+
+public abstract record FplLiveSwingInsight;
+
+public sealed record UniqueRemainingPlayerInsight(
+    int EntryId,
+    string EntryName,
+    string PlayerName) : FplLiveSwingInsight;
+
+public sealed record CaptainClashInsight(
+    int FirstEntryId,
+    string FirstEntryName,
+    string FirstCaptain,
+    int SecondEntryId,
+    string SecondEntryName,
+    string SecondCaptain) : FplLiveSwingInsight;
 
 public sealed record FplLiveCaptainInsights(
     string CaptainName,

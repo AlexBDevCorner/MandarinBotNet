@@ -309,6 +309,13 @@ public sealed class StandingsCommandHandlerTests
         {
             throw new NotSupportedException();
         }
+
+        public Task<IReadOnlyList<PremierLeagueFixture>> GetFixturesAsync(
+            int eventId,
+            CancellationToken cancellationToken)
+        {
+            throw new NotSupportedException();
+        }
     }
 
     private sealed class TestSlashCommandInteraction(List<string> operations)
