@@ -23,7 +23,7 @@ namespace DiscordBot
         private const string DeploymentReadyMessage = "Bot is connected and ready.";
         private Dictionary<string, Func<IDiscordSlashCommandInteraction, Task>>
             _commandHandlers = [];
-        private int _readyCount;
+        private int _initialReadyObserved;
 
         public async Task StartAsync(CancellationToken cancellationToken)
         {
@@ -45,6 +45,7 @@ namespace DiscordBot
             };
 
             gatewayConnection.Log += discordLogHandler.HandleAsync;
+            gatewayConnection.Connected += ConnectedAsync;
             gatewayConnection.Ready += ReadyAsync;
             gatewayConnection.Disconnected += DisconnectedAsync;
             gatewayConnection.SlashCommandExecuted += SlashCommandHandler;
@@ -84,6 +85,7 @@ namespace DiscordBot
         public async Task StopAsync(CancellationToken cancellationToken)
         {
             readiness.MarkDisconnected();
+            Interlocked.Exchange(ref _initialReadyObserved, 0);
             logger.LogInformation("Stopping Discord bot.");
             DetachEventHandlers();
 
@@ -114,10 +116,35 @@ namespace DiscordBot
         private async Task ReadyAsync()
         {
             await commandRegistration.SynchronizeOnceAsync(CancellationToken.None);
-            readiness.MarkReady();
-            var gatewayEvent = Interlocked.Increment(ref _readyCount) == 1
+            var gatewayEvent = Interlocked.CompareExchange(
+                ref _initialReadyObserved,
+                1,
+                0) == 0
                 ? "Ready"
                 : "Reconnected";
+            MarkGatewayReady(gatewayEvent);
+        }
+
+        private Task ConnectedAsync()
+        {
+            // Discord.Net raises Connected, but not Ready, when it resumes an
+            // existing gateway session. Ignore the initial Connected event until
+            // Ready has confirmed that the guild cache was populated once.
+            if (Volatile.Read(ref _initialReadyObserved) != 0)
+            {
+                MarkGatewayReady("Reconnected");
+            }
+
+            return Task.CompletedTask;
+        }
+
+        private void MarkGatewayReady(string gatewayEvent)
+        {
+            if (!readiness.MarkReady())
+            {
+                return;
+            }
+
             logger.LogInformation(
                 "{DeploymentReadyMessage} Gateway event {Event} completed with outcome {Outcome}.",
                 DeploymentReadyMessage,
@@ -139,6 +166,7 @@ namespace DiscordBot
         private void DetachEventHandlers()
         {
             gatewayConnection.Log -= discordLogHandler.HandleAsync;
+            gatewayConnection.Connected -= ConnectedAsync;
             gatewayConnection.Ready -= ReadyAsync;
             gatewayConnection.Disconnected -= DisconnectedAsync;
             gatewayConnection.SlashCommandExecuted -= SlashCommandHandler;

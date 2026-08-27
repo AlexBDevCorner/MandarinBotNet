@@ -7,6 +7,8 @@ public interface IDiscordGatewayConnection
 {
     event Func<LogMessage, Task> Log;
 
+    event Func<Task> Connected;
+
     event Func<Task> Ready;
 
     event Func<Exception, Task> Disconnected;
@@ -41,6 +43,12 @@ public sealed class DiscordGatewayConnection : IDiscordGatewayConnection
     {
         add => _client.Log += value;
         remove => _client.Log -= value;
+    }
+
+    public event Func<Task> Connected
+    {
+        add => _client.Connected += value;
+        remove => _client.Connected -= value;
     }
 
     public event Func<Task> Ready

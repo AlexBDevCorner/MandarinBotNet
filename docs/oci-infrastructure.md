@@ -157,6 +157,8 @@ Register the runner as follows:
    Bot__Schedules__PremierLeagueNotifications__Cron=0 0/15 * * * ?
    Bot__Schedules__ClassicStandings__Enabled=true
    Bot__Schedules__HeadToHeadStandings__Enabled=true
+   Bot__Schedules__FplGameweekRecap__Enabled=true
+   Bot__Schedules__FplGameweekRecap__Cron=0 0 20 * * ?
    Bot__Schedules__FplLiveInsights__Enabled=true
    Bot__Notifications__Targets__0__GuildId=<DISCORD-GUILD-ID>
    Bot__Notifications__Targets__0__ChannelId=<DISCORD-CHANNEL-ID>
