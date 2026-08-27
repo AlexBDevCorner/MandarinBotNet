@@ -68,11 +68,11 @@ public sealed class DiscordConnectionReadiness : IDiscordConnectionReadiness
         }
     }
 
-    public void MarkReady()
+    public bool MarkReady()
     {
         lock (_sync)
         {
-            _ready.TrySetResult();
+            return _ready.TrySetResult();
         }
     }
 

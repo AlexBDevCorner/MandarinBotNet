@@ -54,6 +54,7 @@ public sealed class DiscordBotHostedServiceIntegrationTests
         // Act
         var startTask = host.StartAsync();
         await gateway.StartCalled.Task;
+        await gateway.RaiseConnectedAsync();
 
         // Assert
         startTask.IsCompleted.Should().BeFalse();
@@ -76,13 +77,17 @@ public sealed class DiscordBotHostedServiceIntegrationTests
         var reconnectWait = readiness.WaitUntilReadyAsync(CancellationToken.None);
         reconnectWait.IsCompleted.Should().BeFalse();
 
-        await gateway.RaiseReadyAsync();
+        await gateway.RaiseConnectedAsync();
         await reconnectWait;
         readiness.IsReady.Should().BeTrue();
         commandSynchronizer.CallCount.Should().Be(1);
         logMessages.Should().Contain(message =>
             message.Contains("event Reconnected") &&
             message.Contains("outcome Ready"));
+
+        await gateway.RaiseReadyAsync();
+        logMessages.Count(message => message.Contains("event Reconnected"))
+            .Should().Be(1);
 
         await host.StopAsync();
         readiness.IsReady.Should().BeFalse();
@@ -400,6 +405,7 @@ public sealed class DiscordBotHostedServiceIntegrationTests
     private sealed class TestDiscordGatewayConnection : IDiscordGatewayConnection
     {
         private Func<LogMessage, Task>? _log;
+        private Func<Task>? _connected;
         private Func<Task>? _ready;
         private Func<Exception, Task>? _disconnected;
         private Func<SocketSlashCommand, Task>? _slashCommandExecuted;
@@ -409,6 +415,12 @@ public sealed class DiscordBotHostedServiceIntegrationTests
         {
             add => _log += value;
             remove => _log -= value;
+        }
+
+        public event Func<Task>? Connected
+        {
+            add => _connected += value;
+            remove => _connected -= value;
         }
 
         public event Func<Task>? Ready
@@ -444,6 +456,7 @@ public sealed class DiscordBotHostedServiceIntegrationTests
 
         public int SubscriberCount =>
             SubscriberCountFor(_log) +
+            SubscriberCountFor(_connected) +
             SubscriberCountFor(_ready) +
             SubscriberCountFor(_disconnected) +
             SubscriberCountFor(_slashCommandExecuted) +
@@ -471,6 +484,11 @@ public sealed class DiscordBotHostedServiceIntegrationTests
         public Task RaiseReadyAsync()
         {
             return _ready?.Invoke() ?? Task.CompletedTask;
+        }
+
+        public Task RaiseConnectedAsync()
+        {
+            return _connected?.Invoke() ?? Task.CompletedTask;
         }
 
         public Task RaiseDisconnectedAsync()
