@@ -376,12 +376,23 @@ public sealed class FantasyPremierLeagueClientTests
                   "elements": [
                     {
                       "id": 1,
-                      "stats": { "total_points": 15, "minutes": 90, "goals_scored": 2 },
+                      "stats": {
+                        "total_points": 15,
+                        "minutes": 90,
+                        "yellow_cards": 0,
+                        "red_cards": 0,
+                        "goals_scored": 2
+                      },
                       "explain": []
                     },
                     {
                       "id": 2,
-                      "stats": { "total_points": -1, "minutes": 0 },
+                      "stats": {
+                        "total_points": -1,
+                        "minutes": 0,
+                        "yellow_cards": 1,
+                        "red_cards": 0
+                      },
                       "explain": []
                     }
                   ]
@@ -398,6 +409,10 @@ public sealed class FantasyPremierLeagueClientTests
             .Should().BeEquivalentTo([(1, 15), (2, -1)]);
         result.Elements.Select(element => element.Stats.Minutes)
             .Should().BeEquivalentTo([90, 0]);
+        result.Elements.Select(element => element.Stats.YellowCards)
+            .Should().BeEquivalentTo([0, 1]);
+        result.Elements.Select(element => element.Stats.RedCards)
+            .Should().BeEquivalentTo([0, 0]);
         handler.RequestUris.Should().OnlyContain(
             uri => uri.PathAndQuery == "/api/event/8/live/");
     }

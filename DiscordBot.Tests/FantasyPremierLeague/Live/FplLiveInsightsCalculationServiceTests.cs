@@ -397,6 +397,30 @@ public sealed class FplLiveInsightsCalculationServiceTests
     }
 
     [Test]
+    public void Calculate_ZeroMinuteCardedBenchPlayer_CanBeProjectedAsAutomaticSubstitution()
+    {
+        // Arrange
+        var fixture = CreateLegalAutosubFixture();
+        var outgoingIndex = fixture.PicksByEntry[101].Picks.FindIndex(
+            pick => pick.Element == 3);
+        var incomingIndex = fixture.PicksByEntry[101].Picks.FindIndex(
+            pick => pick.Element == 13);
+        fixture.PicksByEntry[101].Picks[outgoingIndex] = Pick(3, 3, 1);
+        fixture.PicksByEntry[101].Picks[incomingIndex] = Pick(13, 13, 0);
+        fixture.LivePlayers[3] = Stats(0, 0);
+        fixture.LivePlayers[13] = Stats(9, 0, yellowCards: 1);
+
+        // Act
+        var manager = Calculate(CreateService(), fixture).Managers.Single();
+
+        // Assert
+        manager.RawLiveGameweekPoints.Should().Be(9);
+        manager.BenchPoints.Should().Be(0);
+        manager.AutomaticSubstitutionSalvations.Should().ContainSingle().Which.SavedPoints
+            .Should().Be(9);
+    }
+
+    [Test]
     public void Calculate_CaptainDidNotPlay_TransfersCaptainMultiplierToPlayingViceCaptain()
     {
         // Arrange
@@ -413,6 +437,25 @@ public sealed class FplLiveInsightsCalculationServiceTests
         manager.RawLiveGameweekPoints.Should().Be(20);
         manager.Captain.CaptainEffectivePoints.Should().Be(0);
         manager.Captain.ViceCaptainEffectivePoints.Should().Be(20);
+    }
+
+    [Test]
+    public void Calculate_ZeroMinuteCardedCaptain_RetainsCaptaincy()
+    {
+        // Arrange
+        var fixture = CreateTwoPlayerFixture();
+        fixture.PicksByEntry[101].Picks[0] = Pick(1, 1, 0, isCaptain: true);
+        fixture.PicksByEntry[101].Picks[1] = Pick(2, 2, 1, isViceCaptain: true);
+        fixture.LivePlayers[1] = Stats(-1, 0, yellowCards: 1);
+        fixture.LivePlayers[2] = Stats(10, 90);
+
+        // Act
+        var manager = Calculate(CreateService(), fixture).Managers.Single();
+
+        // Assert
+        manager.RawLiveGameweekPoints.Should().Be(8);
+        manager.Captain.CaptainEffectivePoints.Should().Be(-2);
+        manager.Captain.ViceCaptainEffectivePoints.Should().Be(10);
     }
 
     [Test]
@@ -875,12 +918,18 @@ public sealed class FplLiveInsightsCalculationServiceTests
         };
     }
 
-    private static EventLiveElementStats Stats(int totalPoints, int minutes)
+    private static EventLiveElementStats Stats(
+        int totalPoints,
+        int minutes,
+        int yellowCards = 0,
+        int redCards = 0)
     {
         return new EventLiveElementStats
         {
             TotalPoints = totalPoints,
-            Minutes = minutes
+            Minutes = minutes,
+            YellowCards = yellowCards,
+            RedCards = redCards
         };
     }
 

@@ -382,7 +382,7 @@ public sealed class FplLiveInsightsCalculationService(
         if (goalkeeper != default &&
             IsConfirmedNotPlaying(goalkeeper.Element, players, livePlayers, teamStates) &&
             goalkeeperBench is not null &&
-            HasPlayed(goalkeeperBench, livePlayers))
+            HasParticipated(goalkeeperBench, livePlayers))
         {
             ReplaceLineupPlayer(
                 startingLineup,
@@ -401,7 +401,7 @@ public sealed class FplLiveInsightsCalculationService(
         {
             if (usedBench.Contains(benchPick.Element) ||
                 players[benchPick.Element].ElementType == 1 ||
-                !HasPlayed(benchPick, livePlayers))
+                !HasParticipated(benchPick, livePlayers))
             {
                 continue;
             }
@@ -482,11 +482,16 @@ public sealed class FplLiveInsightsCalculationService(
             defenders + midfielders + forwards == 10;
     }
 
-    private static bool HasPlayed(
+    private static bool HasParticipated(
         EntryEventPick? pick,
         IReadOnlyDictionary<int, EventLiveElementStats> livePlayers)
     {
-        return pick is not null && livePlayers[pick.Element].Minutes > 0;
+        return pick is not null && HasParticipated(livePlayers[pick.Element]);
+    }
+
+    private static bool HasParticipated(EventLiveElementStats stats)
+    {
+        return stats.Minutes > 0 || stats.YellowCards > 0 || stats.RedCards > 0;
     }
 
     private static bool IsConfirmedNotPlaying(
@@ -495,7 +500,7 @@ public sealed class FplLiveInsightsCalculationService(
         IReadOnlyDictionary<int, EventLiveElementStats> livePlayers,
         IReadOnlyDictionary<int, FplTeamLiveState> teamStates)
     {
-        return livePlayers[element].Minutes == 0 &&
+        return !HasParticipated(livePlayers[element]) &&
             teamStates[players[element].TeamId] == FplTeamLiveState.Finished;
     }
 
@@ -616,14 +621,16 @@ public sealed class FplLiveInsightsCalculationService(
             }
 
             if (!livePlayers.TryGetValue(pick.Element, out var livePlayer) ||
-                livePlayer.Minutes < 0)
+                livePlayer.Minutes < 0 ||
+                livePlayer.YellowCards < 0 ||
+                livePlayer.RedCards < 0)
             {
                 throw new InvalidDataException(
                     $"The FPL live response did not contain valid player {pick.Element} " +
                     $"data for entry {entryId} in season {season} event {eventId}.");
             }
 
-            if ((pick.Position <= 11 || livePlayer.Minutes > 0) &&
+            if ((pick.Position <= 11 || HasParticipated(livePlayer)) &&
                 !teamStates.ContainsKey(player.TeamId))
             {
                 throw new InvalidDataException(
