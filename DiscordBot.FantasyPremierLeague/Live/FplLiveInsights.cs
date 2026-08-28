@@ -6,7 +6,6 @@ public enum FplLiveInsightsAvailability
 {
     Available,
     NoActiveGameweek,
-    Stale,
     Unavailable
 }
 
@@ -24,12 +23,6 @@ public sealed record FplLiveInsightsResult(
     public static FplLiveInsightsResult NoActiveGameweek()
     {
         return new(FplLiveInsightsAvailability.NoActiveGameweek);
-    }
-
-    public static FplLiveInsightsResult Stale(FplLiveGameweek gameweek)
-    {
-        ArgumentNullException.ThrowIfNull(gameweek);
-        return new(FplLiveInsightsAvailability.Stale, gameweek);
     }
 
     public static FplLiveInsightsResult Unavailable(
@@ -124,7 +117,53 @@ public static class FplLiveInsightsSourceIdentifier
     {
         ArgumentNullException.ThrowIfNull(gameweek);
 
-        return $"{gameweek.Season}-event-{gameweek.EventId}-source-" +
-            $"{gameweek.SourceUpdatedAtUtc.ToUnixTimeSeconds()}";
+        return $"{gameweek.Season}-event-{gameweek.EventId}-live-" +
+            $"{ComputeLiveStateHash(gameweek):x8}";
+    }
+
+    private static int ComputeLiveStateHash(FplLiveGameweek gameweek)
+    {
+        var hash = new HashCode();
+        foreach (var manager in gameweek.Managers)
+        {
+            hash.Add(manager.EntryId);
+            hash.Add(manager.LiveTotalPoints);
+            hash.Add(manager.LiveGameweekPoints);
+            hash.Add(manager.LiveRank);
+            hash.Add(manager.RankChange);
+            hash.Add(manager.TransferCost);
+            hash.Add(manager.BenchPoints);
+            hash.Add(manager.PlayerProgress.Playing);
+            hash.Add(manager.PlayerProgress.YetToPlay);
+            hash.Add(manager.Captain.CaptainEffectivePoints);
+            hash.Add(manager.Captain.ViceCaptainEffectivePoints);
+        }
+
+        foreach (var salvation in gameweek.AutomaticSubstitutionSalvations)
+        {
+            hash.Add(salvation.EntryId);
+            hash.Add(salvation.PlayerInName);
+            hash.Add(salvation.PlayerOutName);
+            hash.Add(salvation.SavedPoints);
+        }
+
+        foreach (var insight in gameweek.SwingInsights)
+        {
+            switch (insight)
+            {
+                case UniqueRemainingPlayerInsight unique:
+                    hash.Add(unique.EntryId);
+                    hash.Add(unique.PlayerName);
+                    break;
+                case CaptainClashInsight clash:
+                    hash.Add(clash.FirstEntryId);
+                    hash.Add(clash.FirstCaptain);
+                    hash.Add(clash.SecondEntryId);
+                    hash.Add(clash.SecondCaptain);
+                    break;
+            }
+        }
+
+        return hash.ToHashCode();
     }
 }

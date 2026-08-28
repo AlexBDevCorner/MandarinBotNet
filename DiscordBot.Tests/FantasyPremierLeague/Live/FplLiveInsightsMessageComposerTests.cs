@@ -114,37 +114,6 @@ public sealed class FplLiveInsightsMessageComposerTests
     }
 
     [Test]
-    public void Compose_StaleInsights_IdentifiesGameweekAndSourceAgeLimit()
-    {
-        // Arrange
-        var gameweek = new FplLiveGameweek(
-            "2026/27",
-            5,
-            new DateTimeOffset(2026, 8, 21, 18, 0, 0, TimeSpan.Zero),
-            new DateTimeOffset(2026, 8, 21, 18, 30, 0, TimeSpan.Zero),
-            [],
-            [],
-            [],
-            [],
-            [],
-            []);
-        var composer = new FplLiveInsightsMessageComposer(
-            new FantasyPremierLeagueOptions
-            {
-                LiveDataMaxAge = TimeSpan.FromMinutes(20)
-            });
-
-        // Act
-        var message = composer.Compose(FplLiveInsightsResult.Stale(gameweek));
-
-        // Assert
-        message.Should().Contain("тура 5");
-        message.Should().Contain("Данные источника обновлены: 2026-08-21 18:00:00 UTC");
-        message.Should().Contain("допустимый возраст: 20 мин");
-        message.Should().Contain("устарели");
-    }
-
-    [Test]
     public void Compose_UnavailableStates_ReturnsRussianMessagesWithEmojis()
     {
         // Arrange
@@ -166,32 +135,87 @@ public sealed class FplLiveInsightsMessageComposerTests
     }
 
     [Test]
-    public void SourceIdentifier_SameSourceUpdateIsStable_ChangedSourceUpdateCreatesNewCheckpoint()
+    public void SourceIdentifier_IdenticalLiveState_IsStableAcrossStandingsTimestampChanges()
     {
         // Arrange
-        var gameweek = new FplLiveGameweek(
+        var gameweek = CreateGameweek(100, 20, 4);
+
+        // Act
+        var firstIdentifier = FplLiveInsightsSourceIdentifier.Create(gameweek);
+        var repeatedIdentifier = FplLiveInsightsSourceIdentifier.Create(gameweek);
+        var sameLiveDifferentStandingsSnapshot = FplLiveInsightsSourceIdentifier.Create(
+            gameweek with
+            {
+                SourceUpdatedAtUtc = gameweek.SourceUpdatedAtUtc.AddMinutes(-90)
+            });
+
+        // Assert
+        repeatedIdentifier.Should().Be(firstIdentifier);
+        sameLiveDifferentStandingsSnapshot.Should().Be(firstIdentifier);
+    }
+
+    [Test]
+    public void SourceIdentifier_DifferentLiveState_CreatesDistinctCheckpointWithSameStandingsTimestamp()
+    {
+        // Arrange
+        var baseGameweek = CreateGameweek(
+            liveTotalPoints: 100,
+            captainEffectivePoints: 20,
+            viceCaptainEffectivePoints: 4);
+        var updatedLive = CreateGameweek(
+            liveTotalPoints: 124,
+            captainEffectivePoints: 22,
+            viceCaptainEffectivePoints: 4);
+
+        // Act
+        var baseIdentifier = FplLiveInsightsSourceIdentifier.Create(baseGameweek);
+        var updatedIdentifier = FplLiveInsightsSourceIdentifier.Create(updatedLive);
+
+        // Assert
+        updatedIdentifier.Should().NotBe(baseIdentifier);
+    }
+
+    private static FplLiveGameweek CreateGameweek(
+        int liveTotalPoints,
+        int captainEffectivePoints,
+        int viceCaptainEffectivePoints)
+    {
+        var manager = new FplLiveManagerInsights(
+            1,
+            "Alpha",
+            "Alice",
+            1,
+            2,
+            1,
+            1,
+            1000,
+            1100,
+            liveTotalPoints,
+            0,
+            liveTotalPoints,
+            liveTotalPoints,
+            0,
+            new FplLivePlayerProgress(1, 0),
+            0,
+            new FplLiveCaptainInsights(
+                "Captain",
+                captainEffectivePoints,
+                captainEffectivePoints,
+                "Vice",
+                viceCaptainEffectivePoints,
+                viceCaptainEffectivePoints),
+            []);
+        return new FplLiveGameweek(
             "2026/27",
             5,
             new DateTimeOffset(2026, 8, 21, 18, 0, 0, TimeSpan.Zero),
             new DateTimeOffset(2026, 8, 21, 18, 5, 0, TimeSpan.Zero),
-            [],
+            [manager],
             [],
             [],
             [],
             [],
             []);
-
-        // Act
-        var firstIdentifier = FplLiveInsightsSourceIdentifier.Create(gameweek);
-        var repeatedIdentifier = FplLiveInsightsSourceIdentifier.Create(gameweek);
-        var updatedIdentifier = FplLiveInsightsSourceIdentifier.Create(gameweek with
-        {
-            SourceUpdatedAtUtc = gameweek.SourceUpdatedAtUtc.AddMinutes(1)
-        });
-
-        // Assert
-        repeatedIdentifier.Should().Be(firstIdentifier);
-        updatedIdentifier.Should().NotBe(firstIdentifier);
     }
 
     private static FplLiveManagerInsights CreateManager(

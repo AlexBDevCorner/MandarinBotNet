@@ -105,8 +105,7 @@ public sealed class FplLiveInsightsServiceTests
     {
         return new FantasyPremierLeagueOptions
         {
-            ClassicLeagueId = 456,
-            LiveDataMaxAge = TimeSpan.FromMinutes(20)
+            ClassicLeagueId = 456
         };
     }
 

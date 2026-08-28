@@ -33,9 +33,6 @@ public sealed class FplLiveInsightsJob(
                     case FplLiveInsightsAvailability.NoActiveGameweek:
                         execution.SetEvent("NoActiveGameweek");
                         return new JobExecutionResult("SkippedNoActiveGameweek");
-                    case FplLiveInsightsAvailability.Stale:
-                        execution.SetEvent(GetEventIdentifier(result));
-                        return new JobExecutionResult("SkippedStaleSource");
                     case FplLiveInsightsAvailability.Unavailable:
                         execution.SetEvent("SourceUnavailable");
                         return new JobExecutionResult("SkippedSourceUnavailable");
@@ -101,13 +98,5 @@ public sealed class FplLiveInsightsJob(
                     skippedCount,
                     failedCount);
             });
-    }
-
-    private static string GetEventIdentifier(FplLiveInsightsResult result)
-    {
-        return result.Gameweek is null
-            ? "SourceUnavailable"
-            : $"{result.Gameweek.Season}-event-" +
-              result.Gameweek.EventId.ToString(CultureInfo.InvariantCulture);
     }
 }

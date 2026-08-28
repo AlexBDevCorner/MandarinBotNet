@@ -18,9 +18,6 @@ public sealed class FplLiveInsightsMessageComposer(
                     "An available FPL live insights result did not include a gameweek.")),
             FplLiveInsightsAvailability.NoActiveGameweek =>
                 "⏸️ Сейчас нет активного тура FPL, поэтому лайв-отчёт недоступен.",
-            FplLiveInsightsAvailability.Stale => ComposeStale(
-                result.Gameweek ?? throw new InvalidDataException(
-                    "A stale FPL live insights result did not include a gameweek.")),
             FplLiveInsightsAvailability.Unavailable =>
                 result.FailureKind == FantasyPremierLeagueFailureKind.Transient
                     ? "⚠️ Лайв-отчёт FPL временно недоступен: источник данных не отвечает " +
@@ -247,16 +244,6 @@ public sealed class FplLiveInsightsMessageComposer(
                     throw new ArgumentOutOfRangeException(nameof(insight));
             }
         }
-    }
-
-    private string ComposeStale(FplLiveGameweek gameweek)
-    {
-        return $"⌛ Лайв-данные FPL для тура {gameweek.EventId.ToString(CultureInfo.InvariantCulture)} " +
-            $"(сезон {DiscordTextSafety.SanitizeExternalName(gameweek.Season)}) устарели. " +
-            $"Данные источника обновлены: {FormatTimestamp(gameweek.SourceUpdatedAtUtc)}; " +
-            $"отчёт собран: {FormatTimestamp(gameweek.CapturedAtUtc)}; " +
-            $"допустимый возраст: {options.LiveDataMaxAge.TotalMinutes.ToString("0.#", CultureInfo.InvariantCulture)} " +
-            "мин. Попробуйте ещё раз позже.";
     }
 
     private static void AppendBenchAlerts(

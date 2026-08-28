@@ -37,7 +37,6 @@ Bot__WelcomeMessages__ChannelId=<WELCOME-CHANNEL-ID>
 Bot__FantasyPremierLeague__ClassicLeagueId=<CLASSIC-LEAGUE-ID>
 Bot__FantasyPremierLeague__HeadToHeadLeagueId=<HEAD-TO-HEAD-LEAGUE-ID>
 Bot__FantasyPremierLeague__MaxStandingsPages=10
-Bot__FantasyPremierLeague__LiveDataMaxAge=00:20:00
 Bot__FantasyPremierLeague__RecognitionRuleVersion=v1
 Bot__FantasyPremierLeague__LargeBenchPointsThreshold=8
 Bot__FantasyPremierLeague__CaptainSuccessEffectivePointsThreshold=20

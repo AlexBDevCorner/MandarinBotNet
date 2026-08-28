@@ -122,12 +122,6 @@ public sealed class MandarinBotOptionsValidator(bool requireOperationalConfigura
                 "Bot:FantasyPremierLeague:MaxStandingsPages must be greater than zero.");
         }
 
-        if (options.FantasyPremierLeague.LiveDataMaxAge <= TimeSpan.Zero)
-        {
-            failures.Add(
-                "Bot:FantasyPremierLeague:LiveDataMaxAge must be greater than zero.");
-        }
-
         if (string.IsNullOrWhiteSpace(options.FantasyPremierLeague.RecognitionRuleVersion))
         {
             failures.Add(

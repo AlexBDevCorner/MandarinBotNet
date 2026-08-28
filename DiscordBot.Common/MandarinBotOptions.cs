@@ -37,7 +37,6 @@ public sealed class DiscordCommandOptions
 public sealed class FantasyPremierLeagueOptions
 {
     public const int DefaultMaxStandingsPages = 10;
-    public static readonly TimeSpan DefaultLiveDataMaxAge = TimeSpan.FromMinutes(20);
     public const string DefaultRecognitionRuleVersion = "v1";
     public const int DefaultLargeBenchPointsThreshold = 8;
     public const int DefaultCaptainSuccessEffectivePointsThreshold = 20;
@@ -50,8 +49,6 @@ public sealed class FantasyPremierLeagueOptions
     public int HeadToHeadLeagueId { get; init; }
 
     public int MaxStandingsPages { get; init; } = DefaultMaxStandingsPages;
-
-    public TimeSpan LiveDataMaxAge { get; init; } = DefaultLiveDataMaxAge;
 
     public string RecognitionRuleVersion { get; init; } = DefaultRecognitionRuleVersion;
 
