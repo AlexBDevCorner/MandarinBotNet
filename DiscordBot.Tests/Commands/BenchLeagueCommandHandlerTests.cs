@@ -92,6 +92,8 @@ public sealed class BenchLeagueCommandHandlerTests
 
         public string UserMention => "<@123>";
 
+        public string? GetStringOption(string name) => null;
+
         public List<string> Messages { get; } = [];
 
         public List<string> Operations { get; } = [];

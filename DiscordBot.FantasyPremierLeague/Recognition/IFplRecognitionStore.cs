@@ -12,5 +12,11 @@ public interface IFplRecognitionStore
         string season,
         int? eventId = null);
 
+    string? GetLatestSeason(int leagueId);
+
+    int? GetFirstCompletedEventId(
+        int leagueId,
+        string season);
+
     void Save(FplRecognitionRun run, FplRecognitionResult result);
 }

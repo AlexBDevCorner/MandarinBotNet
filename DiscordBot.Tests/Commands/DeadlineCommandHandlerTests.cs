@@ -166,6 +166,8 @@ public sealed class DeadlineCommandHandlerTests
 
         public string UserMention => "<@123>";
 
+        public string? GetStringOption(string name) => null;
+
         public List<string> Messages { get; } = [];
 
         public Task RespondAsync(string content)

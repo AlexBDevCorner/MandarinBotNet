@@ -45,6 +45,10 @@ public sealed class DiscordBotHostedServiceIntegrationTests
             TestBenchLeagueCommandHandler>();
         builder.Services.AddSingleton<ILiveInsightsCommandHandler,
             TestLiveInsightsCommandHandler>();
+        builder.Services.AddSingleton<IProfileCommandHandler,
+            TestProfileCommandHandler>();
+        builder.Services.AddSingleton<IAchievementsCommandHandler,
+            TestAchievementsCommandHandler>();
         builder.Services.AddSingleton<IWelcomeMessageHandler,
             TestWelcomeMessageHandler>();
         builder.Services.AddHostedService<DiscordBotHostedService>();
@@ -216,6 +220,66 @@ public sealed class DiscordBotHostedServiceIntegrationTests
     }
 
     [Test]
+    public async Task HandleSlashCommandAsync_ProfileCommand_RoutesToDedicatedHandler()
+    {
+        // Arrange
+        var options = new DiscordOptions
+        {
+            Token = "test-token",
+            ReadinessTimeout = TimeSpan.FromSeconds(5)
+        };
+        var readiness = new DiscordConnectionReadiness(options);
+        var gateway = new TestDiscordGatewayConnection();
+        using var provider = CreateServiceProvider(options, readiness, gateway);
+        var service = provider.GetRequiredService<DiscordBotHostedService>();
+        var handler = provider.GetRequiredService<IProfileCommandHandler>();
+        var interaction = new TestSlashCommandInteraction(
+            DiscordApplicationCommands.ProfileName);
+        var startTask = service.StartAsync(CancellationToken.None);
+        await gateway.RaiseReadyAsync();
+        await startTask;
+
+        // Act
+        await service.HandleSlashCommandAsync(interaction);
+
+        // Assert
+        ((TestProfileCommandHandler)handler).Interaction.Should()
+            .BeSameAs(interaction);
+
+        await service.StopAsync(CancellationToken.None);
+    }
+
+    [Test]
+    public async Task HandleSlashCommandAsync_AchievementsCommand_RoutesToDedicatedHandler()
+    {
+        // Arrange
+        var options = new DiscordOptions
+        {
+            Token = "test-token",
+            ReadinessTimeout = TimeSpan.FromSeconds(5)
+        };
+        var readiness = new DiscordConnectionReadiness(options);
+        var gateway = new TestDiscordGatewayConnection();
+        using var provider = CreateServiceProvider(options, readiness, gateway);
+        var service = provider.GetRequiredService<DiscordBotHostedService>();
+        var handler = provider.GetRequiredService<IAchievementsCommandHandler>();
+        var interaction = new TestSlashCommandInteraction(
+            DiscordApplicationCommands.AchievementsName);
+        var startTask = service.StartAsync(CancellationToken.None);
+        await gateway.RaiseReadyAsync();
+        await startTask;
+
+        // Act
+        await service.HandleSlashCommandAsync(interaction);
+
+        // Assert
+        ((TestAchievementsCommandHandler)handler).Interaction.Should()
+            .BeSameAs(interaction);
+
+        await service.StopAsync(CancellationToken.None);
+    }
+
+    [Test]
     public async Task HandleSlashCommandAsync_UnknownCommand_RespondsInRussian()
     {
         // Arrange
@@ -342,6 +406,10 @@ public sealed class DiscordBotHostedServiceIntegrationTests
             TestBenchLeagueCommandHandler>();
         services.AddSingleton<ILiveInsightsCommandHandler,
             TestLiveInsightsCommandHandler>();
+        services.AddSingleton<IProfileCommandHandler,
+            TestProfileCommandHandler>();
+        services.AddSingleton<IAchievementsCommandHandler,
+            TestAchievementsCommandHandler>();
         services.AddSingleton<IWelcomeMessageHandler,
             TestWelcomeMessageHandler>();
         services.AddSingleton<DiscordBotHostedService>();
@@ -563,6 +631,28 @@ public sealed class DiscordBotHostedServiceIntegrationTests
         }
     }
 
+    private sealed class TestProfileCommandHandler : IProfileCommandHandler
+    {
+        public IDiscordSlashCommandInteraction? Interaction { get; private set; }
+
+        public Task HandleAsync(IDiscordSlashCommandInteraction interaction)
+        {
+            Interaction = interaction;
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class TestAchievementsCommandHandler : IAchievementsCommandHandler
+    {
+        public IDiscordSlashCommandInteraction? Interaction { get; private set; }
+
+        public Task HandleAsync(IDiscordSlashCommandInteraction interaction)
+        {
+            Interaction = interaction;
+            return Task.CompletedTask;
+        }
+    }
+
     private sealed class TestWelcomeMessageHandler : IWelcomeMessageHandler
     {
         public List<DiscordGuildMember> Members { get; } = [];
@@ -580,6 +670,8 @@ public sealed class DiscordBotHostedServiceIntegrationTests
         public string Name { get; } = name;
 
         public string UserMention => "<@123>";
+
+        public string? GetStringOption(string name) => null;
 
         public List<string> Messages { get; } = [];
 

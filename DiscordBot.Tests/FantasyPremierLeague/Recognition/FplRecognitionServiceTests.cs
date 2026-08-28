@@ -126,6 +126,10 @@ public sealed class FplRecognitionServiceTests
             return _results.GetValueOrDefault((leagueId, season, eventId));
         }
 
+        public string? GetLatestSeason(int leagueId) => null;
+
+        public int? GetFirstCompletedEventId(int leagueId, string season) => null;
+
         public IReadOnlyList<FplAchievementAward> GetAchievementAwards(
             int leagueId,
             string season,

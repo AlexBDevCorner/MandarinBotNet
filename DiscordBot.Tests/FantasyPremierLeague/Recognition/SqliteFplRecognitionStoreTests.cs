@@ -110,6 +110,144 @@ public sealed class SqliteFplRecognitionStoreTests
         awards.Single().Season.Should().Be("2026/27");
     }
 
+    [Test]
+    public void GetLatestSeason_ReturnsMostRecentlyCalculatedRun()
+    {
+        // Arrange
+        var store = new SqliteFplRecognitionStore(_databasePath);
+        store.Save(
+            CreateRun(123, "2026/27", 1, "v1", new DateTimeOffset(2026, 8, 1, 0, 0, 0, TimeSpan.Zero)),
+            new FplRecognitionResult([CreateAward(123, "2026/27", 1, 10, "bench-warmer", true)]));
+        store.Save(
+            CreateRun(123, "2027/28", 3, "v1", new DateTimeOffset(2027, 8, 1, 0, 0, 0, TimeSpan.Zero)),
+            new FplRecognitionResult([CreateAward(123, "2027/28", 3, 10, "bench-warmer", true)]));
+
+        // Act
+        var season = store.GetLatestSeason(123);
+
+        // Assert
+        season.Should().Be("2027/28");
+    }
+
+    [Test]
+    public void GetLatestSeason_ZeroAchievementRunStillDeterminesLatestSeason()
+    {
+        // Arrange
+        var store = new SqliteFplRecognitionStore(_databasePath);
+        store.Save(
+            CreateRun(123, "2026/27", 5, "v1", new DateTimeOffset(2026, 8, 5, 0, 0, 0, TimeSpan.Zero)),
+            new FplRecognitionResult([]));
+
+        // Act
+        var season = store.GetLatestSeason(123);
+
+        // Assert
+        season.Should().Be("2026/27");
+    }
+
+    [Test]
+    public void GetFirstCompletedEventId_ReturnsMinimumEventForLeagueAndSeason()
+    {
+        // Arrange
+        var store = new SqliteFplRecognitionStore(_databasePath);
+        store.Save(
+            CreateRun(123, "2026/27", 5, "v1"),
+            new FplRecognitionResult([CreateAward(123, "2026/27", 5, 10, "bench-warmer", true)]));
+        store.Save(
+            CreateRun(123, "2026/27", 3, "v1"),
+            new FplRecognitionResult([CreateAward(123, "2026/27", 3, 10, "bench-warmer", true)]));
+        store.Save(
+            CreateRun(123, "2026/27", 7, "v1"),
+            new FplRecognitionResult([CreateAward(123, "2026/27", 7, 10, "bench-warmer", true)]));
+
+        // Act
+        var eventId = store.GetFirstCompletedEventId(123, "2026/27");
+
+        // Assert
+        eventId.Should().Be(3);
+    }
+
+    [Test]
+    public void GetFirstCompletedEventId_OtherLeagueDoesNotAffectResult()
+    {
+        // Arrange
+        var store = new SqliteFplRecognitionStore(_databasePath);
+        store.Save(
+            CreateRun(123, "2026/27", 4, "v1"),
+            new FplRecognitionResult([CreateAward(123, "2026/27", 4, 10, "bench-warmer", true)]));
+        store.Save(
+            CreateRun(999, "2026/27", 1, "v1"),
+            new FplRecognitionResult([CreateAward(999, "2026/27", 1, 10, "bench-warmer", true)]));
+
+        // Act
+        var eventId = store.GetFirstCompletedEventId(123, "2026/27");
+
+        // Assert
+        eventId.Should().Be(4);
+    }
+
+    [Test]
+    public void GetFirstCompletedEventId_OtherSeasonDoesNotAffectTrackingStart()
+    {
+        // Arrange
+        var store = new SqliteFplRecognitionStore(_databasePath);
+        store.Save(
+            CreateRun(123, "2026/27", 4, "v1"),
+            new FplRecognitionResult([CreateAward(123, "2026/27", 4, 10, "bench-warmer", true)]));
+        store.Save(
+            CreateRun(123, "2025/26", 1, "v1"),
+            new FplRecognitionResult([CreateAward(123, "2025/26", 1, 10, "bench-warmer", true)]));
+
+        // Act
+        var eventId = store.GetFirstCompletedEventId(123, "2026/27");
+
+        // Assert
+        eventId.Should().Be(4);
+    }
+
+    [Test]
+    public void GetLatestSeason_UnknownLeague_ReturnsNull()
+    {
+        var store = new SqliteFplRecognitionStore(_databasePath);
+
+        store.GetLatestSeason(123).Should().BeNull();
+    }
+
+    [Test]
+    public void GetFirstCompletedEventId_UnknownSeason_ReturnsNull()
+    {
+        var store = new SqliteFplRecognitionStore(_databasePath);
+
+        store.GetFirstCompletedEventId(123, "2099/00").Should().BeNull();
+    }
+
+    [Test]
+    public void GetLatestSeason_InvalidLeague_Throws()
+    {
+        var store = new SqliteFplRecognitionStore(_databasePath);
+
+        store.Invoking(s => s.GetLatestSeason(0))
+            .Should().Throw<ArgumentOutOfRangeException>();
+    }
+
+    [Test]
+    public void GetFirstCompletedEventId_InvalidLeague_Throws()
+    {
+        var store = new SqliteFplRecognitionStore(_databasePath);
+
+        store.Invoking(s => s.GetFirstCompletedEventId(0, "2026/27"))
+            .Should().Throw<ArgumentOutOfRangeException>();
+    }
+
+    [Test]
+    public void GetFirstCompletedEventId_InvalidSeason_Throws()
+    {
+        var store = new SqliteFplRecognitionStore(_databasePath);
+
+        store.Invoking(s => s.GetFirstCompletedEventId(123, " "))
+            .Should().Throw<ArgumentException>();
+    }
+
     private static FplAchievementAward CreateAward(
         int leagueId = 123,
         string season = "2026/27",
@@ -136,13 +274,15 @@ public sealed class SqliteFplRecognitionStoreTests
         int leagueId = 123,
         string season = "2026/27",
         int eventId = 5,
-        string ruleVersion = "v1")
+        string ruleVersion = "v1",
+        DateTimeOffset? calculatedAtUtc = null)
     {
         return new FplRecognitionRun(
             leagueId,
             season,
             eventId,
             ruleVersion,
-            new DateTimeOffset(2026, 8, 21, 19, 0, 0, TimeSpan.Zero));
+            calculatedAtUtc ??
+                new DateTimeOffset(2026, 8, 21, 19, 0, 0, TimeSpan.Zero));
     }
 }
