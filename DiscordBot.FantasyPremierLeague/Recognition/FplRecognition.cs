@@ -26,19 +26,6 @@ public sealed record FplAchievementAward(
         : "season";
 }
 
-public sealed record FplManagerRating(
-    int LeagueId,
-    string Season,
-    int EventId,
-    int EntryId,
-    string EntryName,
-    string ManagerName,
-    int Rank,
-    int FraudRating,
-    int MaguireIndex,
-    string RuleVersion,
-    DateTimeOffset CalculatedAtUtc);
-
 public sealed record FplRecognitionRun(
     int LeagueId,
     string Season,
@@ -47,5 +34,4 @@ public sealed record FplRecognitionRun(
     DateTimeOffset CalculatedAtUtc);
 
 public sealed record FplRecognitionResult(
-    IReadOnlyList<FplAchievementAward> Achievements,
-    IReadOnlyList<FplManagerRating> Ratings);
+    IReadOnlyList<FplAchievementAward> Achievements);

@@ -90,7 +90,6 @@ public static class MandarinBotServiceCollectionExtensions
         services.AddSingleton<FplGameweekRecapCalculationService>();
         services.AddSingleton<FplGameweekRecapService>();
         services.AddSingleton<FplAchievementCalculationService>();
-        services.AddSingleton<FplRatingCalculationService>();
         services.AddSingleton<FplRecognitionService>();
         services.AddSingleton<FplLiveInsightsCalculationService>();
         services.AddSingleton<FplLiveInsightsService>();

@@ -8,7 +8,6 @@ public sealed class FplRecognitionService(
     IFplStatisticsStore statisticsStore,
     IFplRecognitionStore recognitionStore,
     FplAchievementCalculationService achievementCalculationService,
-    FplRatingCalculationService ratingCalculationService,
     TimeProvider timeProvider,
     ILogger<FplRecognitionService> logger)
 {
@@ -48,10 +47,6 @@ public sealed class FplRecognitionService(
             seasonHistory,
             existingAwards,
             calculatedAtUtc);
-        var ratings = ratingCalculationService.Calculate(
-            options.ClassicLeagueId,
-            snapshot,
-            calculatedAtUtc);
 
         recognitionStore.Save(
             new FplRecognitionRun(
@@ -60,7 +55,7 @@ public sealed class FplRecognitionService(
                 snapshot.EventId,
                 options.RecognitionRuleVersion,
                 calculatedAtUtc),
-            new FplRecognitionResult(awards, ratings));
+            new FplRecognitionResult(awards));
 
         var persistedRecognition = recognitionStore.GetCompletedResult(
             options.ClassicLeagueId,
@@ -74,12 +69,11 @@ public sealed class FplRecognitionService(
 
         logger.LogInformation(
             "Persisted FPL recognition for league {LeagueId}, season {Season}, event " +
-            "{EventId}: {AchievementCount} achievements and {RatingCount} ratings.",
+            "{EventId}: {AchievementCount} achievements.",
             options.ClassicLeagueId,
             snapshot.Season,
             snapshot.EventId,
-            persistedRecognition.Achievements.Count,
-            persistedRecognition.Ratings.Count);
+            persistedRecognition.Achievements.Count);
         return persistedRecognition;
     }
 }

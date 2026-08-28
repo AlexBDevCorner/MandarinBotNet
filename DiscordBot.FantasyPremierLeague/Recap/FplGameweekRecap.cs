@@ -20,8 +20,6 @@ public sealed record FplGameweekRecap(
     IReadOnlyList<FplCaptainPerformance> CaptainGeniuses)
 {
     public IReadOnlyList<FplAchievementAward> Achievements { get; init; } = [];
-
-    public IReadOnlyList<FplManagerRating> Ratings { get; init; } = [];
 }
 
 public sealed record FplCaptainPerformance(
