@@ -105,7 +105,7 @@ public sealed class FplLiveInsightsMessageComposerTests
         message.Should().Contain("💥 Капитанские провалы (капитан ≤ 2, вице-капитан ≥ 8):");
         message.Should().Contain(
             "🧠 Удачный выбор капитана (с учётом множителя от 20 очков):");
-        message.Should().Contain("🛰️ Данные источника обновлены: 2026-08-21 18:45:00 UTC");
+        message.Should().Contain("🛰️ Снимок турнирной таблицы FPL: 2026-08-21 18:45:00 UTC");
         message.Should().Contain("отчёт собран: 2026-08-21 18:50:00 UTC");
         message.IndexOf("🏆 Лайв-таблица:", StringComparison.Ordinal)
             .Should().BeLessThan(message.IndexOf("🪑 Очки на скамейке", StringComparison.Ordinal));

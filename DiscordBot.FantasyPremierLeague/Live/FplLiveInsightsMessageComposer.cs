@@ -114,7 +114,7 @@ public sealed class FplLiveInsightsMessageComposer(
             }
         }
 
-        summary.Append("\n\n🛰️ Данные источника обновлены: ");
+        summary.Append("\n\n🛰️ Снимок турнирной таблицы FPL: ");
         summary.Append(FormatTimestamp(gameweek.SourceUpdatedAtUtc));
         summary.Append("; отчёт собран: ");
         summary.Append(FormatTimestamp(gameweek.CapturedAtUtc));
