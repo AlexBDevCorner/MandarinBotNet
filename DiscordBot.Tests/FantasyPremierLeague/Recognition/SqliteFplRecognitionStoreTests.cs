@@ -52,34 +52,20 @@ public sealed class SqliteFplRecognitionStoreTests
             EntryName = "Renamed Alpha",
             RuleVersion = "v2"
         };
-        var originalRating = CreateRating(fraudRating: 10);
-        var rewrittenRating = originalRating with
-        {
-            FraudRating = 99,
-            RuleVersion = "v2"
-        };
 
         // Act
         store.Save(
             CreateRun(eventId: 1, ruleVersion: "v1"),
-            new FplRecognitionResult([firstBlood, repeatedBenchWarmer], []));
+            new FplRecognitionResult([firstBlood, repeatedBenchWarmer]));
         store.Save(
             CreateRun(eventId: 2, ruleVersion: "v2"),
-            new FplRecognitionResult([laterFirstBlood], []));
-        store.Save(
-            CreateRun(eventId: 5, ruleVersion: "v1"),
-            new FplRecognitionResult([], [originalRating]));
-        store.Save(
-            CreateRun(eventId: 5, ruleVersion: "v2"),
-            new FplRecognitionResult([], [rewrittenRating]));
+            new FplRecognitionResult([laterFirstBlood]));
 
         // Assert
         store.GetAchievementAwards(123, "2026/27")
             .Should().HaveCount(2);
         store.GetAchievementAwards(123, "2026/27", eventId: 2)
             .Should().BeEmpty();
-        store.GetManagerRatings(123, "2026/27", eventId: 5)
-            .Should().ContainSingle().Which.Should().BeEquivalentTo(originalRating);
     }
 
     [Test]
@@ -88,7 +74,7 @@ public sealed class SqliteFplRecognitionStoreTests
         // Arrange
         var store = new SqliteFplRecognitionStore(_databasePath);
         var run = CreateRun(eventId: 5, ruleVersion: "v1");
-        store.Save(run, new FplRecognitionResult([], []));
+        store.Save(run, new FplRecognitionResult([]));
 
         // Act
         var result = store.GetCompletedResult(123, "2026/27", 5);
@@ -96,7 +82,6 @@ public sealed class SqliteFplRecognitionStoreTests
         // Assert
         result.Should().NotBeNull();
         result!.Achievements.Should().BeEmpty();
-        result.Ratings.Should().BeEmpty();
     }
 
     [Test]
@@ -107,18 +92,15 @@ public sealed class SqliteFplRecognitionStoreTests
         store.Save(
             CreateRun(123, "2026/27", 1, "v1"),
             new FplRecognitionResult(
-                [CreateAward(123, "2026/27", 1, 10, "bench-warmer", true)],
-                []));
+                [CreateAward(123, "2026/27", 1, 10, "bench-warmer", true)]));
         store.Save(
             CreateRun(456, "2026/27", 1, "v1"),
             new FplRecognitionResult(
-                [CreateAward(456, "2026/27", 1, 10, "bench-warmer", true)],
-                []));
+                [CreateAward(456, "2026/27", 1, 10, "bench-warmer", true)]));
         store.Save(
             CreateRun(123, "2027/28", 1, "v1"),
             new FplRecognitionResult(
-                [CreateAward(123, "2027/28", 1, 10, "bench-warmer", true)],
-                []));
+                [CreateAward(123, "2027/28", 1, 10, "bench-warmer", true)]));
 
         // Act
         var awards = store.GetAchievementAwards(123, "2026/27");
@@ -146,22 +128,6 @@ public sealed class SqliteFplRecognitionStoreTests
             achievementKey,
             "Test achievement",
             isRepeatable,
-            "v1",
-            new DateTimeOffset(2026, 8, 21, 19, 0, 0, TimeSpan.Zero));
-    }
-
-    private static FplManagerRating CreateRating(int fraudRating)
-    {
-        return new FplManagerRating(
-            123,
-            "2026/27",
-            5,
-            10,
-            "Alpha",
-            "Alice",
-            1,
-            fraudRating,
-            42,
             "v1",
             new DateTimeOffset(2026, 8, 21, 19, 0, 0, TimeSpan.Zero));
     }

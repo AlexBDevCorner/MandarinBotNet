@@ -57,8 +57,7 @@ public sealed class SqliteFplRecognitionStore : IFplRecognitionStore
 
         return runExists
             ? new FplRecognitionResult(
-                GetAchievementAwards(leagueId, season, eventId),
-                GetManagerRatings(leagueId, season, eventId))
+                GetAchievementAwards(leagueId, season, eventId))
             : null;
     }
 
@@ -119,85 +118,16 @@ public sealed class SqliteFplRecognitionStore : IFplRecognitionStore
         return awards;
     }
 
-    public IReadOnlyList<FplManagerRating> GetManagerRatings(
-        int leagueId,
-        string season,
-        int? eventId = null)
-    {
-        ValidateLeagueAndSeason(leagueId, season);
-        ValidateOptionalEvent(eventId);
-
-        using var connection = OpenConnection();
-        using var command = connection.CreateCommand();
-        command.CommandTimeout = CommandTimeoutSeconds;
-        command.CommandText = $"""
-            SELECT league_id,
-                   season,
-                   event_id,
-                   entry_id,
-                   entry_name,
-                   manager_name,
-                   rank,
-                   fraud_rating,
-                   maguire_index,
-                   rule_version,
-                   calculated_at_utc
-            FROM fpl_manager_ratings
-            WHERE league_id = $league_id
-              AND season = $season
-              {(eventId is null ? string.Empty : "AND event_id = $event_id")}
-            ORDER BY event_id, rank, entry_name, entry_id;
-            """;
-        command.Parameters.AddWithValue("$league_id", leagueId);
-        command.Parameters.AddWithValue("$season", season);
-        if (eventId is not null)
-        {
-            command.Parameters.AddWithValue("$event_id", eventId.Value);
-        }
-
-        var ratings = new List<FplManagerRating>();
-        using var reader = command.ExecuteReader();
-        while (reader.Read())
-        {
-            ratings.Add(new FplManagerRating(
-                Convert.ToInt32(reader.GetInt64(0)),
-                reader.GetString(1),
-                Convert.ToInt32(reader.GetInt64(2)),
-                Convert.ToInt32(reader.GetInt64(3)),
-                reader.GetString(4),
-                reader.GetString(5),
-                Convert.ToInt32(reader.GetInt64(6)),
-                Convert.ToInt32(reader.GetInt64(7)),
-                Convert.ToInt32(reader.GetInt64(8)),
-                reader.GetString(9),
-                ParseTimestamp(reader.GetString(10))));
-        }
-
-        return ratings;
-    }
-
     public void Save(FplRecognitionRun run, FplRecognitionResult result)
     {
         ValidateRun(run);
         ArgumentNullException.ThrowIfNull(result);
         ArgumentNullException.ThrowIfNull(result.Achievements);
-        ArgumentNullException.ThrowIfNull(result.Ratings);
 
         foreach (var award in result.Achievements)
         {
             ValidateAward(award);
             ValidateMatchesRun(award.LeagueId, award.Season, award.EventId, award.RuleVersion, run);
-        }
-
-        foreach (var rating in result.Ratings)
-        {
-            ValidateRating(rating);
-            ValidateMatchesRun(
-                rating.LeagueId,
-                rating.Season,
-                rating.EventId,
-                rating.RuleVersion,
-                run);
         }
 
         using var connection = OpenConnection();
@@ -206,7 +136,6 @@ public sealed class SqliteFplRecognitionStore : IFplRecognitionStore
         try
         {
             InsertAwards(connection, transaction, result.Achievements);
-            InsertRatings(connection, transaction, result.Ratings);
             InsertRecognitionRun(connection, transaction, run);
             transaction.Commit();
         }
@@ -297,80 +226,6 @@ public sealed class SqliteFplRecognitionStore : IFplRecognitionStore
             versionParameter.Value = award.RuleVersion;
             awardedAtParameter.Value = FormatTimestamp(award.AwardedAtUtc);
             occurrenceParameter.Value = award.OccurrenceKey;
-            command.ExecuteNonQuery();
-        }
-    }
-
-    private static void InsertRatings(
-        SqliteConnection connection,
-        SqliteTransaction transaction,
-        IReadOnlyList<FplManagerRating> ratings)
-    {
-        using var command = connection.CreateCommand();
-        command.Transaction = transaction;
-        command.CommandTimeout = CommandTimeoutSeconds;
-        command.CommandText =
-            """
-            INSERT OR IGNORE INTO fpl_manager_ratings (
-                league_id,
-                season,
-                event_id,
-                entry_id,
-                entry_name,
-                manager_name,
-                rank,
-                fraud_rating,
-                maguire_index,
-                rule_version,
-                calculated_at_utc
-            )
-            VALUES (
-                $league_id,
-                $season,
-                $event_id,
-                $entry_id,
-                $entry_name,
-                $manager_name,
-                $rank,
-                $fraud_rating,
-                $maguire_index,
-                $rule_version,
-                $calculated_at_utc
-            );
-            """;
-        var leagueIdParameter = command.Parameters.AddWithValue("$league_id", 0);
-        var seasonParameter = command.Parameters.AddWithValue("$season", string.Empty);
-        var eventIdParameter = command.Parameters.AddWithValue("$event_id", 0);
-        var entryIdParameter = command.Parameters.AddWithValue("$entry_id", 0);
-        var entryNameParameter = command.Parameters.AddWithValue(
-            "$entry_name",
-            string.Empty);
-        var managerNameParameter = command.Parameters.AddWithValue(
-            "$manager_name",
-            string.Empty);
-        var rankParameter = command.Parameters.AddWithValue("$rank", 0);
-        var fraudRatingParameter = command.Parameters.AddWithValue("$fraud_rating", 0);
-        var maguireIndexParameter = command.Parameters.AddWithValue("$maguire_index", 0);
-        var versionParameter = command.Parameters.AddWithValue(
-            "$rule_version",
-            string.Empty);
-        var calculatedAtParameter = command.Parameters.AddWithValue(
-            "$calculated_at_utc",
-            string.Empty);
-
-        foreach (var rating in ratings)
-        {
-            leagueIdParameter.Value = rating.LeagueId;
-            seasonParameter.Value = rating.Season;
-            eventIdParameter.Value = rating.EventId;
-            entryIdParameter.Value = rating.EntryId;
-            entryNameParameter.Value = rating.EntryName;
-            managerNameParameter.Value = rating.ManagerName;
-            rankParameter.Value = rating.Rank;
-            fraudRatingParameter.Value = rating.FraudRating;
-            maguireIndexParameter.Value = rating.MaguireIndex;
-            versionParameter.Value = rating.RuleVersion;
-            calculatedAtParameter.Value = FormatTimestamp(rating.CalculatedAtUtc);
             command.ExecuteNonQuery();
         }
     }
@@ -478,29 +333,6 @@ public sealed class SqliteFplRecognitionStore : IFplRecognitionStore
                 """;
             awardsIndexCommand.ExecuteNonQuery();
         }
-
-        using (var ratingsCommand = connection.CreateCommand())
-        {
-            ratingsCommand.CommandTimeout = CommandTimeoutSeconds;
-            ratingsCommand.CommandText =
-                """
-                CREATE TABLE IF NOT EXISTS fpl_manager_ratings (
-                    league_id INTEGER NOT NULL,
-                    season TEXT NOT NULL,
-                    event_id INTEGER NOT NULL,
-                    entry_id INTEGER NOT NULL,
-                    entry_name TEXT NOT NULL,
-                    manager_name TEXT NOT NULL,
-                    rank INTEGER NOT NULL,
-                    fraud_rating INTEGER NOT NULL,
-                    maguire_index INTEGER NOT NULL,
-                    rule_version TEXT NOT NULL,
-                    calculated_at_utc TEXT NOT NULL,
-                    PRIMARY KEY (league_id, season, event_id, entry_id)
-                ) WITHOUT ROWID;
-                """;
-            ratingsCommand.ExecuteNonQuery();
-        }
     }
 
     private SqliteConnection OpenConnection()
@@ -529,38 +361,6 @@ public sealed class SqliteFplRecognitionStore : IFplRecognitionStore
             throw new ArgumentException(
                 "The achievement award must include an award timestamp.",
                 nameof(award));
-        }
-    }
-
-    private static void ValidateRating(FplManagerRating rating)
-    {
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(rating.LeagueId);
-        ArgumentException.ThrowIfNullOrWhiteSpace(rating.Season);
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(rating.EventId);
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(rating.EntryId);
-        ArgumentException.ThrowIfNullOrWhiteSpace(rating.EntryName);
-        ArgumentException.ThrowIfNullOrWhiteSpace(rating.ManagerName);
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(rating.Rank);
-        if (rating.FraudRating is < 0 or > 100)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(rating),
-                "The Fraud Rating must be between 0 and 100.");
-        }
-
-        if (rating.MaguireIndex is < 0 or > 100)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(rating),
-                "The Maguire Index must be between 0 and 100.");
-        }
-
-        ArgumentException.ThrowIfNullOrWhiteSpace(rating.RuleVersion);
-        if (rating.CalculatedAtUtc == default)
-        {
-            throw new ArgumentException(
-                "The manager rating must include a calculation timestamp.",
-                nameof(rating));
         }
     }
 

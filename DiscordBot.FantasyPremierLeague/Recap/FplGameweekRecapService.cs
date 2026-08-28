@@ -70,8 +70,7 @@ public sealed class FplGameweekRecapService(
             var recognition = recognitionService.EvaluateAndPersist(snapshot);
             return recap with
             {
-                Achievements = recognition.Achievements,
-                Ratings = recognition.Ratings
+                Achievements = recognition.Achievements
             };
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)

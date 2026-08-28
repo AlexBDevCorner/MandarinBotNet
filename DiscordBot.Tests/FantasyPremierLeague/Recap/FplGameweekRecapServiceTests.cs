@@ -255,7 +255,6 @@ public sealed class FplGameweekRecapServiceTests
             statisticsStore,
             new InMemoryFplRecognitionStore(),
             new FplAchievementCalculationService(options),
-            new FplRatingCalculationService(options),
             new FixedTimeProvider(),
             new RecordingLogger<FplRecognitionService>());
     }
@@ -263,7 +262,6 @@ public sealed class FplGameweekRecapServiceTests
     private sealed class InMemoryFplRecognitionStore : IFplRecognitionStore
     {
         private readonly List<FplAchievementAward> _awards = [];
-        private readonly List<FplManagerRating> _ratings = [];
         private readonly Dictionary<(int LeagueId, string Season, int EventId), FplRecognitionResult>
             _completedResults = [];
 
@@ -286,23 +284,11 @@ public sealed class FplGameweekRecapServiceTests
                 .ToArray();
         }
 
-        public IReadOnlyList<FplManagerRating> GetManagerRatings(
-            int leagueId,
-            string season,
-            int? eventId = null)
-        {
-            return _ratings
-                .Where(rating => rating.LeagueId == leagueId && rating.Season == season)
-                .Where(rating => eventId is null || rating.EventId == eventId)
-                .ToArray();
-        }
-
         public void Save(FplRecognitionRun run, FplRecognitionResult result)
         {
             if (!_completedResults.ContainsKey((run.LeagueId, run.Season, run.EventId)))
             {
                 _awards.AddRange(result.Achievements);
-                _ratings.AddRange(result.Ratings);
                 _completedResults.Add(
                     (run.LeagueId, run.Season, run.EventId),
                     result);

@@ -67,7 +67,6 @@ public sealed class FplRecognitionServiceTests
         firstResult.Achievements.Should().NotContain(award =>
             award.AchievementKey == "bench-warmer");
         retryResult.Should().BeEquivalentTo(firstResult);
-        retryResult.Ratings.Should().OnlyContain(rating => rating.RuleVersion == "v1");
     }
 
     private static FplRecognitionService CreateService(
@@ -80,7 +79,6 @@ public sealed class FplRecognitionServiceTests
             statisticsStore,
             recognitionStore,
             new FplAchievementCalculationService(options),
-            new FplRatingCalculationService(options),
             new FixedTimeProvider(),
             new RecordingLogger<FplRecognitionService>());
     }
@@ -136,20 +134,6 @@ public sealed class FplRecognitionServiceTests
             return _awards
                 .Where(award => award.LeagueId == leagueId && award.Season == season)
                 .Where(award => eventId is null || award.EventId == eventId)
-                .ToArray();
-        }
-
-        public IReadOnlyList<FplManagerRating> GetManagerRatings(
-            int leagueId,
-            string season,
-            int? eventId = null)
-        {
-            return _results
-                .Where(pair =>
-                    pair.Key.LeagueId == leagueId &&
-                    pair.Key.Season == season &&
-                    (eventId is null || pair.Key.EventId == eventId))
-                .SelectMany(pair => pair.Value.Ratings)
                 .ToArray();
         }
 

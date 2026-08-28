@@ -173,9 +173,6 @@ public sealed class PremierLeagueMessageCompositionService(
         summary.Append("\n\n🎖️ Достижения:");
         AppendAchievements(summary, recap.Achievements);
 
-        summary.Append("\n\n📊 Рейтинги:");
-        AppendRatings(summary, recap.Ratings);
-
         return summary.ToString();
     }
 
@@ -328,29 +325,6 @@ public sealed class PremierLeagueMessageCompositionService(
             summary.Append(DiscordTextSafety.SanitizeExternalName(award.EntryName));
             summary.Append(" — ");
             summary.Append(GetLocalizedAchievementName(award));
-        }
-    }
-
-    private static void AppendRatings(
-        StringBuilder summary,
-        IEnumerable<FplManagerRating> ratings)
-    {
-        var managerRatings = ratings.ToArray();
-        if (managerRatings.Length == 0)
-        {
-            summary.Append("\n(пока нет)");
-            return;
-        }
-
-        foreach (var rating in managerRatings)
-        {
-            summary.Append("\n");
-            summary.Append(DiscordTextSafety.SanitizeExternalName(rating.EntryName));
-            summary.Append(" — 🤡 Рейтинг фрода ");
-            summary.Append(rating.FraudRating.ToString(CultureInfo.InvariantCulture));
-            summary.Append("/100; 🗿 Индекс Магуайра ");
-            summary.Append(rating.MaguireIndex.ToString(CultureInfo.InvariantCulture));
-            summary.Append("/100");
         }
     }
 

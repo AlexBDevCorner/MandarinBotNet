@@ -34,21 +34,6 @@ public sealed class FplGameweekRecapMessageCompositionTests
                 CreateAchievement("captain-disaster", "Captain Disaster"),
                 CreateAchievement("differential-merchant", "Differential Merchant"),
                 CreateAchievement("minus-eight-enjoyer", "-8 Enjoyer")
-            ],
-            Ratings =
-            [
-                new FplManagerRating(
-                    123,
-                    "2026/27",
-                    5,
-                    10,
-                    "Alpha",
-                    "Manager Alpha",
-                    1,
-                    64,
-                    42,
-                    "v1",
-                    DateTimeOffset.UtcNow)
             ]
         };
         var composer = new PremierLeagueMessageCompositionService(
@@ -75,9 +60,6 @@ public sealed class FplGameweekRecapMessageCompositionTests
         message.Should().Contain("Alpha — 💥 Капитанская катастрофа");
         message.Should().Contain("Alpha — 💎 Повелитель дифференциалов");
         message.Should().Contain("Alpha — 💸 Любитель минус восьми");
-        message.Should().Contain("📊 Рейтинги:");
-        message.Should().Contain(
-            "Alpha — 🤡 Рейтинг фрода 64/100; 🗿 Индекс Магуайра 42/100");
     }
 
     [Test]
