@@ -105,43 +105,12 @@ public sealed class FplLiveInsightsMessageComposerTests
         message.Should().Contain("💥 Капитанские провалы (капитан ≤ 2, вице-капитан ≥ 8):");
         message.Should().Contain(
             "🧠 Удачный выбор капитана (с учётом множителя от 20 очков):");
-        message.Should().Contain("🛰️ Данные источника обновлены: 2026-08-21 18:45:00 UTC");
+        message.Should().Contain("🛰️ Снимок турнирной таблицы FPL: 2026-08-21 18:45:00 UTC");
         message.Should().Contain("отчёт собран: 2026-08-21 18:50:00 UTC");
         message.IndexOf("🏆 Лайв-таблица:", StringComparison.Ordinal)
             .Should().BeLessThan(message.IndexOf("🪑 Очки на скамейке", StringComparison.Ordinal));
         message.Should().NotContain("@everyone");
         message.Should().NotContain("@here");
-    }
-
-    [Test]
-    public void Compose_StaleInsights_IdentifiesGameweekAndSourceAgeLimit()
-    {
-        // Arrange
-        var gameweek = new FplLiveGameweek(
-            "2026/27",
-            5,
-            new DateTimeOffset(2026, 8, 21, 18, 0, 0, TimeSpan.Zero),
-            new DateTimeOffset(2026, 8, 21, 18, 30, 0, TimeSpan.Zero),
-            [],
-            [],
-            [],
-            [],
-            [],
-            []);
-        var composer = new FplLiveInsightsMessageComposer(
-            new FantasyPremierLeagueOptions
-            {
-                LiveDataMaxAge = TimeSpan.FromMinutes(20)
-            });
-
-        // Act
-        var message = composer.Compose(FplLiveInsightsResult.Stale(gameweek));
-
-        // Assert
-        message.Should().Contain("тура 5");
-        message.Should().Contain("Данные источника обновлены: 2026-08-21 18:00:00 UTC");
-        message.Should().Contain("допустимый возраст: 20 мин");
-        message.Should().Contain("устарели");
     }
 
     [Test]
@@ -166,32 +135,102 @@ public sealed class FplLiveInsightsMessageComposerTests
     }
 
     [Test]
-    public void SourceIdentifier_SameSourceUpdateIsStable_ChangedSourceUpdateCreatesNewCheckpoint()
+    public void SourceIdentifier_IdenticalLiveState_IsStableAcrossStandingsTimestampChanges()
     {
         // Arrange
-        var gameweek = new FplLiveGameweek(
+        var gameweek = CreateGameweek(100, 20, 4);
+
+        // Act
+        var firstIdentifier = FplLiveInsightsSourceIdentifier.Create(gameweek);
+        var repeatedIdentifier = FplLiveInsightsSourceIdentifier.Create(gameweek);
+        var sameLiveDifferentStandingsSnapshot = FplLiveInsightsSourceIdentifier.Create(
+            gameweek with
+            {
+                SourceUpdatedAtUtc = gameweek.SourceUpdatedAtUtc.AddMinutes(-90)
+            });
+
+        // Assert
+        repeatedIdentifier.Should().Be(firstIdentifier);
+        sameLiveDifferentStandingsSnapshot.Should().Be(firstIdentifier);
+    }
+
+    [Test]
+    public void SourceIdentifier_DifferentLiveState_CreatesDistinctCheckpointWithSameStandingsTimestamp()
+    {
+        // Arrange
+        var baseGameweek = CreateGameweek(
+            liveTotalPoints: 100,
+            captainEffectivePoints: 20,
+            viceCaptainEffectivePoints: 4);
+        var updatedLive = CreateGameweek(
+            liveTotalPoints: 124,
+            captainEffectivePoints: 22,
+            viceCaptainEffectivePoints: 4);
+
+        // Act
+        var baseIdentifier = FplLiveInsightsSourceIdentifier.Create(baseGameweek);
+        var updatedIdentifier = FplLiveInsightsSourceIdentifier.Create(updatedLive);
+
+        // Assert
+        updatedIdentifier.Should().NotBe(baseIdentifier);
+    }
+
+    [Test]
+    public void SourceIdentifier_IsDeterministicAcrossProcessRestarts()
+    {
+        // The live-state fingerprint must be stable across process restarts, so it
+        // cannot rely on System.HashCode (which randomizes per process). A fixed
+        // expected value forces the implementation to use a deterministic digest; a
+        // reintroduced randomized hash would fail this on the next CI run.
+        var gameweek = CreateGameweek(100, 20, 4);
+
+        var identifier = FplLiveInsightsSourceIdentifier.Create(gameweek);
+
+        identifier.Should().Be(
+            "2026/27-event-5-live-ac8d05b9c53e7d3e8c8b4d6d76fa0bd8");
+    }
+
+    private static FplLiveGameweek CreateGameweek(
+        int liveTotalPoints,
+        int captainEffectivePoints,
+        int viceCaptainEffectivePoints)
+    {
+        var manager = new FplLiveManagerInsights(
+            1,
+            "Alpha",
+            "Alice",
+            1,
+            2,
+            1,
+            1,
+            1000,
+            1100,
+            liveTotalPoints,
+            0,
+            liveTotalPoints,
+            liveTotalPoints,
+            0,
+            new FplLivePlayerProgress(1, 0),
+            0,
+            new FplLiveCaptainInsights(
+                "Captain",
+                captainEffectivePoints,
+                captainEffectivePoints,
+                "Vice",
+                viceCaptainEffectivePoints,
+                viceCaptainEffectivePoints),
+            []);
+        return new FplLiveGameweek(
             "2026/27",
             5,
             new DateTimeOffset(2026, 8, 21, 18, 0, 0, TimeSpan.Zero),
             new DateTimeOffset(2026, 8, 21, 18, 5, 0, TimeSpan.Zero),
-            [],
+            [manager],
             [],
             [],
             [],
             [],
             []);
-
-        // Act
-        var firstIdentifier = FplLiveInsightsSourceIdentifier.Create(gameweek);
-        var repeatedIdentifier = FplLiveInsightsSourceIdentifier.Create(gameweek);
-        var updatedIdentifier = FplLiveInsightsSourceIdentifier.Create(gameweek with
-        {
-            SourceUpdatedAtUtc = gameweek.SourceUpdatedAtUtc.AddMinutes(1)
-        });
-
-        // Assert
-        repeatedIdentifier.Should().Be(firstIdentifier);
-        updatedIdentifier.Should().NotBe(firstIdentifier);
     }
 
     private static FplLiveManagerInsights CreateManager(

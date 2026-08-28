@@ -67,29 +67,25 @@ public sealed class FplLiveInsightsService(
                     $"for season {season} event {eventId}.");
             }
 
-            var sourceAge = capturedAtUtc - sourceUpdatedAtUtc;
-            if (sourceAge < TimeSpan.Zero)
-            {
-                throw new InvalidDataException(
-                    $"The FPL standings source timestamp is in the future for season " +
-                    $"{season} event {eventId}.");
-            }
-
-            if (sourceAge > options.LiveDataMaxAge)
+            var standingsAge = capturedAtUtc - sourceUpdatedAtUtc;
+            if (standingsAge < TimeSpan.Zero)
             {
                 logger.LogWarning(
-                    "FPL live insights skipped stale source data for season {Season} " +
-                    "event {EventId}; source age is {SourceAgeMinutes} minutes and the " +
-                    "maximum is {MaximumAgeMinutes} minutes.",
+                    "The FPL league standings snapshot timestamp is in the future for " +
+                    "season {Season} event {EventId}; it is retained as standings metadata " +
+                    "only and does not gate the live calculation.",
+                    season,
+                    eventId);
+            }
+            else
+            {
+                logger.LogInformation(
+                    "FPL league standings snapshot for season {Season} event {EventId} is " +
+                    "{StandingsAgeMinutes} minutes old; it is retained as standings metadata " +
+                    "only and does not gate the live calculation.",
                     season,
                     eventId,
-                    Math.Round(sourceAge.TotalMinutes, 1),
-                    Math.Round(options.LiveDataMaxAge.TotalMinutes, 1));
-                return FplLiveInsightsResult.Stale(CreateMetadata(
-                    season,
-                    eventId,
-                    sourceUpdatedAtUtc,
-                    capturedAtUtc));
+                    Math.Round(standingsAge.TotalMinutes, 1));
             }
 
             var fixtures = await premierLeagueClient.GetFixturesAsync(
@@ -182,25 +178,6 @@ public sealed class FplLiveInsightsService(
                 eventId);
             return FplLiveInsightsResult.Unavailable();
         }
-    }
-
-    private static FplLiveGameweek CreateMetadata(
-        string season,
-        int eventId,
-        DateTimeOffset sourceUpdatedAtUtc,
-        DateTimeOffset capturedAtUtc)
-    {
-        return new FplLiveGameweek(
-            season,
-            eventId,
-            sourceUpdatedAtUtc,
-            capturedAtUtc,
-            [],
-            [],
-            [],
-            [],
-            [],
-            []);
     }
 
     private static string GetSeason(BootstrapStaticResponse bootstrap)

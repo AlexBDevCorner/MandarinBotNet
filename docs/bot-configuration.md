@@ -37,7 +37,6 @@ Bot__WelcomeMessages__ChannelId=<WELCOME-CHANNEL-ID>
 Bot__FantasyPremierLeague__ClassicLeagueId=<CLASSIC-LEAGUE-ID>
 Bot__FantasyPremierLeague__HeadToHeadLeagueId=<HEAD-TO-HEAD-LEAGUE-ID>
 Bot__FantasyPremierLeague__MaxStandingsPages=10
-Bot__FantasyPremierLeague__LiveDataMaxAge=00:20:00
 Bot__FantasyPremierLeague__RecognitionRuleVersion=v1
 Bot__FantasyPremierLeague__LargeBenchPointsThreshold=8
 Bot__FantasyPremierLeague__CaptainSuccessEffectivePointsThreshold=20
@@ -175,11 +174,13 @@ The message includes all managers meeting the configured bench threshold, captai
 disasters, captain successes, and automatic-substitution salvations. Ties are not
 discarded.
 
-`LiveDataMaxAge` defaults to 20 minutes. Stale standings data is reported as stale
-and is not used to publish misleading live points. The FPL HTTP client already
-classifies rate limits and transient upstream failures for retry; the live service
-turns an exhausted failure into a safe command response and skips the scheduled
-publication.
+The classic league standings `last_updated_data` timestamp is retained as standings
+metadata only and never blocks the live calculation. The `/live` command keeps
+fetching fixtures, event live data, and manager picks even when the standings
+snapshot is old; it only reports failure when the required FPL responses fail or fail
+validation. The FPL HTTP client already classifies rate limits and transient upstream
+failures for retry; the live service turns an exhausted failure into a safe command
+response and skips the scheduled publication.
 
 The optional `FplLiveInsights` job is disabled by default. When enabled, it runs at
 the configured cron interval and publishes only once for each event/source update

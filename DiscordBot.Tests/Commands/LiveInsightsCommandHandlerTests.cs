@@ -16,8 +16,7 @@ public sealed class LiveInsightsCommandHandlerTests
         // Arrange
         var options = new FantasyPremierLeagueOptions
         {
-            ClassicLeagueId = 123,
-            LiveDataMaxAge = TimeSpan.FromMinutes(20)
+            ClassicLeagueId = 123
         };
         var service = new FplLiveInsightsService(
             new TestFantasyPremierLeagueClient(),

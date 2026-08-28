@@ -41,24 +41,30 @@ public sealed class FplLiveInsightsServiceTests
     }
 
     [Test]
-    public async Task GetCurrentAsync_StaleStandings_SkipsLiveRequestsAndReturnsFreshnessMetadata()
+    public async Task GetCurrentAsync_OldStandingsSnapshot_DoesNotBlockLiveCalculation()
     {
         // Arrange
         var client = CreateClient();
         client.Standings = CreateStandings(
-            new DateTimeOffset(2026, 8, 21, 17, 0, 0, TimeSpan.Zero));
+            new DateTimeOffset(2026, 8, 18, 9, 0, 0, TimeSpan.Zero));
         var service = CreateService(client, CreateOptions());
 
         // Act
         var result = await service.GetCurrentAsync(CancellationToken.None);
 
         // Assert
-        result.Availability.Should().Be(FplLiveInsightsAvailability.Stale);
+        result.Availability.Should().Be(FplLiveInsightsAvailability.Available);
         result.Gameweek.Should().NotBeNull();
         result.Gameweek!.EventId.Should().Be(5);
         result.Gameweek.SourceUpdatedAtUtc.Should().Be(
-            new DateTimeOffset(2026, 8, 21, 17, 0, 0, TimeSpan.Zero));
-        client.Operations.Should().Equal("Bootstrap", "Classic:456");
+            new DateTimeOffset(2026, 8, 18, 9, 0, 0, TimeSpan.Zero));
+        result.Gameweek.Managers.Should().ContainSingle();
+        client.Operations.Should().Equal(
+            "Bootstrap",
+            "Classic:456",
+            "Fixtures:5",
+            "Live:5",
+            "Picks:123:5");
     }
 
     [Test]
@@ -99,8 +105,7 @@ public sealed class FplLiveInsightsServiceTests
     {
         return new FantasyPremierLeagueOptions
         {
-            ClassicLeagueId = 456,
-            LiveDataMaxAge = TimeSpan.FromMinutes(20)
+            ClassicLeagueId = 456
         };
     }
 
