@@ -5,12 +5,6 @@ namespace DiscordBot.FantasyPremierLeague.Recognition;
 public sealed class FplAchievementCalculationService(
     FantasyPremierLeagueOptions options)
 {
-    private const string FirstBloodKey = "first-blood";
-    private const string BenchWarmerKey = "bench-warmer";
-    private const string CaptainDisasterKey = "captain-disaster";
-    private const string DifferentialMerchantKey = "differential-merchant";
-    private const string MinusEightEnjoyerKey = "minus-eight-enjoyer";
-
     public IReadOnlyList<FplAchievementAward> Calculate(
         int leagueId,
         FplGameweekSnapshot snapshot,
@@ -88,29 +82,29 @@ public sealed class FplAchievementCalculationService(
         return
         [
             new FplAchievementDefinition(
-                FirstBloodKey,
+                FplAchievementKeys.FirstBlood,
                 "First Blood",
                 "Won the first recorded gameweek of the season.",
                 IsRepeatable: false),
             new FplAchievementDefinition(
-                BenchWarmerKey,
+                FplAchievementKeys.BenchWarmer,
                 "Bench Warmer",
                 $"Left at least {options.LargeBenchPointsThreshold} points on the bench.",
                 IsRepeatable: true),
             new FplAchievementDefinition(
-                CaptainDisasterKey,
+                FplAchievementKeys.CaptainDisaster,
                 "Captain Disaster",
                 $"Captained a player on at most {options.CaptainDisasterPointsThreshold} raw " +
                 "points while the vice-captain scored at least " +
                 $"{options.CaptainDisasterViceCaptainPointsThreshold}.",
                 IsRepeatable: true),
             new FplAchievementDefinition(
-                DifferentialMerchantKey,
+                FplAchievementKeys.DifferentialMerchant,
                 "Differential Merchant",
                 "Was the only manager in the league to captain that player.",
                 IsRepeatable: true),
             new FplAchievementDefinition(
-                MinusEightEnjoyerKey,
+                FplAchievementKeys.MinusEightEnjoyer,
                 "-8 Enjoyer",
                 $"Took at least {options.TransferCostAchievementThreshold} points in " +
                 "transfer hits.",
@@ -128,16 +122,16 @@ public sealed class FplAchievementCalculationService(
     {
         return achievementKey switch
         {
-            FirstBloodKey => isFirstRecordedGameweek &&
+            FplAchievementKeys.FirstBlood => isFirstRecordedGameweek &&
                 manager.EventScore == highestScore,
-            BenchWarmerKey => manager.BenchPoints >= options.LargeBenchPointsThreshold,
-            CaptainDisasterKey => captainData.Captain.Points <=
+            FplAchievementKeys.BenchWarmer => manager.BenchPoints >= options.LargeBenchPointsThreshold,
+            FplAchievementKeys.CaptainDisaster => captainData.Captain.Points <=
                     options.CaptainDisasterPointsThreshold &&
                 captainData.ViceCaptain.Points >=
                     options.CaptainDisasterViceCaptainPointsThreshold &&
                 captainData.Captain.Points < captainData.ViceCaptain.Points,
-            DifferentialMerchantKey => captainCounts[captainData.Captain.PlayerId] == 1,
-            MinusEightEnjoyerKey => manager.TransferCost >=
+            FplAchievementKeys.DifferentialMerchant => captainCounts[captainData.Captain.PlayerId] == 1,
+            FplAchievementKeys.MinusEightEnjoyer => manager.TransferCost >=
                 options.TransferCostAchievementThreshold,
             _ => throw new ArgumentOutOfRangeException(nameof(achievementKey))
         };

@@ -69,14 +69,16 @@ public sealed class DiscordCommandRegistrationTests
         // Assert
         commandClient.GlobalCalls.Should().Be(1);
         commandClient.GuildCalls.Should().Be(0);
-        commandClient.Commands.Should().HaveCount(5);
+        commandClient.Commands.Should().HaveCount(7);
         commandClient.Commands!.Select(command => command.Name.Value).Should()
             .Equal(
                 DiscordApplicationCommands.HugMeName,
                 DiscordApplicationCommands.StandingsName,
                 DiscordApplicationCommands.DeadlineName,
                 DiscordApplicationCommands.BenchLeagueName,
-                DiscordApplicationCommands.LiveInsightsName);
+                DiscordApplicationCommands.LiveInsightsName,
+                DiscordApplicationCommands.ProfileName,
+                DiscordApplicationCommands.AchievementsName);
         commandClient.Commands.Cast<SlashCommandProperties>()
             .Select(command => command.Description.Value)
             .Should().Equal(
@@ -84,7 +86,34 @@ public sealed class DiscordCommandRegistrationTests
                 "Показывает текущие таблицы лиг FPL. 🏆",
                 "Показывает ближайшие дедлайны FPL и ЛЧ по рижскому времени. ⏰",
                 "Показывает таблицу Лиги обогревателей скамейки. 🔥",
-                "Показывает результаты лиги FPL в реальном времени. ⚡");
+                "Показывает результаты лиги FPL в реальном времени. ⚡",
+                "Показывает профиль и достижения менеджера FPL. 🏅",
+                "Показывает лидеров сезона по достижениям FPL. 🎖️");
+    }
+
+    [Test]
+    public async Task SynchronizeAsync_ProfileCommand_HasRequiredManagerOption()
+    {
+        // Arrange
+        var commandClient = new TestApplicationCommandClient();
+        var synchronizer = new DiscordCommandSynchronizer(
+            new DiscordCommandRegistrationOptions(
+                DiscordCommandRegistrationMode.Global,
+                GuildId: null),
+            commandClient,
+            new TestLogger<DiscordCommandSynchronizer>());
+
+        // Act
+        await synchronizer.SynchronizeAsync(CancellationToken.None);
+
+        // Assert
+        var profileCommand = commandClient.Commands!.Cast<SlashCommandProperties>()
+            .Single(command => command.Name.Value == DiscordApplicationCommands.ProfileName);
+        profileCommand.Options.IsSpecified.Should().BeTrue();
+        var option = profileCommand.Options.Value.Single();
+        option.Name.Should().Be("manager");
+        option.Type.Should().Be(ApplicationCommandOptionType.String);
+        option.IsRequired.Should().BeTrue();
     }
 
     [Test]
@@ -107,7 +136,7 @@ public sealed class DiscordCommandRegistrationTests
         commandClient.GlobalCalls.Should().Be(0);
         commandClient.GuildCalls.Should().Be(1);
         commandClient.GuildId.Should().Be(guildId);
-        commandClient.Commands.Should().HaveCount(5);
+        commandClient.Commands.Should().HaveCount(7);
     }
 
     [Test]

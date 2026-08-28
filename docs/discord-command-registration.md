@@ -13,7 +13,19 @@ The synchronized command set currently contains:
   league IDs;
 - `/deadline`, which shows the next FPL gameweek deadline in Riga time;
 - `/benchleague`, which shows the current bench warming league standings from
-  the local SQLite storage.
+  the local SQLite storage;
+- `/live`, which shows live Fantasy Premier League insights for the configured
+  classic league;
+- `/profile`, which requires a `manager` string option (team name or manager
+  name, matched case-insensitively, with a unique partial match also accepted).
+  It reads persisted local season statistics and recognition data for the
+  configured classic FPL league and shows the manager's trophy cabinet, tracked
+  gameweek wins and personal records. It does not perform arbitrary league
+  lookup and does not call the FPL API at command time;
+- `/achievements`, which shows the season recognition leaderboards (total
+  awards, per-achievement champions and tracked gameweek-win leaders) for the
+  configured classic FPL league. It does not perform arbitrary league lookup and
+  does not call the FPL API at command time.
 
 Registration runs once after the Discord gateway first becomes ready during a
 process startup. It uses Discord's bulk-overwrite endpoint, so removed or

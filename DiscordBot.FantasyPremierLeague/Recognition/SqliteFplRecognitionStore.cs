@@ -118,6 +118,51 @@ public sealed class SqliteFplRecognitionStore : IFplRecognitionStore
         return awards;
     }
 
+    public string? GetLatestSeason(int leagueId)
+    {
+        ValidateLeagueId(leagueId);
+
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandTimeout = CommandTimeoutSeconds;
+        command.CommandText =
+            """
+            SELECT season
+            FROM fpl_recognition_runs
+            WHERE league_id = $league_id
+            ORDER BY calculated_at_utc DESC
+            LIMIT 1;
+            """;
+        command.Parameters.AddWithValue("$league_id", leagueId);
+
+        return command.ExecuteScalar() as string;
+    }
+
+    public int? GetFirstCompletedEventId(
+        int leagueId,
+        string season)
+    {
+        ValidateLeagueAndSeason(leagueId, season);
+
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandTimeout = CommandTimeoutSeconds;
+        command.CommandText =
+            """
+            SELECT MIN(event_id)
+            FROM fpl_recognition_runs
+            WHERE league_id = $league_id
+              AND season = $season;
+            """;
+        command.Parameters.AddWithValue("$league_id", leagueId);
+        command.Parameters.AddWithValue("$season", season);
+
+        var value = command.ExecuteScalar();
+        return value is null or DBNull
+            ? null
+            : Convert.ToInt32(value);
+    }
+
     public void Save(FplRecognitionRun run, FplRecognitionResult result)
     {
         ValidateRun(run);
@@ -405,6 +450,11 @@ public sealed class SqliteFplRecognitionStore : IFplRecognitionStore
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(leagueId);
         ArgumentException.ThrowIfNullOrWhiteSpace(season);
+    }
+
+    private static void ValidateLeagueId(int leagueId)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(leagueId);
     }
 
     private static void ValidateOptionalEvent(int? eventId)

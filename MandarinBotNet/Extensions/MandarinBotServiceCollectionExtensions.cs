@@ -91,12 +91,16 @@ public static class MandarinBotServiceCollectionExtensions
         services.AddSingleton<FplGameweekRecapService>();
         services.AddSingleton<FplAchievementCalculationService>();
         services.AddSingleton<FplRecognitionService>();
+        services.AddSingleton<FplRecognitionQueryService>();
+        services.AddSingleton<FplRecognitionMessageCompositionService>();
         services.AddSingleton<FplLiveInsightsCalculationService>();
         services.AddSingleton<FplLiveInsightsService>();
         services.AddSingleton<FplLiveInsightsMessageComposer>();
         services.AddSingleton<FplPriceChangeService>();
         services.AddSingleton<FplPriceChangeMessageCompositionService>();
         services.AddSingleton<ILiveInsightsCommandHandler, LiveInsightsCommandHandler>();
+        services.AddSingleton<IProfileCommandHandler, ProfileCommandHandler>();
+        services.AddSingleton<IAchievementsCommandHandler, AchievementsCommandHandler>();
         services.AddSingleton<WelcomeMessageTemplateRotator>();
         services.AddSingleton<
             IWelcomeMessageDestinationResolver,

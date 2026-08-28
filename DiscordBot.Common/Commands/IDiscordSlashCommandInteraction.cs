@@ -6,6 +6,8 @@ public interface IDiscordSlashCommandInteraction
 
     string UserMention { get; }
 
+    string? GetStringOption(string name);
+
     Task RespondAsync(string content);
 
     Task DeferAsync();

@@ -10,6 +10,20 @@ internal sealed class DiscordNetSlashCommandInteraction(
 
     public string UserMention => command.User.Mention;
 
+    public string? GetStringOption(string name)
+    {
+        ArgumentNullException.ThrowIfNull(name);
+
+        var option = command.Data.Options
+            .FirstOrDefault(option => option.Name == name);
+        if (option is null)
+        {
+            return null;
+        }
+
+        return option.Value as string;
+    }
+
     public Task RespondAsync(string content)
     {
         return command.RespondAsync(content);

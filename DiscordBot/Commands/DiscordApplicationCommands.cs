@@ -9,6 +9,8 @@ public static class DiscordApplicationCommands
     public const string StandingsName = "standings";
     public const string BenchLeagueName = "benchleague";
     public const string LiveInsightsName = "live";
+    public const string ProfileName = "profile";
+    public const string AchievementsName = "achievements";
 
     public static ApplicationCommandProperties[] BuildDesiredSet()
     {
@@ -33,6 +35,19 @@ public static class DiscordApplicationCommands
             new SlashCommandBuilder()
                 .WithName(LiveInsightsName)
                 .WithDescription("Показывает результаты лиги FPL в реальном времени. ⚡")
+                .Build(),
+            new SlashCommandBuilder()
+                .WithName(ProfileName)
+                .WithDescription("Показывает профиль и достижения менеджера FPL. 🏅")
+                .AddOption(
+                    "manager",
+                    ApplicationCommandOptionType.String,
+                    "Название команды или имя менеджера",
+                    isRequired: true)
+                .Build(),
+            new SlashCommandBuilder()
+                .WithName(AchievementsName)
+                .WithDescription("Показывает лидеров сезона по достижениям FPL. 🎖️")
                 .Build()
         ];
     }

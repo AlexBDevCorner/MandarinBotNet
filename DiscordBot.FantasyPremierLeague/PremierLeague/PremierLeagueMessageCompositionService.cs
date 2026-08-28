@@ -396,21 +396,10 @@ public sealed class PremierLeagueMessageCompositionService(
             summary.Append("\n");
             summary.Append(DiscordTextSafety.SanitizeExternalName(award.EntryName));
             summary.Append(" — ");
-            summary.Append(GetLocalizedAchievementName(award));
+            summary.Append(FplAchievementDisplay.GetName(
+                award.AchievementKey,
+                award.AchievementName));
         }
-    }
-
-    private static string GetLocalizedAchievementName(FplAchievementAward award)
-    {
-        return award.AchievementKey switch
-        {
-            "first-blood" => "🩸 Первая кровь",
-            "bench-warmer" => "🔥 Обогреватель скамейки",
-            "captain-disaster" => "💥 Капитанская катастрофа",
-            "differential-merchant" => "💎 Повелитель дифференциалов",
-            "minus-eight-enjoyer" => "💸 Любитель минус восьми",
-            _ => DiscordTextSafety.SanitizeExternalName(award.AchievementName)
-        };
     }
 
     private static string GetStandingsRankLabel(int rank) => rank switch

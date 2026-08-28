@@ -243,6 +243,8 @@ public sealed class LiveInsightsCommandHandlerTests
 
         public string UserMention => "<@123>";
 
+        public string? GetStringOption(string name) => null;
+
         public List<string> Operations { get; } = [];
 
         public List<string> Messages { get; } = [];
