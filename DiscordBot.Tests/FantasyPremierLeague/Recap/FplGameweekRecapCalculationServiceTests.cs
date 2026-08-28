@@ -273,6 +273,29 @@ public sealed class FplGameweekRecapCalculationServiceTests
     }
 
     [Test]
+    public void Calculate_RecentWins_WithHistoryGap_StillReported()
+    {
+        var history = new[]
+        {
+            CreateSnapshot(1, CreateManager(10, "Alpha", 40, 100, 3, 3), CreateManager(20, "Beta", 70, 200, 1, 1)),
+            CreateSnapshot(2, CreateManager(10, "Alpha", 40, 200, 3, 3), CreateManager(20, "Beta", 70, 300, 1, 1)),
+            CreateSnapshot(4, CreateManager(10, "Alpha", 70, 400, 1, 1), CreateManager(20, "Beta", 40, 390, 2, 2)),
+            CreateSnapshot(5, CreateManager(10, "Alpha", 70, 500, 1, 1), CreateManager(20, "Beta", 40, 490, 2, 2)),
+            CreateSnapshot(6, CreateManager(10, "Alpha", 40, 600, 2, 2), CreateManager(20, "Beta", 70, 590, 1, 1))
+        };
+        var snapshot = CreateSnapshot(
+            7,
+            CreateManager(10, "Alpha", 70, 700, 1, 1),
+            CreateManager(20, "Beta", 40, 690, 2, 2));
+
+        var recap = Calculate(snapshot, history.Append(snapshot).ToArray());
+
+        var trend = recap.SeasonTrends.OfType<FplRecentWinsTrend>().Single();
+        trend.Manager.EntryName.Should().Be("Alpha");
+        trend.WinCount.Should().Be(3);
+    }
+
+    [Test]
     public void Calculate_ConsecutiveRankRises_Reported()
     {
         var history = new[]

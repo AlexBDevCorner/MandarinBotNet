@@ -241,10 +241,6 @@ public sealed class FplGameweekRecapCalculationService(FantasyPremierLeagueOptio
         }
 
         var window = orderedHistory.TakeLast(RecentWinsWindow).ToArray();
-        if (!IsConsecutive(window))
-        {
-            return null;
-        }
 
         var winCounts = new Dictionary<int, int>();
         foreach (var snapshotItem in window)

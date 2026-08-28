@@ -326,7 +326,9 @@ public sealed class PremierLeagueMessageCompositionService(
                     recentWins.Manager.EntryName));
                 summary.Append(
                     $" — {recentWins.WinCount.ToString(CultureInfo.InvariantCulture)} " +
-                    $"победы за последние {recentWins.Window.ToString(CultureInfo.InvariantCulture)} туров");
+                    $"{FormatWinsNoun(recentWins.WinCount)} за последние " +
+                    $"{recentWins.Window.ToString(CultureInfo.InvariantCulture)} " +
+                    $"{FormatTourNoun(recentWins.Window)}");
                 break;
             case FplConsecutiveRankRisesTrend rises:
                 summary.Append("\n⬆️ ");
@@ -334,7 +336,8 @@ public sealed class PremierLeagueMessageCompositionService(
                     rises.Manager.EntryName));
                 summary.Append(
                     $" поднимается в таблице " +
-                    $"{rises.StreakLength.ToString(CultureInfo.InvariantCulture)} тура подряд");
+                    $"{rises.StreakLength.ToString(CultureInfo.InvariantCulture)} " +
+                    $"{FormatTourNoun(rises.StreakLength)} подряд");
                 break;
             case FplLeaderGapReductionTrend gap:
                 summary.Append("\n🎯 ");
@@ -358,12 +361,11 @@ public sealed class PremierLeagueMessageCompositionService(
             return;
         }
 
-        var leader = standings[0];
-        for (var i = 0; i < standings.Count; i++)
+        var leaderTotal = standings[0].TotalScore;
+        foreach (var manager in standings)
         {
-            var manager = standings[i];
             summary.Append('\n');
-            summary.Append(GetStandingsRankLabel(i + 1));
+            summary.Append(GetStandingsRankLabel(manager.Rank));
             summary.Append(' ');
             summary.Append(DiscordTextSafety.SanitizeExternalName(manager.EntryName));
             summary.Append(" — ");
@@ -377,9 +379,9 @@ public sealed class PremierLeagueMessageCompositionService(
                     $" {arrow}{delta.ToString(CultureInfo.InvariantCulture)}");
             }
 
-            if (manager.EntryId != leader.EntryId)
+            if (manager.Rank != 1)
             {
-                var gap = leader.TotalScore - manager.TotalScore;
+                var gap = leaderTotal - manager.TotalScore;
                 summary.Append($" — {gap.ToString(CultureInfo.InvariantCulture)} до лидера");
             }
         }
@@ -469,6 +471,40 @@ public sealed class PremierLeagueMessageCompositionService(
         }
 
         return "очками";
+    }
+
+    private static string FormatWinsNoun(int count)
+    {
+        var mod10 = count % 10;
+        var mod100 = count % 100;
+        if (mod10 == 1 && mod100 != 11)
+        {
+            return "победа";
+        }
+
+        if (mod10 is >= 2 and <= 4 && (mod100 < 10 || mod100 >= 20))
+        {
+            return "победы";
+        }
+
+        return "побед";
+    }
+
+    private static string FormatTourNoun(int count)
+    {
+        var mod10 = count % 10;
+        var mod100 = count % 100;
+        if (mod10 == 1 && mod100 != 11)
+        {
+            return "тур";
+        }
+
+        if (mod10 is >= 2 and <= 4 && (mod100 < 10 || mod100 >= 20))
+        {
+            return "тура";
+        }
+
+        return "туров";
     }
 
     private static IReadOnlyList<string> GetCongratulationsMessages(

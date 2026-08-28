@@ -100,6 +100,58 @@ public sealed class FplGameweekRecapMessageCompositionTests
     }
 
     [Test]
+    public void ComposeGameweekRecap_TiedRanks_RendersSharedPositionsAndNoGapForJointLeaders()
+    {
+        var leaderA = CreateManager(10, "Leader A", 70, 1247, 1, 2);
+        var leaderB = CreateManager(20, "Leader B", 70, 1247, 1, 1);
+        var third = CreateManager(30, "Third", 60, 1219, 3, 5);
+        var fourth = CreateManager(40, "Fourth", 60, 1203, 4, 4);
+        var fifth = CreateManager(50, "Fifth", 60, 1197, 5, 5);
+
+        var recap = new FplGameweekRecap(
+            "2026/27",
+            5,
+            [new FplGameweekWinnerHighlight(70, [leaderA])],
+            [],
+            [leaderA, leaderB, third, fourth, fifth],
+            []);
+
+        var message = CreateComposer().ComposeGameweekRecap(recap);
+
+        message.Should().Contain("🥇 Leader A — 1 247 ↑1");
+        message.Should().Contain("🥇 Leader B — 1 247");
+        message.Should().Contain("🥉 Third — 1 219 ↑2 — 28 до лидера");
+        message.Should().Contain("4. Fourth — 1 203 — 44 до лидера");
+        message.Should().Contain("5. Fifth — 1 197 — 50 до лидера");
+        message.Should().NotContain("🥈");
+        message.Should().NotContain("Leader B — 1 247 —");
+    }
+
+    [Test]
+    public void ComposeGameweekRecap_Pluralization_UsesCorrectFormsForFive()
+    {
+        var manager = CreateManager(10, "Streaker", 70, 1247, 1, 4);
+
+        var recap = new FplGameweekRecap(
+            "2026/27",
+            5,
+            [new FplGameweekWinnerHighlight(70, [manager])],
+            [
+                new FplRecentWinsTrend(manager, 5, 5),
+                new FplConsecutiveRankRisesTrend(manager, 5)
+            ],
+            [manager],
+            []);
+
+        var message = CreateComposer().ComposeGameweekRecap(recap);
+
+        message.Should().Contain("— 5 побед за последние 5 туров");
+        message.Should().Contain("5 туров подряд");
+        message.Should().NotContain("5 победы");
+        message.Should().NotContain("5 тура подряд");
+    }
+
+    [Test]
     public void ComposeGameweekRecap_UnsafeExternalNames_DoesNotAllowMentions()
     {
         var manager = CreateManager(10, "@everyone\nInjected", 80, 1000, 1, 1, captainPoints: 2, viceCaptainPoints: 13);
