@@ -1,3 +1,6 @@
+using System.Globalization;
+using System.Security.Cryptography;
+using System.Text;
 using DiscordBot.FantasyPremierLeague;
 
 namespace DiscordBot.FantasyPremierLeague.Live;
@@ -118,33 +121,35 @@ public static class FplLiveInsightsSourceIdentifier
         ArgumentNullException.ThrowIfNull(gameweek);
 
         return $"{gameweek.Season}-event-{gameweek.EventId}-live-" +
-            $"{ComputeLiveStateHash(gameweek):x8}";
+            $"{ComputeLiveStateHash(gameweek)}";
     }
 
-    private static int ComputeLiveStateHash(FplLiveGameweek gameweek)
+    private static string ComputeLiveStateHash(FplLiveGameweek gameweek)
     {
-        var hash = new HashCode();
+        var canonical = new StringBuilder();
         foreach (var manager in gameweek.Managers)
         {
-            hash.Add(manager.EntryId);
-            hash.Add(manager.LiveTotalPoints);
-            hash.Add(manager.LiveGameweekPoints);
-            hash.Add(manager.LiveRank);
-            hash.Add(manager.RankChange);
-            hash.Add(manager.TransferCost);
-            hash.Add(manager.BenchPoints);
-            hash.Add(manager.PlayerProgress.Playing);
-            hash.Add(manager.PlayerProgress.YetToPlay);
-            hash.Add(manager.Captain.CaptainEffectivePoints);
-            hash.Add(manager.Captain.ViceCaptainEffectivePoints);
+            canonical.Append("m:")
+                .Append(manager.EntryId).Append('|')
+                .Append(manager.LiveTotalPoints).Append('|')
+                .Append(manager.LiveGameweekPoints).Append('|')
+                .Append(manager.LiveRank).Append('|')
+                .Append(manager.RankChange).Append('|')
+                .Append(manager.TransferCost).Append('|')
+                .Append(manager.BenchPoints).Append('|')
+                .Append(manager.PlayerProgress.Playing).Append('|')
+                .Append(manager.PlayerProgress.YetToPlay).Append('|')
+                .Append(manager.Captain.CaptainEffectivePoints).Append('|')
+                .Append(manager.Captain.ViceCaptainEffectivePoints).Append(';');
         }
 
         foreach (var salvation in gameweek.AutomaticSubstitutionSalvations)
         {
-            hash.Add(salvation.EntryId);
-            hash.Add(salvation.PlayerInName);
-            hash.Add(salvation.PlayerOutName);
-            hash.Add(salvation.SavedPoints);
+            canonical.Append("s:")
+                .Append(salvation.EntryId).Append('|')
+                .Append(salvation.PlayerInName).Append('|')
+                .Append(salvation.PlayerOutName).Append('|')
+                .Append(salvation.SavedPoints).Append(';');
         }
 
         foreach (var insight in gameweek.SwingInsights)
@@ -152,18 +157,27 @@ public static class FplLiveInsightsSourceIdentifier
             switch (insight)
             {
                 case UniqueRemainingPlayerInsight unique:
-                    hash.Add(unique.EntryId);
-                    hash.Add(unique.PlayerName);
+                    canonical.Append("u:")
+                        .Append(unique.EntryId).Append('|')
+                        .Append(unique.PlayerName).Append(';');
                     break;
                 case CaptainClashInsight clash:
-                    hash.Add(clash.FirstEntryId);
-                    hash.Add(clash.FirstCaptain);
-                    hash.Add(clash.SecondEntryId);
-                    hash.Add(clash.SecondCaptain);
+                    canonical.Append("c:")
+                        .Append(clash.FirstEntryId).Append('|')
+                        .Append(clash.FirstCaptain).Append('|')
+                        .Append(clash.SecondEntryId).Append('|')
+                        .Append(clash.SecondCaptain).Append(';');
                     break;
             }
         }
 
-        return hash.ToHashCode();
+        var digest = SHA256.HashData(Encoding.UTF8.GetBytes(canonical.ToString()));
+        var fingerprint = new StringBuilder(digest.Length * 2);
+        for (var i = 0; i < 16; i++)
+        {
+            fingerprint.Append(digest[i].ToString("x2", CultureInfo.InvariantCulture));
+        }
+
+        return fingerprint.ToString();
     }
 }

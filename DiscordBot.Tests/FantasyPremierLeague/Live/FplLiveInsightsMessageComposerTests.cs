@@ -175,6 +175,21 @@ public sealed class FplLiveInsightsMessageComposerTests
         updatedIdentifier.Should().NotBe(baseIdentifier);
     }
 
+    [Test]
+    public void SourceIdentifier_IsDeterministicAcrossProcessRestarts()
+    {
+        // The live-state fingerprint must be stable across process restarts, so it
+        // cannot rely on System.HashCode (which randomizes per process). A fixed
+        // expected value forces the implementation to use a deterministic digest; a
+        // reintroduced randomized hash would fail this on the next CI run.
+        var gameweek = CreateGameweek(100, 20, 4);
+
+        var identifier = FplLiveInsightsSourceIdentifier.Create(gameweek);
+
+        identifier.Should().Be(
+            "2026/27-event-5-live-ac8d05b9c53e7d3e8c8b4d6d76fa0bd8");
+    }
+
     private static FplLiveGameweek CreateGameweek(
         int liveTotalPoints,
         int captainEffectivePoints,
