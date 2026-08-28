@@ -35,25 +35,18 @@ public sealed class FplLiveInsightsMessageComposer(
         var summary = new StringBuilder(
             $"⚡ FPL в прямом эфире — тур {gameweek.EventId.ToString(CultureInfo.InvariantCulture)} " +
             $"(сезон {DiscordTextSafety.SanitizeExternalName(gameweek.Season)}):");
-        summary.Append("\n🛰️ Данные источника обновлены: ");
-        summary.Append(FormatTimestamp(gameweek.SourceUpdatedAtUtc));
-        summary.Append("; отчёт собран: ");
-        summary.Append(FormatTimestamp(gameweek.CapturedAtUtc));
 
-        summary.Append("\n\n👥 Менеджеры:");
+        summary.Append("\n\n🏆 Лайв-таблица:");
         foreach (var manager in gameweek.Managers)
         {
-            summary.Append('\n');
-            summary.Append(manager.Rank.ToString(CultureInfo.InvariantCulture));
-            summary.Append(". ");
-            summary.Append(DiscordTextSafety.SanitizeExternalName(manager.EntryName));
-            summary.Append(" (");
-            summary.Append(DiscordTextSafety.SanitizeExternalName(manager.ManagerName));
-            summary.Append(") — ");
-            summary.Append(manager.LivePoints.ToString(CultureInfo.InvariantCulture));
-            summary.Append(" очков в лайве; игроков осталось: ");
-            summary.Append(manager.PlayersRemainingToPlay.ToString(CultureInfo.InvariantCulture));
+            AppendLiveManager(summary, manager);
         }
+
+        summary.Append("\n\n🎯 Ещё в игре:");
+        AppendPlayerProgress(summary, gameweek.Managers);
+
+        summary.Append("\n\n⚔️ Что ещё может всё испортить:");
+        AppendSwingInsights(summary, gameweek.SwingInsights);
 
         summary.Append("\n\n🪑 Очки на скамейке (от ");
         summary.Append(options.LargeBenchPointsThreshold.ToString(CultureInfo.InvariantCulture));
@@ -121,7 +114,139 @@ public sealed class FplLiveInsightsMessageComposer(
             }
         }
 
+        summary.Append("\n\n🛰️ Данные источника обновлены: ");
+        summary.Append(FormatTimestamp(gameweek.SourceUpdatedAtUtc));
+        summary.Append("; отчёт собран: ");
+        summary.Append(FormatTimestamp(gameweek.CapturedAtUtc));
+
         return summary.ToString();
+    }
+
+    private static void AppendLiveManager(
+        StringBuilder summary,
+        FplLiveManagerInsights manager)
+    {
+        summary.Append('\n');
+        summary.Append(FormatLiveRank(manager.LiveRank));
+        summary.Append(' ');
+        summary.Append(DiscordTextSafety.SanitizeExternalName(manager.EntryName));
+        summary.Append(" (");
+        summary.Append(DiscordTextSafety.SanitizeExternalName(manager.ManagerName));
+        summary.Append(") — ");
+        summary.Append(manager.LiveTotalPoints.ToString(CultureInfo.InvariantCulture));
+        summary.Append(" очков (");
+        summary.Append(FormatSigned(manager.LiveGameweekPoints));
+        summary.Append(" за тур");
+        if (manager.TransferCost > 0)
+        {
+            summary.Append(", -");
+            summary.Append(manager.TransferCost.ToString(CultureInfo.InvariantCulture));
+            summary.Append(" за трансферы");
+        }
+
+        summary.Append(')');
+        if (manager.RankChange > 0)
+        {
+            summary.Append(" ↑");
+            summary.Append(manager.RankChange.ToString(CultureInfo.InvariantCulture));
+        }
+        else if (manager.RankChange < 0)
+        {
+            summary.Append(" ↓");
+            summary.Append((-manager.RankChange).ToString(CultureInfo.InvariantCulture));
+        }
+        else
+        {
+            summary.Append(" —");
+        }
+
+        if (manager.GapToLeader > 0)
+        {
+            summary.Append(" — ");
+            summary.Append(manager.GapToLeader.ToString(CultureInfo.InvariantCulture));
+            summary.Append(" до лидера");
+        }
+    }
+
+    private static void AppendPlayerProgress(
+        StringBuilder summary,
+        IEnumerable<FplLiveManagerInsights> managers)
+    {
+        foreach (var manager in managers)
+        {
+            summary.Append('\n');
+            summary.Append(DiscordTextSafety.SanitizeExternalName(manager.EntryName));
+            summary.Append(" — ");
+            if (manager.PlayerProgress.Active == 0)
+            {
+                summary.Append("все закончили");
+                continue;
+            }
+
+            var hasPreviousPart = false;
+            if (manager.PlayerProgress.Playing > 0)
+            {
+                summary.Append(manager.PlayerProgress.Playing.ToString(
+                    CultureInfo.InvariantCulture));
+                summary.Append(" играет");
+                hasPreviousPart = true;
+            }
+
+            if (manager.PlayerProgress.YetToPlay > 0)
+            {
+                if (hasPreviousPart)
+                {
+                    summary.Append(", ");
+                }
+
+                summary.Append(manager.PlayerProgress.YetToPlay.ToString(
+                    CultureInfo.InvariantCulture));
+                summary.Append(" ещё не начал");
+            }
+        }
+    }
+
+    private static void AppendSwingInsights(
+        StringBuilder summary,
+        IEnumerable<FplLiveSwingInsight> insights)
+    {
+        var swingInsights = insights.ToArray();
+        if (swingInsights.Length == 0)
+        {
+            summary.Append("\n(пока нечему)");
+            return;
+        }
+
+        foreach (var insight in swingInsights)
+        {
+            summary.Append("\n• ");
+            switch (insight)
+            {
+                case CaptainClashInsight clash:
+                    summary.Append(DiscordTextSafety.SanitizeExternalName(
+                        clash.FirstEntryName));
+                    summary.Append(": ");
+                    summary.Append(DiscordTextSafety.SanitizeExternalName(
+                        clash.FirstCaptain));
+                    summary.Append(" (C) против ");
+                    summary.Append(DiscordTextSafety.SanitizeExternalName(
+                        clash.SecondCaptain));
+                    summary.Append(" (C) у ");
+                    summary.Append(DiscordTextSafety.SanitizeExternalName(
+                        clash.SecondEntryName));
+                    break;
+                case UniqueRemainingPlayerInsight unique:
+                    summary.Append(DiscordTextSafety.SanitizeExternalName(
+                        unique.EntryName));
+                    summary.Append(" — единственный с ");
+                    summary.Append(DiscordTextSafety.SanitizeExternalName(
+                        unique.PlayerName));
+                    summary.Append(" среди активных составов");
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(insight));
+            }
+        }
     }
 
     private string ComposeStale(FplLiveGameweek gameweek)
@@ -182,6 +307,17 @@ public sealed class FplLiveInsightsMessageComposer(
             summary.Append(manager.Captain.ViceCaptainPoints.ToString(
                 CultureInfo.InvariantCulture));
         }
+    }
+
+    private static string FormatLiveRank(int rank)
+    {
+        return rank switch
+        {
+            1 => "🥇",
+            2 => "🥈",
+            3 => "🥉",
+            _ => $"{rank.ToString(CultureInfo.InvariantCulture)}."
+        };
     }
 
     private static string FormatTimestamp(DateTimeOffset timestamp)

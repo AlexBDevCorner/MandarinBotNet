@@ -9,7 +9,7 @@ namespace DiscordBot.Tests.FantasyPremierLeague.Live;
 public sealed class FplLiveInsightsMessageComposerTests
 {
     [Test]
-    public void Compose_AvailableInsights_IncludesFreshnessManagersThresholdsAndAlerts()
+    public void Compose_AvailableInsights_PutsLiveTableFirstAndRetainsAlerts()
     {
         // Arrange
         var options = new FantasyPremierLeagueOptions
@@ -19,18 +19,49 @@ public sealed class FplLiveInsightsMessageComposerTests
             CaptainDisasterPointsThreshold = 2,
             CaptainDisasterViceCaptainPointsThreshold = 8
         };
+        var alpha = CreateManager(
+            1,
+            "@everyone Alpha",
+            "@here Alice",
+            officialRank: 1,
+            previousRank: 3,
+            liveRank: 1,
+            rankChange: 2,
+            previousTotal: 1184,
+            officialTotal: 1251,
+            rawLiveGameweekPoints: 67,
+            transferCost: 4,
+            liveGameweekPoints: 63,
+            liveTotalPoints: 1247,
+            gapToLeader: 0,
+            progress: new FplLivePlayerProgress(1, 1),
+            benchPoints: 9);
+        var beta = CreateManager(
+            2,
+            "Beta",
+            "Bob",
+            officialRank: 2,
+            previousRank: 1,
+            liveRank: 2,
+            rankChange: -1,
+            previousTotal: 1170,
+            officialTotal: 1241,
+            rawLiveGameweekPoints: 71,
+            transferCost: 0,
+            liveGameweekPoints: 71,
+            liveTotalPoints: 1241,
+            gapToLeader: 6,
+            progress: new FplLivePlayerProgress(0, 3),
+            benchPoints: 0);
         var gameweek = new FplLiveGameweek(
             "2026/27",
             5,
             new DateTimeOffset(2026, 8, 21, 18, 45, 0, TimeSpan.Zero),
             new DateTimeOffset(2026, 8, 21, 18, 50, 0, TimeSpan.Zero),
-            [
-                CreateManager("@everyone Alpha", "@here Alice", 1, 64, 2, 2),
-                CreateManager("Beta", "Bob", 2, 52, 1, 0)
-            ],
-            [CreateManager("@everyone Alpha", "@here Alice", 1, 64, 2, 2)],
-            [CreateManager("@everyone Alpha", "@here Alice", 1, 64, 2, 2)],
-            [CreateManager("Beta", "Bob", 2, 52, 1, 0)],
+            [alpha, beta],
+            [alpha],
+            [alpha],
+            [beta],
             [new FplAutomaticSubstitutionSalvation(
                 1,
                 "@everyone Alpha",
@@ -38,7 +69,17 @@ public sealed class FplLiveInsightsMessageComposerTests
                 9,
                 "Starter Out",
                 0,
-                9)]);
+                9)],
+            [
+                new CaptainClashInsight(
+                    1,
+                    "@everyone Alpha",
+                    "Salah",
+                    2,
+                    "Beta",
+                    "Haaland"),
+                new UniqueRemainingPlayerInsight(1, "@everyone Alpha", "@here Palmer")
+            ]);
         var composer = new FplLiveInsightsMessageComposer(options);
 
         // Act
@@ -46,17 +87,28 @@ public sealed class FplLiveInsightsMessageComposerTests
 
         // Assert
         message.Should().Contain("⚡ FPL в прямом эфире — тур 5 (сезон 2026/27)");
-        message.Should().Contain("Данные источника обновлены: 2026-08-21 18:45:00 UTC");
-        message.Should().Contain("отчёт собран: 2026-08-21 18:50:00 UTC");
-        message.Should().Contain("@\u200Beveryone Alpha");
-        message.Should().Contain("@\u200Bhere Alice");
-        message.Should().Contain("64 очков в лайве; игроков осталось: 2");
+        message.Should().Contain("🏆 Лайв-таблица:");
+        message.Should().Contain(
+            "🥇 @\u200Beveryone Alpha (@\u200Bhere Alice) — 1247 очков (+63 за тур, -4 за трансферы) ↑2");
+        message.Should().Contain(
+            "🥈 Beta (Bob) — 1241 очков (+71 за тур) ↓1 — 6 до лидера");
+        message.Should().Contain("🎯 Ещё в игре:");
+        message.Should().Contain("@\u200Beveryone Alpha — 1 играет, 1 ещё не начал");
+        message.Should().Contain("Beta — 3 ещё не начал");
+        message.Should().Contain("⚔️ Что ещё может всё испортить:");
+        message.Should().Contain("Salah (C) против Haaland (C)");
+        message.Should().Contain(
+            "@\u200Beveryone Alpha — единственный с @\u200Bhere Palmer среди активных составов");
         message.Should().Contain("🪑 Очки на скамейке (от 8):");
         message.Should().Contain("🛟 Спасение автозаменой:");
         message.Should().Contain("Bench In (9) заменил Starter Out (0); +9 очков спасено");
         message.Should().Contain("💥 Капитанские провалы (капитан ≤ 2, вице-капитан ≥ 8):");
         message.Should().Contain(
             "🧠 Удачный выбор капитана (с учётом множителя от 20 очков):");
+        message.Should().Contain("🛰️ Данные источника обновлены: 2026-08-21 18:45:00 UTC");
+        message.Should().Contain("отчёт собран: 2026-08-21 18:50:00 UTC");
+        message.IndexOf("🏆 Лайв-таблица:", StringComparison.Ordinal)
+            .Should().BeLessThan(message.IndexOf("🪑 Очки на скамейке", StringComparison.Ordinal));
         message.Should().NotContain("@everyone");
         message.Should().NotContain("@here");
     }
@@ -70,6 +122,7 @@ public sealed class FplLiveInsightsMessageComposerTests
             5,
             new DateTimeOffset(2026, 8, 21, 18, 0, 0, TimeSpan.Zero),
             new DateTimeOffset(2026, 8, 21, 18, 30, 0, TimeSpan.Zero),
+            [],
             [],
             [],
             [],
@@ -125,6 +178,7 @@ public sealed class FplLiveInsightsMessageComposerTests
             [],
             [],
             [],
+            [],
             []);
 
         // Act
@@ -141,28 +195,47 @@ public sealed class FplLiveInsightsMessageComposerTests
     }
 
     private static FplLiveManagerInsights CreateManager(
+        int entryId,
         string entryName,
         string managerName,
-        int rank,
-        int livePoints,
-        int playersRemaining,
+        int officialRank,
+        int previousRank,
+        int liveRank,
+        int rankChange,
+        int previousTotal,
+        int officialTotal,
+        int rawLiveGameweekPoints,
+        int transferCost,
+        int liveGameweekPoints,
+        int liveTotalPoints,
+        int gapToLeader,
+        FplLivePlayerProgress progress,
         int benchPoints)
     {
         return new FplLiveManagerInsights(
-            rank,
+            entryId,
             entryName,
             managerName,
-            rank,
-            livePoints,
-            playersRemaining,
+            officialRank,
+            previousRank,
+            liveRank,
+            rankChange,
+            previousTotal,
+            officialTotal,
+            rawLiveGameweekPoints,
+            transferCost,
+            liveGameweekPoints,
+            liveTotalPoints,
+            gapToLeader,
+            progress,
             benchPoints,
             new FplLiveCaptainInsights(
                 "Captain",
-                rank == 1 ? 1 : 10,
-                rank == 1 ? 2 : 20,
+                officialRank == 1 ? 1 : 10,
+                officialRank == 1 ? 2 : 20,
                 "Vice",
-                rank == 1 ? 10 : 1,
-                rank == 1 ? 10 : 1),
+                officialRank == 1 ? 10 : 1,
+                officialRank == 1 ? 10 : 1),
             []);
     }
 }

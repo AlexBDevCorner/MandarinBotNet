@@ -35,6 +35,7 @@ public sealed class FplLiveInsightsServiceTests
         client.Operations.Should().Equal(
             "Bootstrap",
             "Classic:456",
+            "Fixtures:5",
             "Live:5",
             "Picks:123:5");
     }
@@ -142,6 +143,37 @@ public sealed class FplLiveInsightsServiceTests
 
         public Exception? BootstrapException { get; set; }
 
+        public IReadOnlyList<PremierLeagueFixture> Fixtures { get; set; } =
+        [
+            new PremierLeagueFixture
+            {
+                Id = 1,
+                EventId = 5,
+                HomeTeamId = 1,
+                AwayTeamId = 101,
+                Started = true,
+                Finished = true
+            },
+            new PremierLeagueFixture
+            {
+                Id = 2,
+                EventId = 5,
+                HomeTeamId = 2,
+                AwayTeamId = 102,
+                Started = true,
+                Finished = true
+            },
+            new PremierLeagueFixture
+            {
+                Id = 3,
+                EventId = 5,
+                HomeTeamId = 3,
+                AwayTeamId = 103,
+                Started = true,
+                Finished = true
+            }
+        ];
+
         public Task<BootstrapStaticResponse> GetBootstrapStaticAsync(
             CancellationToken cancellationToken)
         {
@@ -166,9 +198,27 @@ public sealed class FplLiveInsightsServiceTests
                     ],
                     Elements =
                     [
-                        new PremierLeagueElement { Id = 1, WebName = "Captain" },
-                        new PremierLeagueElement { Id = 2, WebName = "Vice" },
-                        new PremierLeagueElement { Id = 3, WebName = "Bench" }
+                        new PremierLeagueElement
+                        {
+                            Id = 1,
+                            TeamId = 1,
+                            ElementType = 2,
+                            WebName = "Captain"
+                        },
+                        new PremierLeagueElement
+                        {
+                            Id = 2,
+                            TeamId = 2,
+                            ElementType = 3,
+                            WebName = "Vice"
+                        },
+                        new PremierLeagueElement
+                        {
+                            Id = 3,
+                            TeamId = 3,
+                            ElementType = 4,
+                            WebName = "Bench"
+                        }
                     ]
                 })
                 : Task.FromException<BootstrapStaticResponse>(BootstrapException);
@@ -197,6 +247,7 @@ public sealed class FplLiveInsightsServiceTests
             Operations.Add($"Picks:{entryId}:{eventId}");
             return Task.FromResult(new EntryEventPicksResponse
             {
+                EntryHistory = new EntryEventHistory(),
                 Picks =
                 [
                     new EntryEventPick
@@ -221,6 +272,14 @@ public sealed class FplLiveInsightsServiceTests
                     }
                 ]
             });
+        }
+
+        public Task<IReadOnlyList<PremierLeagueFixture>> GetFixturesAsync(
+            int eventId,
+            CancellationToken cancellationToken)
+        {
+            Operations.Add($"Fixtures:{eventId}");
+            return Task.FromResult(Fixtures);
         }
 
         public Task<EventLiveResponse> GetEventLiveAsync(

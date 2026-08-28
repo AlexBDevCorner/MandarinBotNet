@@ -34,6 +34,8 @@ public sealed class FantasyPremierLeagueClientTests
                       "elements": [
                         {
                           "id": 7,
+                          "team": 14,
+                          "element_type": 2,
                           "web_name": "Player",
                           "now_cost": 85
                         }
@@ -51,7 +53,15 @@ public sealed class FantasyPremierLeagueClientTests
         result.Events[0].Id.Should().Be(42);
         result.Events[0].IsFinished.Should().BeTrue();
         result.Events[0].IsCurrent.Should().BeTrue();
-        result.Elements.Should().ContainSingle().Which.NowCost.Should().Be(85);
+        result.Elements.Should().ContainSingle().Which.Should().BeEquivalentTo(
+            new PremierLeagueElement
+            {
+                Id = 7,
+                TeamId = 14,
+                ElementType = 2,
+                WebName = "Player",
+                NowCost = 85
+            });
         handler.AttemptCount.Should().Be(2);
         handler.RequestUris.Should().OnlyContain(
             uri => uri.AbsolutePath == "/api/bootstrap-static/");
@@ -303,6 +313,7 @@ public sealed class FantasyPremierLeagueClientTests
             Task.FromResult(CreateJsonResponse(
                 """
                 {
+                  "active_chip": "3xc",
                   "picks": [
                     {
                       "element": 1,
@@ -314,7 +325,7 @@ public sealed class FantasyPremierLeagueClientTests
                     {
                       "element": 2,
                       "position": 1,
-                      "multiplier": 2,
+                      "multiplier": 3,
                       "is_captain": true,
                       "is_vice_captain": false
                     }
@@ -341,8 +352,9 @@ public sealed class FantasyPremierLeagueClientTests
         result.Picks[0].Element.Should().Be(1);
         result.Picks[0].Multiplier.Should().Be(0);
         result.Picks[1].Element.Should().Be(2);
-        result.Picks[1].Multiplier.Should().Be(2);
+        result.Picks[1].Multiplier.Should().Be(3);
         result.Picks[1].IsCaptain.Should().BeTrue();
+        result.ActiveChip.Should().Be("3xc");
         result.AutomaticSubstitutions.Should().ContainSingle().Which.Should()
             .BeEquivalentTo(new EntryAutomaticSubstitution
             {
@@ -364,12 +376,23 @@ public sealed class FantasyPremierLeagueClientTests
                   "elements": [
                     {
                       "id": 1,
-                      "stats": { "total_points": 15, "minutes": 90, "goals_scored": 2 },
+                      "stats": {
+                        "total_points": 15,
+                        "minutes": 90,
+                        "yellow_cards": 0,
+                        "red_cards": 0,
+                        "goals_scored": 2
+                      },
                       "explain": []
                     },
                     {
                       "id": 2,
-                      "stats": { "total_points": -1, "minutes": 0 },
+                      "stats": {
+                        "total_points": -1,
+                        "minutes": 0,
+                        "yellow_cards": 1,
+                        "red_cards": 0
+                      },
                       "explain": []
                     }
                   ]
@@ -386,8 +409,60 @@ public sealed class FantasyPremierLeagueClientTests
             .Should().BeEquivalentTo([(1, 15), (2, -1)]);
         result.Elements.Select(element => element.Stats.Minutes)
             .Should().BeEquivalentTo([90, 0]);
+        result.Elements.Select(element => element.Stats.YellowCards)
+            .Should().BeEquivalentTo([0, 1]);
+        result.Elements.Select(element => element.Stats.RedCards)
+            .Should().BeEquivalentTo([0, 0]);
         handler.RequestUris.Should().OnlyContain(
             uri => uri.PathAndQuery == "/api/event/8/live/");
+    }
+
+    [Test]
+    public async Task GetFixturesAsync_ValidPayload_ReturnsFixtureStateAndTeamIds()
+    {
+        // Arrange
+        var handler = new StubHttpMessageHandler((_, _) =>
+            Task.FromResult(CreateJsonResponse(
+                """
+                [
+                  {
+                    "id": 99,
+                    "event": 8,
+                    "team_h": 14,
+                    "team_a": 21,
+                    "kickoff_time": "2027-02-02T12:00:00Z",
+                    "started": true,
+                    "finished": false
+                  }
+                ]
+                """)));
+        using var provider = CreateProvider(handler);
+        var client = provider.GetRequiredService<IFantasyPremierLeagueClient>();
+
+        // Act
+        var result = await client.GetFixturesAsync(8, CancellationToken.None);
+
+        // Assert
+        result.Should().ContainSingle().Which.Should().BeEquivalentTo(
+            new PremierLeagueFixture
+            {
+                Id = 99,
+                EventId = 8,
+                HomeTeamId = 14,
+                AwayTeamId = 21,
+                KickoffTimeUtc = new DateTimeOffset(
+                    2027,
+                    2,
+                    2,
+                    12,
+                    0,
+                    0,
+                    TimeSpan.Zero),
+                Started = true,
+                Finished = false
+            });
+        handler.RequestUris.Should().OnlyContain(
+            uri => uri.PathAndQuery == "/api/fixtures/?event=8");
     }
 
     [Test]
@@ -485,10 +560,13 @@ public sealed class FantasyPremierLeagueClientTests
             {
               "standings": {
                 "page": {{page}},
-                "has_next": {{hasNext.ToString().ToLowerInvariant()}},
-                "results": [
+                  "has_next": {{hasNext.ToString().ToLowerInvariant()}},
+                  "results": [
                   {
+                    "event_total": 0,
+                    "last_rank": {{rank}},
                     "rank": {{rank}},
+                    "total": 100,
                     "entry_name": "Team {{rank}}"
                   }
                 ]

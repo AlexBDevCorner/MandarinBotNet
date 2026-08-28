@@ -20,8 +20,15 @@ public sealed class EventLiveElement
 public sealed class EventLiveElementStats
 {
     [JsonPropertyName("total_points")]
+    [JsonRequired]
     public int TotalPoints { get; init; }
 
     [JsonPropertyName("minutes")]
     public int Minutes { get; init; }
+
+    [JsonPropertyName("yellow_cards")]
+    public int YellowCards { get; init; }
+
+    [JsonPropertyName("red_cards")]
+    public int RedCards { get; init; }
 }

@@ -23,4 +23,8 @@ public interface IFantasyPremierLeagueClient
     Task<EventLiveResponse> GetEventLiveAsync(
         int eventId,
         CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<PremierLeagueFixture>> GetFixturesAsync(
+        int eventId,
+        CancellationToken cancellationToken);
 }

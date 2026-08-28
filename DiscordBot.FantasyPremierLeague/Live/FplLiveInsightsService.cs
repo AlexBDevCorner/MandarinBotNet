@@ -92,6 +92,9 @@ public sealed class FplLiveInsightsService(
                     capturedAtUtc));
             }
 
+            var fixtures = await premierLeagueClient.GetFixturesAsync(
+                eventId,
+                cancellationToken);
             var live = await premierLeagueClient.GetEventLiveAsync(
                 eventId,
                 cancellationToken);
@@ -128,7 +131,8 @@ public sealed class FplLiveInsightsService(
                 standings.Standings.Results,
                 picksByEntry,
                 players,
-                livePlayers);
+                livePlayers,
+                fixtures);
             logger.LogInformation(
                 "Calculated FPL live insights for season {Season} event {EventId} with " +
                 "{ManagerCount} managers, {BenchAlertCount} bench alerts, " +
@@ -191,6 +195,7 @@ public sealed class FplLiveInsightsService(
             eventId,
             sourceUpdatedAtUtc,
             capturedAtUtc,
+            [],
             [],
             [],
             [],
