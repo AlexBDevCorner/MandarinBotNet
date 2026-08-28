@@ -66,7 +66,8 @@ public sealed class FplGameweekRecapService(
                 return null;
             }
 
-            var recap = calculationService.Calculate(snapshot);
+            var seasonHistory = statisticsStore.GetSnapshots(season);
+            var recap = calculationService.Calculate(snapshot, seasonHistory);
             var recognition = recognitionService.EvaluateAndPersist(snapshot);
             return recap with
             {

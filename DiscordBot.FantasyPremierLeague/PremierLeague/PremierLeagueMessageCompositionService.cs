@@ -117,61 +117,34 @@ public sealed class PremierLeagueMessageCompositionService(
         ArgumentNullException.ThrowIfNull(recap);
 
         var summary = new StringBuilder(
-            $"📊 Лига Пельменных Обнимашек — итоги тура " +
-            $"{recap.EventId.ToString(CultureInfo.InvariantCulture)} " +
-            $"(сезон {DiscordTextSafety.SanitizeExternalName(recap.Season)}):");
+            $"📊 GW{recap.EventId.ToString(CultureInfo.InvariantCulture)} — что произошло");
 
-        summary.Append("\n\n👑 Победитель тура: ");
-        summary.Append(FormatManagersWithScore(
-            recap.HighestScorers,
-            recap.HighestScore));
-        summary.Append("\n🚀 Лучший результат: ");
-        summary.Append(FormatManagersWithScore(
-            recap.HighestScorers,
-            recap.HighestScore));
-        summary.Append("\n🫣 Худший результат: ");
-        summary.Append(FormatManagersWithScore(
-            recap.LowestScorers,
-            recap.LowestScore));
-        summary.Append("\n📈 Средний балл лиги: ");
-        summary.Append(recap.AverageScore.ToString("0.0", CultureInfo.InvariantCulture));
-        summary.Append("\n🧗 Главный взлёт: ");
-        summary.Append(FormatRankChanges(recap.BiggestClimbers, recap.BiggestClimb));
-        summary.Append("\n🪂 Главное падение: ");
-        summary.Append(FormatRankChanges(recap.BiggestFallers, recap.BiggestFall));
-
-        summary.Append("\n\n🔄 Заметные изменения позиций:");
-        if (recap.NotableRankChanges.Count == 0)
+        foreach (var highlight in recap.Highlights)
         {
-            summary.Append("\n(нет заметных изменений)");
+            summary.Append('\n');
+            AppendHighlight(summary, highlight);
         }
-        else
+
+        if (recap.SeasonTrends.Count > 0)
         {
-            foreach (var manager in recap.NotableRankChanges)
+            summary.Append("\n\n📈 Сюжет сезона");
+            foreach (var trend in recap.SeasonTrends)
             {
-                summary.Append("\n");
-                summary.Append(FormatRankChange(manager));
+                AppendTrend(summary, trend);
             }
         }
 
-        summary.Append("\n\n🏆 Номинации:");
-        summary.Append("\n👑 Победитель тура: ");
-        summary.Append(FormatManagersWithScore(
-            recap.HighestScorers,
-            recap.HighestScore));
-        summary.Append("\n🤡 Фрод тура: ");
-        summary.Append(FormatManagersWithScore(
-            recap.LowestScorers,
-            recap.LowestScore));
-        summary.Append("\n🪑 Повелитель скамейки: ");
-        summary.Append(FormatManagersWithScore(
-            recap.Benchmasters,
-            manager => manager.BenchPoints));
-        summary.Append("\n🧠 Капитанский гений: ");
-        summary.Append(FormatCaptainPerformances(recap.CaptainGeniuses));
+        if (recap.Standings.Count > 0)
+        {
+            summary.Append("\n\n🏆 Таблица");
+            AppendStandings(summary, recap.Standings);
+        }
 
-        summary.Append("\n\n🎖️ Достижения:");
-        AppendAchievements(summary, recap.Achievements);
+        if (recap.Achievements.Count > 0)
+        {
+            summary.Append("\n\n🎖️ Достижения");
+            AppendAchievements(summary, recap.Achievements);
+        }
 
         return summary.ToString();
     }
@@ -249,77 +222,174 @@ public sealed class PremierLeagueMessageCompositionService(
         return count;
     }
 
-    private static string FormatManagersWithScore(
-        IEnumerable<FplManagerGameweekStatistics> managers,
-        int score)
+    private static void AppendHighlight(StringBuilder summary, FplRecapHighlight highlight)
     {
-        return FormatManagersWithScore(managers, _ => score);
-    }
-
-    private static string FormatManagersWithScore(
-        IEnumerable<FplManagerGameweekStatistics> managers,
-        Func<FplManagerGameweekStatistics, int> score)
-    {
-        var formattedManagers = managers
-            .Select(manager =>
-                $"{DiscordTextSafety.SanitizeExternalName(manager.EntryName)} — " +
-                $"{score(manager).ToString(CultureInfo.InvariantCulture)} очков")
-            .ToArray();
-
-        return formattedManagers.Length == 0
-            ? "(нет данных)"
-            : string.Join(", ", formattedManagers);
-    }
-
-    private static string FormatRankChanges(
-        IEnumerable<FplManagerGameweekStatistics> managers,
-        int rankChange)
-    {
-        if (rankChange == 0)
+        switch (highlight)
         {
-            return "(нет изменений)";
+            case FplGameweekWinnerHighlight winner:
+                AppendWinner(summary, winner);
+                break;
+            case FplRankMovementHighlight movement:
+                summary.Append(
+                    movement.Kind == FplRecapHighlightKind.BiggestClimb
+                        ? "🚀 "
+                        : "🪂 ");
+                summary.Append(DiscordTextSafety.SanitizeExternalName(
+                    movement.Manager.EntryName));
+                summary.Append(
+                    movement.Kind == FplRecapHighlightKind.BiggestClimb
+                        ? " взлетел с "
+                        : " упал с ");
+                summary.Append(OrdinalGenitive(movement.PreviousRank));
+                summary.Append(" на ");
+                summary.Append(OrdinalPlace(movement.CurrentRank));
+                break;
+            case FplCaptainDisasterHighlight captainDisaster:
+                summary.Append("💥 ");
+                summary.Append(DiscordTextSafety.SanitizeExternalName(
+                    captainDisaster.Manager.EntryName));
+                summary.Append(": капитан ");
+                summary.Append(DiscordTextSafety.SanitizeExternalName(
+                    captainDisaster.Captain.PlayerName));
+                summary.Append(
+                    $" — {captainDisaster.Captain.Points.ToString(CultureInfo.InvariantCulture)}, VC ");
+                summary.Append(DiscordTextSafety.SanitizeExternalName(
+                    captainDisaster.ViceCaptain.PlayerName));
+                summary.Append(
+                    $" — {captainDisaster.ViceCaptain.Points.ToString(CultureInfo.InvariantCulture)}");
+                break;
+            case FplTransferHitHighlight transferHit:
+                summary.Append("💸 ");
+                summary.Append(DiscordTextSafety.SanitizeExternalName(
+                    transferHit.Manager.EntryName));
+                summary.Append(
+                    $" взял -{transferHit.TransferCost.ToString(CultureInfo.InvariantCulture)} " +
+                    "за трансферы и закончил тур с " +
+                    $"{transferHit.Manager.EventScore.ToString(CultureInfo.InvariantCulture)} " +
+                    $"{FormatPointsInstrumental(transferHit.Manager.EventScore)}");
+                break;
+            case FplBenchDisasterHighlight benchDisaster:
+                summary.Append("🪑 ");
+                summary.Append(DiscordTextSafety.SanitizeExternalName(
+                    benchDisaster.Manager.EntryName));
+                summary.Append(
+                    $" оставил {benchDisaster.Manager.BenchPoints.ToString(CultureInfo.InvariantCulture)} " +
+                    $"{FormatPointsNoun(benchDisaster.Manager.BenchPoints)} на скамейке");
+                break;
+        }
+    }
+
+    private static void AppendWinner(
+        StringBuilder summary,
+        FplGameweekWinnerHighlight highlight)
+    {
+        summary.Append("👑 ");
+        summary.Append(DiscordTextSafety.SanitizeExternalName(
+            highlight.Winners[0].EntryName));
+        if (highlight.Winners.Count > 1)
+        {
+            for (var i = 1; i < highlight.Winners.Count; i++)
+            {
+                summary.Append(i == highlight.Winners.Count - 1 ? " и " : ", ");
+                summary.Append(DiscordTextSafety.SanitizeExternalName(
+                    highlight.Winners[i].EntryName));
+            }
+
+            summary.Append(" разделили победу в туре");
+        }
+        else
+        {
+            summary.Append(" выиграл тур");
         }
 
-        return string.Join(
-            ", ",
-            managers.Select(manager =>
-                $"{DiscordTextSafety.SanitizeExternalName(manager.EntryName)} " +
-                $"({FormatSignedNumber(rankChange)})"));
+        summary.Append(
+            $" — {highlight.Score.ToString(CultureInfo.InvariantCulture)} " +
+            $"{FormatPointsNoun(highlight.Score)}");
     }
 
-    private static string FormatRankChange(FplManagerGameweekStatistics manager)
+    private static void AppendTrend(StringBuilder summary, FplSeasonTrend trend)
     {
-        return $"{DiscordTextSafety.SanitizeExternalName(manager.EntryName)} " +
-            $"({FormatSignedNumber(manager.RankChange)})";
+        switch (trend)
+        {
+            case FplFirstTimeAtTopTrend firstTime:
+                summary.Append("\n👑 ");
+                summary.Append(DiscordTextSafety.SanitizeExternalName(
+                    firstTime.Leader.EntryName));
+                summary.Append(
+                    firstTime.SinceTrackingStarted
+                        ? " впервые с начала отслеживания вышел на первое место"
+                        : " впервые вышел на первое место");
+                break;
+            case FplRecentWinsTrend recentWins:
+                summary.Append("\n🔥 ");
+                summary.Append(DiscordTextSafety.SanitizeExternalName(
+                    recentWins.Manager.EntryName));
+                summary.Append(
+                    $" — {recentWins.WinCount.ToString(CultureInfo.InvariantCulture)} " +
+                    $"победы за последние {recentWins.Window.ToString(CultureInfo.InvariantCulture)} туров");
+                break;
+            case FplConsecutiveRankRisesTrend rises:
+                summary.Append("\n⬆️ ");
+                summary.Append(DiscordTextSafety.SanitizeExternalName(
+                    rises.Manager.EntryName));
+                summary.Append(
+                    $" поднимается в таблице " +
+                    $"{rises.StreakLength.ToString(CultureInfo.InvariantCulture)} тура подряд");
+                break;
+            case FplLeaderGapReductionTrend gap:
+                summary.Append("\n🎯 ");
+                summary.Append(DiscordTextSafety.SanitizeExternalName(
+                    gap.Manager.EntryName));
+                summary.Append(
+                    $" сократил отставание от лидера с " +
+                    $"{gap.PreviousGap.ToString(CultureInfo.InvariantCulture)} до " +
+                    $"{gap.CurrentGap.ToString(CultureInfo.InvariantCulture)} " +
+                    $"{FormatPointsNoun(gap.CurrentGap)}");
+                break;
+        }
     }
 
-    private static string FormatCaptainPerformances(
-        IEnumerable<FplCaptainPerformance> performances)
+    private static void AppendStandings(
+        StringBuilder summary,
+        IReadOnlyList<FplManagerGameweekStatistics> standings)
     {
-        var formattedPerformances = performances
-            .Select(performance =>
-                $"{DiscordTextSafety.SanitizeExternalName(performance.Manager.EntryName)} " +
-                $"({DiscordTextSafety.SanitizeExternalName(performance.Captain.PlayerName)}, " +
-                $"{performance.EffectivePoints.ToString(CultureInfo.InvariantCulture)} очков)")
-            .ToArray();
+        if (standings.Count == 0)
+        {
+            return;
+        }
 
-        return formattedPerformances.Length == 0
-            ? "(нет данных)"
-            : string.Join(", ", formattedPerformances);
+        var leader = standings[0];
+        for (var i = 0; i < standings.Count; i++)
+        {
+            var manager = standings[i];
+            summary.Append('\n');
+            summary.Append(GetStandingsRankLabel(i + 1));
+            summary.Append(' ');
+            summary.Append(DiscordTextSafety.SanitizeExternalName(manager.EntryName));
+            summary.Append(" — ");
+            summary.Append(FormatTotal(manager.TotalScore));
+
+            if (manager.LastRank > 0 && manager.Rank != manager.LastRank)
+            {
+                var delta = Math.Abs(manager.Rank - manager.LastRank);
+                var arrow = manager.Rank < manager.LastRank ? '↑' : '↓';
+                summary.Append(
+                    $" {arrow}{delta.ToString(CultureInfo.InvariantCulture)}");
+            }
+
+            if (manager.EntryId != leader.EntryId)
+            {
+                var gap = leader.TotalScore - manager.TotalScore;
+                summary.Append($" — {gap.ToString(CultureInfo.InvariantCulture)} до лидера");
+            }
+        }
     }
 
     private static void AppendAchievements(
         StringBuilder summary,
         IEnumerable<FplAchievementAward> achievements)
     {
-        var awards = achievements.ToArray();
-        if (awards.Length == 0)
-        {
-            summary.Append("\n(пока нет)");
-            return;
-        }
-
-        foreach (var award in awards)
+        foreach (var award in achievements)
         {
             summary.Append("\n");
             summary.Append(DiscordTextSafety.SanitizeExternalName(award.EntryName));
@@ -341,12 +411,13 @@ public sealed class PremierLeagueMessageCompositionService(
         };
     }
 
-    private static string FormatSignedNumber(int value)
+    private static string GetStandingsRankLabel(int rank) => rank switch
     {
-        return value > 0
-            ? $"+{value.ToString(CultureInfo.InvariantCulture)}"
-            : value.ToString(CultureInfo.InvariantCulture);
-    }
+        1 => "🥇",
+        2 => "🥈",
+        3 => "🥉",
+        _ => $"{rank.ToString(CultureInfo.InvariantCulture)}."
+    };
 
     private static string GetRankLabel(int rank) => rank switch
     {
@@ -355,6 +426,50 @@ public sealed class PremierLeagueMessageCompositionService(
         3 => ":three:",
         _ => $"{rank.ToString(CultureInfo.InvariantCulture)}."
     };
+
+    private static string FormatTotal(int total)
+    {
+        return total.ToString("#,##0", CultureInfo.InvariantCulture).Replace(',', ' ');
+    }
+
+    private static string OrdinalGenitive(int rank)
+    {
+        return $"{rank.ToString(CultureInfo.InvariantCulture)}-го";
+    }
+
+    private static string OrdinalPlace(int rank)
+    {
+        return $"{rank.ToString(CultureInfo.InvariantCulture)}-е место";
+    }
+
+    private static string FormatPointsNoun(int count)
+    {
+        var mod10 = count % 10;
+        var mod100 = count % 100;
+        if (mod10 == 1 && mod100 != 11)
+        {
+            return "очко";
+        }
+
+        if (mod10 is >= 2 and <= 4 && (mod100 < 10 || mod100 >= 20))
+        {
+            return "очка";
+        }
+
+        return "очков";
+    }
+
+    private static string FormatPointsInstrumental(int count)
+    {
+        var mod10 = count % 10;
+        var mod100 = count % 100;
+        if (mod10 == 1 && mod100 != 11)
+        {
+            return "очком";
+        }
+
+        return "очками";
+    }
 
     private static IReadOnlyList<string> GetCongratulationsMessages(
         ClassicStanding eventWinner)

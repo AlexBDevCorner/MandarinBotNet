@@ -30,7 +30,7 @@ public sealed class FplGameweekRecapServiceTests
             client,
             store,
             collectionService,
-            new FplGameweekRecapCalculationService(),
+            new FplGameweekRecapCalculationService(options),
             recognitionService,
             new RecordingLogger<FplGameweekRecapService>());
 
@@ -41,7 +41,8 @@ public sealed class FplGameweekRecapServiceTests
         recap.Should().NotBeNull();
         recap!.Season.Should().Be("2026/27");
         recap.EventId.Should().Be(5);
-        recap.HighestScorers.Should().ContainSingle().Which.EntryName.Should().Be("Team A");
+        recap.Highlights.OfType<FplGameweekWinnerHighlight>().Single().Winners
+            .Should().ContainSingle().Which.EntryName.Should().Be("Team A");
         store.GetSnapshot("2026/27", 5).Should().NotBeNull();
     }
 
@@ -83,7 +84,7 @@ public sealed class FplGameweekRecapServiceTests
             client,
             store,
             collectionService,
-            new FplGameweekRecapCalculationService(),
+            new FplGameweekRecapCalculationService(options),
             recognitionService,
             logger);
 
@@ -95,6 +96,45 @@ public sealed class FplGameweekRecapServiceTests
         logger.Entries.Should().Contain(entry =>
             entry.Level == LogLevel.Warning &&
             entry.Message.Contains("source data was unavailable or incomplete"));
+    }
+
+    [Test]
+    public async Task GetLatestAsync_SeasonHistory_LoadedAndPassedToCalculation()
+    {
+        // Arrange
+        var client = new TestFantasyPremierLeagueClient();
+        var store = new SpyFplStatisticsStore();
+        store.SaveSnapshot(CreateSnapshot(
+            4,
+            CreateManager(200, "Old Leader", 60, 500, 1, 1),
+            CreateManager(100, "Team A", 50, 400, 2, 3)));
+        store.SaveSnapshot(CreateSnapshot(
+            5,
+            CreateManager(100, "Team A", 50, 450, 1, 2),
+            CreateManager(200, "Old Leader", 60, 440, 2, 1)));
+        var options = new FantasyPremierLeagueOptions { ClassicLeagueId = 123 };
+        var collectionService = new FplStatisticsCollectionService(
+            client,
+            options,
+            store,
+            new FixedTimeProvider(),
+            new RecordingLogger<FplStatisticsCollectionService>());
+        var recognitionService = CreateRecognitionService(options, store);
+        var service = new FplGameweekRecapService(
+            client,
+            store,
+            collectionService,
+            new FplGameweekRecapCalculationService(options),
+            recognitionService,
+            new RecordingLogger<FplGameweekRecapService>());
+
+        // Act
+        var recap = await service.GetLatestAsync(CancellationToken.None);
+
+        // Assert
+        recap.Should().NotBeNull();
+        store.GetSnapshotsCalled.Should().BeTrue();
+        recap!.SeasonTrends.OfType<FplFirstTimeAtTopTrend>().Should().ContainSingle();
     }
 
     private sealed class TestFantasyPremierLeagueClient : IFantasyPremierLeagueClient
@@ -211,7 +251,7 @@ public sealed class FplGameweekRecapServiceTests
         }
     }
 
-    private sealed class InMemoryFplStatisticsStore : IFplStatisticsStore
+    private class InMemoryFplStatisticsStore : IFplStatisticsStore
     {
         private readonly List<FplGameweekSnapshot> _snapshots = [];
 
@@ -234,7 +274,7 @@ public sealed class FplGameweekRecapServiceTests
                 snapshot.Season == season && snapshot.EventId == eventId);
         }
 
-        public IReadOnlyList<FplGameweekSnapshot> GetSnapshots(
+        public virtual IReadOnlyList<FplGameweekSnapshot> GetSnapshots(
             string season,
             int? eventId = null,
             int? managerEntryId = null)
@@ -245,6 +285,56 @@ public sealed class FplGameweekRecapServiceTests
                 .ToArray();
         }
     }
+
+    private sealed class SpyFplStatisticsStore : InMemoryFplStatisticsStore
+    {
+        public bool GetSnapshotsCalled { get; private set; }
+
+        public override IReadOnlyList<FplGameweekSnapshot> GetSnapshots(
+            string season,
+            int? eventId = null,
+            int? managerEntryId = null)
+        {
+            GetSnapshotsCalled = true;
+            return base.GetSnapshots(season, eventId, managerEntryId);
+        }
+    }
+
+    private static FplGameweekSnapshot CreateSnapshot(
+        int eventId,
+        params FplManagerGameweekStatistics[] managers) => new(
+            "2026/27",
+            eventId,
+            DateTimeOffset.UtcNow,
+            DateTimeOffset.UtcNow,
+            DateTimeOffset.UtcNow,
+            managers);
+
+    private static FplManagerGameweekStatistics CreateManager(
+        int entryId,
+        string entryName,
+        int eventScore,
+        int totalScore,
+        int rank,
+        int lastRank,
+        int benchPoints = 0) => new(
+            entryId,
+            entryName,
+            $"Manager {entryName}",
+            eventScore,
+            totalScore,
+            rank,
+            lastRank,
+            lastRank - rank,
+            benchPoints,
+            [
+                new FplLineupPick(
+                    entryId, $"Cap {entryName}", 1, 2, IsCaptain: true, IsViceCaptain: false, Points: 10),
+                new FplLineupPick(
+                    entryId + 1, $"VC {entryName}", 2, 1, IsCaptain: false, IsViceCaptain: true, Points: 0),
+                new FplLineupPick(
+                    entryId + 2, $"Bench {entryName}", 12, 0, IsCaptain: false, IsViceCaptain: false, Points: benchPoints)
+            ]);
 
     private static FplRecognitionService CreateRecognitionService(
         FantasyPremierLeagueOptions options,
