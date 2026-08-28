@@ -4,6 +4,9 @@ namespace DiscordBot.Responses;
 
 public sealed class EntryEventPicksResponse
 {
+    [JsonPropertyName("active_chip")]
+    public string? ActiveChip { get; init; }
+
     [JsonPropertyName("picks")]
     public List<EntryEventPick> Picks { get; init; } = null!;
 

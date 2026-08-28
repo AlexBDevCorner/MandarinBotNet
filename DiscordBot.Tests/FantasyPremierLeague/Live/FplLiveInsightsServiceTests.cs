@@ -198,9 +198,27 @@ public sealed class FplLiveInsightsServiceTests
                     ],
                     Elements =
                     [
-                        new PremierLeagueElement { Id = 1, TeamId = 1, WebName = "Captain" },
-                        new PremierLeagueElement { Id = 2, TeamId = 2, WebName = "Vice" },
-                        new PremierLeagueElement { Id = 3, TeamId = 3, WebName = "Bench" }
+                        new PremierLeagueElement
+                        {
+                            Id = 1,
+                            TeamId = 1,
+                            ElementType = 2,
+                            WebName = "Captain"
+                        },
+                        new PremierLeagueElement
+                        {
+                            Id = 2,
+                            TeamId = 2,
+                            ElementType = 3,
+                            WebName = "Vice"
+                        },
+                        new PremierLeagueElement
+                        {
+                            Id = 3,
+                            TeamId = 3,
+                            ElementType = 4,
+                            WebName = "Bench"
+                        }
                     ]
                 })
                 : Task.FromException<BootstrapStaticResponse>(BootstrapException);

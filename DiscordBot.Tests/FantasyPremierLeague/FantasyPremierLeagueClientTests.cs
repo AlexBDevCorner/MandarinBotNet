@@ -35,6 +35,7 @@ public sealed class FantasyPremierLeagueClientTests
                         {
                           "id": 7,
                           "team": 14,
+                          "element_type": 2,
                           "web_name": "Player",
                           "now_cost": 85
                         }
@@ -57,6 +58,7 @@ public sealed class FantasyPremierLeagueClientTests
             {
                 Id = 7,
                 TeamId = 14,
+                ElementType = 2,
                 WebName = "Player",
                 NowCost = 85
             });
@@ -311,6 +313,7 @@ public sealed class FantasyPremierLeagueClientTests
             Task.FromResult(CreateJsonResponse(
                 """
                 {
+                  "active_chip": "3xc",
                   "picks": [
                     {
                       "element": 1,
@@ -322,7 +325,7 @@ public sealed class FantasyPremierLeagueClientTests
                     {
                       "element": 2,
                       "position": 1,
-                      "multiplier": 2,
+                      "multiplier": 3,
                       "is_captain": true,
                       "is_vice_captain": false
                     }
@@ -349,8 +352,9 @@ public sealed class FantasyPremierLeagueClientTests
         result.Picks[0].Element.Should().Be(1);
         result.Picks[0].Multiplier.Should().Be(0);
         result.Picks[1].Element.Should().Be(2);
-        result.Picks[1].Multiplier.Should().Be(2);
+        result.Picks[1].Multiplier.Should().Be(3);
         result.Picks[1].IsCaptain.Should().BeTrue();
+        result.ActiveChip.Should().Be("3xc");
         result.AutomaticSubstitutions.Should().ContainSingle().Which.Should()
             .BeEquivalentTo(new EntryAutomaticSubstitution
             {

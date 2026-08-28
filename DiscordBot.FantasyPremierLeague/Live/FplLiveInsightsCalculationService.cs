@@ -75,11 +75,13 @@ public sealed class FplLiveInsightsCalculationService(
 
         var orderedScores = OrderManagerScores(scores);
         var managers = CreateManagerInsights(orderedScores);
+        var scoresByEntry = scores.ToDictionary(score => score.Standing.Entry);
         var benchAlerts = managers
             .Where(manager => manager.BenchPoints >= options.LargeBenchPointsThreshold)
             .ToArray();
         var captainDisasters = managers
             .Where(manager =>
+                scoresByEntry[manager.EntryId].CaptainFixtureFinished &&
                 manager.Captain.CaptainPoints <= options.CaptainDisasterPointsThreshold &&
                 manager.Captain.ViceCaptainPoints >=
                     options.CaptainDisasterViceCaptainPointsThreshold &&
@@ -140,36 +142,50 @@ public sealed class FplLiveInsightsCalculationService(
             standing.Entry);
         var captainPick = picks.Picks.Single(pick => pick.IsCaptain);
         var viceCaptainPick = picks.Picks.Single(pick => pick.IsViceCaptain);
+        var effectiveLineup = CalculateEffectiveLineup(
+            picks,
+            picksByPlayer,
+            players,
+            livePlayers,
+            teamStates,
+            season,
+            eventId,
+            standing.Entry);
         var captainStats = livePlayers[captainPick.Element];
         var viceCaptainStats = livePlayers[viceCaptainPick.Element];
         var captain = new FplLiveCaptainInsights(
             players[captainPick.Element].WebName,
             captainStats.TotalPoints,
-            checked(captainStats.TotalPoints * captainPick.Multiplier),
+            checked(captainStats.TotalPoints *
+                effectiveLineup.EffectiveMultipliers[captainPick.Element]),
             players[viceCaptainPick.Element].WebName,
             viceCaptainStats.TotalPoints,
-            checked(viceCaptainStats.TotalPoints * viceCaptainPick.Multiplier));
+            checked(viceCaptainStats.TotalPoints *
+                effectiveLineup.EffectiveMultipliers[viceCaptainPick.Element]));
         var managerAutomaticSubstitutionSalvations =
             CreateAutomaticSubstitutionSalvations(
                 standing,
-                picks,
-                picksByPlayer,
+                effectiveLineup.AutomaticSubstitutions,
                 players,
-                livePlayers,
-                season,
-                eventId);
+                livePlayers);
         var rawLiveGameweekPoints = CalculateRawLiveGameweekPoints(
             picks.Picks,
+            effectiveLineup.EffectiveMultipliers,
             livePlayers);
         var transferCost = picks.EntryHistory.EventTransfersCost;
         var liveGameweekPoints = checked(rawLiveGameweekPoints - transferCost);
         var previousTotalPoints = checked(standing.Total - standing.EventTotal);
         var liveTotalPoints = checked(previousTotalPoints + liveGameweekPoints);
-        var benchPoints = CalculateBenchPoints(picks.Picks, livePlayers);
+        var benchPoints = CalculateBenchPoints(
+            picks.Picks,
+            effectiveLineup.EffectiveMultipliers,
+            livePlayers);
         var playerProgress = CalculatePlayerProgress(
             picks.Picks,
             players,
             teamStates,
+            effectiveLineup.EffectiveMultipliers,
+            effectiveLineup.EffectiveCaptainElement,
             standing);
 
         return new FplLiveManagerScore(
@@ -184,18 +200,316 @@ public sealed class FplLiveInsightsCalculationService(
             playerProgress.Exposures,
             benchPoints,
             captain,
-            managerAutomaticSubstitutionSalvations);
+            managerAutomaticSubstitutionSalvations,
+            effectiveLineup.CaptainFixtureFinished);
+    }
+
+    private static FplLiveEffectiveLineup CalculateEffectiveLineup(
+        EntryEventPicksResponse picks,
+        IReadOnlyDictionary<int, EntryEventPick> picksByPlayer,
+        IReadOnlyDictionary<int, PremierLeagueElement> players,
+        IReadOnlyDictionary<int, EventLiveElementStats> livePlayers,
+        IReadOnlyDictionary<int, FplTeamLiveState> teamStates,
+        string season,
+        int eventId,
+        int entryId)
+    {
+        var captain = picks.Picks.Single(pick => pick.IsCaptain);
+        var viceCaptain = picks.Picks.Single(pick => pick.IsViceCaptain);
+        var isBenchBoost = string.Equals(
+            picks.ActiveChip,
+            "bboost",
+            StringComparison.OrdinalIgnoreCase);
+        var effectiveMultipliers = picks.Picks.ToDictionary(
+            pick => pick.Element,
+            pick => isBenchBoost || pick.Position <= 11 ? 1 : 0);
+        var substitutions = new List<EntryAutomaticSubstitution>();
+
+        if (!isBenchBoost)
+        {
+            var declaredSubstitutions = picks.AutomaticSubstitutions ?? [];
+            if (declaredSubstitutions.Count > 0)
+            {
+                ApplyAutomaticSubstitutions(
+                    declaredSubstitutions,
+                    picksByPlayer,
+                    effectiveMultipliers,
+                    season,
+                    eventId,
+                    entryId);
+                substitutions.AddRange(declaredSubstitutions);
+            }
+            else
+            {
+                var projectedSubstitutions = SimulateAutomaticSubstitutions(
+                    picks.Picks,
+                    players,
+                    livePlayers,
+                    teamStates);
+                ApplyAutomaticSubstitutions(
+                    projectedSubstitutions,
+                    picksByPlayer,
+                    effectiveMultipliers,
+                    season,
+                    eventId,
+                    entryId);
+                substitutions.AddRange(projectedSubstitutions);
+            }
+
+            foreach (var pick in picks.Picks.Where(pick =>
+                         pick.Position <= 11 &&
+                         IsConfirmedNotPlaying(
+                             pick.Element,
+                             players,
+                             livePlayers,
+                             teamStates)))
+            {
+                effectiveMultipliers[pick.Element] = 0;
+            }
+        }
+
+        var captainWasConfirmedNotPlaying = IsConfirmedNotPlaying(
+            captain.Element,
+            players,
+            livePlayers,
+            teamStates);
+        var captainFixtureFinished =
+            teamStates[players[captain.Element].TeamId] == FplTeamLiveState.Finished;
+        var effectiveCaptainElement = IsEffectivePlayer(
+            captain,
+            effectiveMultipliers)
+            ? captain.Element
+            : 0;
+        if (captainWasConfirmedNotPlaying)
+        {
+            effectiveMultipliers[captain.Element] = 0;
+            effectiveCaptainElement = IsEffectivePlayer(
+                viceCaptain,
+                effectiveMultipliers) &&
+                !IsConfirmedNotPlaying(
+                    viceCaptain.Element,
+                    players,
+                    livePlayers,
+                    teamStates)
+                ? viceCaptain.Element
+                : 0;
+        }
+
+        var captainMultiplier = GetCaptainMultiplier(picks);
+        if (effectiveCaptainElement > 0)
+        {
+            effectiveMultipliers[effectiveCaptainElement] = captainMultiplier;
+        }
+
+        return new FplLiveEffectiveLineup(
+            effectiveMultipliers,
+            substitutions,
+            effectiveCaptainElement,
+            captainFixtureFinished);
+    }
+
+    private static int GetCaptainMultiplier(EntryEventPicksResponse picks)
+    {
+        return string.Equals(
+            picks.ActiveChip,
+            "3xc",
+            StringComparison.OrdinalIgnoreCase)
+            ? 3
+            : 2;
+    }
+
+    private static bool IsEffectivePlayer(
+        EntryEventPick pick,
+        IReadOnlyDictionary<int, int> effectiveMultipliers)
+    {
+        return effectiveMultipliers[pick.Element] > 0;
+    }
+
+    private static void ApplyAutomaticSubstitutions(
+        IReadOnlyList<EntryAutomaticSubstitution> substitutions,
+        IReadOnlyDictionary<int, EntryEventPick> picksByPlayer,
+        IDictionary<int, int> effectiveMultipliers,
+        string season,
+        int eventId,
+        int entryId)
+    {
+        var substitutedPlayers = new HashSet<int>();
+        foreach (var substitution in substitutions)
+        {
+            // Live payloads can retain original positions, while finalized payloads
+            // may already have moved the two players into their effective slots.
+            if (substitution is null ||
+                substitution.ElementIn == substitution.ElementOut ||
+                !substitutedPlayers.Add(substitution.ElementIn) ||
+                !substitutedPlayers.Add(substitution.ElementOut) ||
+                !picksByPlayer.TryGetValue(substitution.ElementIn, out var playerIn) ||
+                !picksByPlayer.TryGetValue(substitution.ElementOut, out var playerOut) ||
+                (playerIn.Position <= 11) == (playerOut.Position <= 11))
+            {
+                throw new InvalidDataException(
+                    $"The FPL picks response contained an invalid automatic substitution " +
+                    $"for entry {entryId} in season {season} event {eventId}.");
+            }
+
+            effectiveMultipliers[playerOut.Element] = 0;
+            effectiveMultipliers[playerIn.Element] = 1;
+        }
+    }
+
+    private static IReadOnlyList<EntryAutomaticSubstitution>
+        SimulateAutomaticSubstitutions(
+            IReadOnlyList<EntryEventPick> picks,
+            IReadOnlyDictionary<int, PremierLeagueElement> players,
+            IReadOnlyDictionary<int, EventLiveElementStats> livePlayers,
+            IReadOnlyDictionary<int, FplTeamLiveState> teamStates)
+    {
+        var startingLineup = picks
+            .Where(pick => pick.Position <= 11)
+            .OrderBy(pick => pick.Position)
+            .Select(pick => (pick.Element, ElementType: players[pick.Element].ElementType))
+            .ToList();
+        var bench = picks
+            .Where(pick => pick.Position > 11)
+            .OrderBy(pick => pick.Position)
+            .ToArray();
+        var usedBench = new HashSet<int>();
+        var substitutions = new List<EntryAutomaticSubstitution>();
+
+        var goalkeeper = startingLineup.FirstOrDefault(player => player.ElementType == 1);
+        var goalkeeperBench = bench.FirstOrDefault(pick =>
+            pick.Position == 12 &&
+            players[pick.Element].ElementType == 1);
+        if (goalkeeper != default &&
+            IsConfirmedNotPlaying(goalkeeper.Element, players, livePlayers, teamStates) &&
+            goalkeeperBench is not null &&
+            HasPlayed(goalkeeperBench, livePlayers))
+        {
+            ReplaceLineupPlayer(
+                startingLineup,
+                goalkeeper.Element,
+                goalkeeperBench.Element,
+                players[goalkeeperBench.Element].ElementType);
+            usedBench.Add(goalkeeperBench.Element);
+            substitutions.Add(new EntryAutomaticSubstitution
+            {
+                ElementIn = goalkeeperBench.Element,
+                ElementOut = goalkeeper.Element
+            });
+        }
+
+        foreach (var benchPick in bench.Where(pick => pick.Position > 12))
+        {
+            if (usedBench.Contains(benchPick.Element) ||
+                players[benchPick.Element].ElementType == 1 ||
+                !HasPlayed(benchPick, livePlayers))
+            {
+                continue;
+            }
+
+            foreach (var replacement in startingLineup.Where(player =>
+                         player.ElementType != 1 &&
+                         IsConfirmedNotPlaying(
+                             player.Element,
+                             players,
+                             livePlayers,
+                             teamStates)))
+            {
+                var trialLineup = startingLineup
+                    .Select(player => player.Element == replacement.Element
+                        ? (benchPick.Element, players[benchPick.Element].ElementType)
+                        : player)
+                    .ToArray();
+                if (!IsValidFormation(trialLineup))
+                {
+                    continue;
+                }
+
+                ReplaceLineupPlayer(
+                    startingLineup,
+                    replacement.Element,
+                    benchPick.Element,
+                    players[benchPick.Element].ElementType);
+                usedBench.Add(benchPick.Element);
+                substitutions.Add(new EntryAutomaticSubstitution
+                {
+                    ElementIn = benchPick.Element,
+                    ElementOut = replacement.Element
+                });
+                break;
+            }
+        }
+
+        return substitutions;
+    }
+
+    private static void ReplaceLineupPlayer(
+        IList<(int Element, int ElementType)> lineup,
+        int elementOut,
+        int elementIn,
+        int elementInType)
+    {
+        var index = -1;
+        for (var currentIndex = 0; currentIndex < lineup.Count; currentIndex++)
+        {
+            if (lineup[currentIndex].Element == elementOut)
+            {
+                index = currentIndex;
+                break;
+            }
+        }
+
+        if (index < 0)
+        {
+            throw new InvalidDataException(
+                "The FPL lineup simulation could not find the outgoing player.");
+        }
+
+        lineup[index] = (elementIn, elementInType);
+    }
+
+    private static bool IsValidFormation(
+        IReadOnlyList<(int Element, int ElementType)> lineup)
+    {
+        var goalkeepers = lineup.Count(player => player.ElementType == 1);
+        var defenders = lineup.Count(player => player.ElementType == 2);
+        var midfielders = lineup.Count(player => player.ElementType == 3);
+        var forwards = lineup.Count(player => player.ElementType == 4);
+        return lineup.Count == 11 &&
+            goalkeepers == 1 &&
+            defenders >= 3 &&
+            midfielders >= 2 &&
+            forwards >= 1 &&
+            defenders + midfielders + forwards == 10;
+    }
+
+    private static bool HasPlayed(
+        EntryEventPick? pick,
+        IReadOnlyDictionary<int, EventLiveElementStats> livePlayers)
+    {
+        return pick is not null && livePlayers[pick.Element].Minutes > 0;
+    }
+
+    private static bool IsConfirmedNotPlaying(
+        int element,
+        IReadOnlyDictionary<int, PremierLeagueElement> players,
+        IReadOnlyDictionary<int, EventLiveElementStats> livePlayers,
+        IReadOnlyDictionary<int, FplTeamLiveState> teamStates)
+    {
+        return livePlayers[element].Minutes == 0 &&
+            teamStates[players[element].TeamId] == FplTeamLiveState.Finished;
     }
 
     private static int CalculateRawLiveGameweekPoints(
         IReadOnlyList<EntryEventPick> picks,
+        IReadOnlyDictionary<int, int> effectiveMultipliers,
         IReadOnlyDictionary<int, EventLiveElementStats> livePlayers)
     {
         var points = 0;
         foreach (var pick in picks)
         {
             points = checked(points +
-                checked(livePlayers[pick.Element].TotalPoints * pick.Multiplier));
+                checked(livePlayers[pick.Element].TotalPoints *
+                    effectiveMultipliers[pick.Element]));
         }
 
         return points;
@@ -203,10 +517,12 @@ public sealed class FplLiveInsightsCalculationService(
 
     private static int CalculateBenchPoints(
         IReadOnlyList<EntryEventPick> picks,
+        IReadOnlyDictionary<int, int> effectiveMultipliers,
         IReadOnlyDictionary<int, EventLiveElementStats> livePlayers)
     {
         var points = 0;
-        foreach (var pick in picks.Where(pick => pick.Position > 11 && pick.Multiplier == 0))
+        foreach (var pick in picks.Where(pick =>
+                     pick.Position > 11 && effectiveMultipliers[pick.Element] == 0))
         {
             points = checked(points + livePlayers[pick.Element].TotalPoints);
         }
@@ -219,12 +535,14 @@ public sealed class FplLiveInsightsCalculationService(
         IReadOnlyList<EntryEventPick> picks,
         IReadOnlyDictionary<int, PremierLeagueElement> players,
         IReadOnlyDictionary<int, FplTeamLiveState> teamStates,
+        IReadOnlyDictionary<int, int> effectiveMultipliers,
+        int effectiveCaptainElement,
         ClassicStanding standing)
     {
         var playing = 0;
         var yetToPlay = 0;
         var exposures = new List<FplLivePlayerExposure>();
-        foreach (var pick in picks.Where(pick => pick.Multiplier > 0))
+        foreach (var pick in picks.Where(pick => effectiveMultipliers[pick.Element] > 0))
         {
             var state = teamStates[players[pick.Element].TeamId];
             switch (state)
@@ -246,8 +564,8 @@ public sealed class FplLiveInsightsCalculationService(
                 players[pick.Element].WebName,
                 standing.Entry,
                 standing.EntryName,
-                pick.Multiplier,
-                pick.IsCaptain));
+                effectiveMultipliers[pick.Element],
+                pick.Element == effectiveCaptainElement));
         }
 
         return (new FplLivePlayerProgress(playing, yetToPlay), exposures);
@@ -288,18 +606,13 @@ public sealed class FplLiveInsightsCalculationService(
 
             if (!players.TryGetValue(pick.Element, out var player) ||
                 string.IsNullOrWhiteSpace(player.WebName) ||
-                (pick.Multiplier > 0 && player.TeamId <= 0))
+                player.TeamId <= 0 ||
+                player.ElementType < 1 ||
+                player.ElementType > 4)
             {
                 throw new InvalidDataException(
-                    $"The FPL bootstrap response did not contain a valid team for player " +
+                    $"The FPL bootstrap response did not contain valid player metadata for " +
                     $"{pick.Element} for entry {entryId} in season {season} event {eventId}.");
-            }
-
-            if (pick.Multiplier > 0 && !teamStates.ContainsKey(player.TeamId))
-            {
-                throw new InvalidDataException(
-                    $"The FPL fixtures response did not contain a fixture for team " +
-                    $"{player.TeamId} for entry {entryId} in season {season} event {eventId}.");
             }
 
             if (!livePlayers.TryGetValue(pick.Element, out var livePlayer) ||
@@ -308,6 +621,14 @@ public sealed class FplLiveInsightsCalculationService(
                 throw new InvalidDataException(
                     $"The FPL live response did not contain valid player {pick.Element} " +
                     $"data for entry {entryId} in season {season} event {eventId}.");
+            }
+
+            if ((pick.Position <= 11 || livePlayer.Minutes > 0) &&
+                !teamStates.ContainsKey(player.TeamId))
+            {
+                throw new InvalidDataException(
+                    $"The FPL fixtures response did not contain a fixture for team " +
+                    $"{player.TeamId} for entry {entryId} in season {season} event {eventId}.");
             }
         }
 
@@ -334,25 +655,13 @@ public sealed class FplLiveInsightsCalculationService(
     private static IReadOnlyList<FplAutomaticSubstitutionSalvation>
         CreateAutomaticSubstitutionSalvations(
             ClassicStanding standing,
-            EntryEventPicksResponse picks,
-            IReadOnlyDictionary<int, EntryEventPick> picksByPlayer,
+            IReadOnlyList<EntryAutomaticSubstitution> substitutions,
             IReadOnlyDictionary<int, PremierLeagueElement> players,
-            IReadOnlyDictionary<int, EventLiveElementStats> livePlayers,
-            string season,
-            int eventId)
+            IReadOnlyDictionary<int, EventLiveElementStats> livePlayers)
     {
         var salvations = new List<FplAutomaticSubstitutionSalvation>();
-        foreach (var substitution in picks.AutomaticSubstitutions ?? [])
+        foreach (var substitution in substitutions)
         {
-            if (!picksByPlayer.ContainsKey(substitution.ElementIn) ||
-                !picksByPlayer.ContainsKey(substitution.ElementOut) ||
-                substitution.ElementIn == substitution.ElementOut)
-            {
-                throw new InvalidDataException(
-                    $"The FPL picks response contained an invalid automatic substitution " +
-                    $"for entry {standing.Entry} in season {season} event {eventId}.");
-            }
-
             var playerInPoints = livePlayers[substitution.ElementIn].TotalPoints;
             var playerOutPoints = livePlayers[substitution.ElementOut].TotalPoints;
             var savedPoints = checked(playerInPoints - playerOutPoints);
@@ -649,5 +958,12 @@ public sealed class FplLiveInsightsCalculationService(
         int BenchPoints,
         FplLiveCaptainInsights Captain,
         IReadOnlyList<FplAutomaticSubstitutionSalvation>
-            AutomaticSubstitutionSalvations);
+            AutomaticSubstitutionSalvations,
+        bool CaptainFixtureFinished);
+
+    private sealed record FplLiveEffectiveLineup(
+        IReadOnlyDictionary<int, int> EffectiveMultipliers,
+        IReadOnlyList<EntryAutomaticSubstitution> AutomaticSubstitutions,
+        int EffectiveCaptainElement,
+        bool CaptainFixtureFinished);
 }

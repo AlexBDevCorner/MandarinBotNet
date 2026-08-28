@@ -267,12 +267,13 @@ public sealed class FplLiveInsightsCalculationServiceTests
         fixture.PicksByEntry[101] = new EntryEventPicksResponse
         {
             EntryHistory = new EntryEventHistory(),
+            ActiveChip = "bboost",
             Picks =
             [
                 Pick(1, 1, 3, isCaptain: true),
                 Pick(2, 2, 1, isViceCaptain: true),
                 Pick(3, 3, 1),
-                Pick(4, 12, 0),
+                Pick(4, 12, 1),
                 Pick(5, 13, 1)
             ]
         };
@@ -281,7 +282,7 @@ public sealed class FplLiveInsightsCalculationServiceTests
             Fixture(1, 1, 101, started: true, finished: true),
             Fixture(2, 2, 102, started: true, finished: false),
             Fixture(3, 3, 103, started: false, finished: false),
-            Fixture(4, 4, 104, started: false, finished: false),
+            Fixture(4, 4, 104, started: true, finished: true),
             Fixture(5, 5, 105, started: false, finished: false)
         ];
 
@@ -311,9 +312,9 @@ public sealed class FplLiveInsightsCalculationServiceTests
             transferCost: 0,
             new PickData(1, 1, 1, 2, 1, IsCaptain: true),
             new PickData(2, 2, 2, 1, 10, IsViceCaptain: true),
-            new PickData(5, 5, 3, 0, 0, Name: "Starter Out"),
+            new PickData(4, 4, 3, 1, 9, Name: "Bench In"),
             new PickData(3, 3, 12, 0, 8, Name: "Bench One"),
-            new PickData(4, 4, 13, 1, 9, Name: "Bench In"));
+            new PickData(5, 5, 13, 0, 0, Name: "Starter Out"));
         fixture.PicksByEntry[101].AutomaticSubstitutions.Add(
             new EntryAutomaticSubstitution
             {
@@ -330,6 +331,8 @@ public sealed class FplLiveInsightsCalculationServiceTests
             .Should().Equal("Alpha");
         result.CaptainDisasters.Select(manager => manager.EntryName)
             .Should().Equal("Alpha");
+        result.Managers.Single().RawLiveGameweekPoints.Should().Be(21);
+        result.Managers.Single().LiveTotalPoints.Should().Be(1021);
         result.AutomaticSubstitutionSalvations.Should().ContainSingle().Which.Should()
             .BeEquivalentTo(new FplAutomaticSubstitutionSalvation(
                 101,
@@ -367,6 +370,123 @@ public sealed class FplLiveInsightsCalculationServiceTests
             .Be(new FplLivePlayerProgress(1, 0));
         finished.Managers.Single().PlayerProgress.Should()
             .Be(new FplLivePlayerProgress(0, 0));
+    }
+
+    [Test]
+    public void Calculate_PendingAutomaticSubstitution_ProjectsBenchPlayerBeforeFplUpdatesMultipliers()
+    {
+        // Arrange
+        var fixture = CreateLegalAutosubFixture();
+        var outgoingIndex = fixture.PicksByEntry[101].Picks.FindIndex(
+            pick => pick.Element == 4);
+        var incomingIndex = fixture.PicksByEntry[101].Picks.FindIndex(
+            pick => pick.Element == 13);
+        fixture.PicksByEntry[101].Picks[outgoingIndex] = Pick(4, 4, 1);
+        fixture.PicksByEntry[101].Picks[incomingIndex] = Pick(13, 13, 0);
+        fixture.LivePlayers[4] = Stats(0, 0);
+        fixture.LivePlayers[13] = Stats(9, 90);
+
+        // Act
+        var manager = Calculate(CreateService(), fixture).Managers.Single();
+
+        // Assert
+        manager.RawLiveGameweekPoints.Should().Be(9);
+        manager.BenchPoints.Should().Be(0);
+        manager.AutomaticSubstitutionSalvations.Should().ContainSingle().Which.SavedPoints
+            .Should().Be(9);
+    }
+
+    [Test]
+    public void Calculate_CaptainDidNotPlay_TransfersCaptainMultiplierToPlayingViceCaptain()
+    {
+        // Arrange
+        var fixture = CreateTwoPlayerFixture();
+        fixture.PicksByEntry[101].Picks[0] = Pick(1, 1, 0, isCaptain: true);
+        fixture.PicksByEntry[101].Picks[1] = Pick(2, 2, 1, isViceCaptain: true);
+        fixture.LivePlayers[1] = Stats(0, 0);
+        fixture.LivePlayers[2] = Stats(10, 90);
+
+        // Act
+        var manager = Calculate(CreateService(), fixture).Managers.Single();
+
+        // Assert
+        manager.RawLiveGameweekPoints.Should().Be(20);
+        manager.Captain.CaptainEffectivePoints.Should().Be(0);
+        manager.Captain.ViceCaptainEffectivePoints.Should().Be(20);
+    }
+
+    [Test]
+    public void Calculate_TripleCaptainDidNotPlay_TransfersTripleMultiplierToPlayingViceCaptain()
+    {
+        // Arrange
+        var fixture = CreateTwoPlayerFixture();
+        var picks = fixture.PicksByEntry[101];
+        fixture.PicksByEntry[101] = new EntryEventPicksResponse
+        {
+            ActiveChip = "3xc",
+            EntryHistory = picks.EntryHistory,
+            Picks = picks.Picks,
+            AutomaticSubstitutions = picks.AutomaticSubstitutions
+        };
+        fixture.PicksByEntry[101].Picks[0] = Pick(1, 1, 0, isCaptain: true);
+        fixture.PicksByEntry[101].Picks[1] = Pick(2, 2, 1, isViceCaptain: true);
+        fixture.LivePlayers[1] = Stats(0, 0);
+        fixture.LivePlayers[2] = Stats(10, 90);
+
+        // Act
+        var manager = Calculate(CreateService(), fixture).Managers.Single();
+
+        // Assert
+        manager.RawLiveGameweekPoints.Should().Be(30);
+        manager.Captain.CaptainEffectivePoints.Should().Be(0);
+        manager.Captain.ViceCaptainEffectivePoints.Should().Be(30);
+    }
+
+    [Test]
+    public void Calculate_BenchBoost_DoesNotReportAutomaticSubstitutionSalvation()
+    {
+        // Arrange
+        var fixture = CreateLegalAutosubFixture(benchBoost: true);
+        var outgoingIndex = fixture.PicksByEntry[101].Picks.FindIndex(
+            pick => pick.Element == 4);
+        var incomingIndex = fixture.PicksByEntry[101].Picks.FindIndex(
+            pick => pick.Element == 13);
+        fixture.PicksByEntry[101].Picks[outgoingIndex] = Pick(4, 4, 0);
+        fixture.PicksByEntry[101].Picks[incomingIndex] = Pick(13, 13, 1);
+        fixture.PicksByEntry[101].AutomaticSubstitutions.Add(
+            new EntryAutomaticSubstitution
+            {
+                ElementIn = 13,
+                ElementOut = 4
+            });
+        fixture.LivePlayers[4] = Stats(0, 0);
+        fixture.LivePlayers[13] = Stats(9, 90);
+
+        // Act
+        var manager = Calculate(CreateService(), fixture).Managers.Single();
+
+        // Assert
+        manager.RawLiveGameweekPoints.Should().Be(9);
+        manager.BenchPoints.Should().Be(0);
+        manager.AutomaticSubstitutionSalvations.Should().BeEmpty();
+    }
+
+    [Test]
+    public void Calculate_CaptainFixtureNotFinished_DoesNotDeclarePrematureCaptainDisaster()
+    {
+        // Arrange
+        var fixture = CreateTwoPlayerFixture();
+        fixture.Fixtures[0] = Fixture(1, 1, 101, started: false, finished: false);
+        fixture.PicksByEntry[101].Picks[0] = Pick(1, 1, 2, isCaptain: true);
+        fixture.PicksByEntry[101].Picks[1] = Pick(2, 2, 1, isViceCaptain: true);
+        fixture.LivePlayers[1] = Stats(0, 0);
+        fixture.LivePlayers[2] = Stats(10, 90);
+
+        // Act
+        var result = Calculate(CreateService(), fixture);
+
+        // Assert
+        result.CaptainDisasters.Should().BeEmpty();
     }
 
     [Test]
@@ -622,6 +742,49 @@ public sealed class FplLiveInsightsCalculationServiceTests
         return fixture;
     }
 
+    private static CalculationFixture CreateLegalAutosubFixture(bool benchBoost = false)
+    {
+        var fixture = new CalculationFixture();
+        AddManager(
+            fixture,
+            101,
+            "Alpha",
+            "Alice",
+            officialRank: 1,
+            previousRank: 1,
+            previousTotal: 1000,
+            eventTotal: 0,
+            transferCost: 0,
+            new PickData(1, 1, 1, 2, 0, ElementType: 1, IsCaptain: true),
+            new PickData(2, 2, 2, 1, 0, ElementType: 2, IsViceCaptain: true),
+            new PickData(3, 3, 3, 1, 0, ElementType: 2),
+            new PickData(4, 4, 4, 1, 0, ElementType: 2),
+            new PickData(5, 5, 5, 1, 0, ElementType: 3),
+            new PickData(6, 6, 6, 1, 0, ElementType: 3),
+            new PickData(7, 7, 7, 1, 0, ElementType: 3),
+            new PickData(8, 8, 8, 1, 0, ElementType: 3),
+            new PickData(9, 9, 9, 1, 0, ElementType: 4),
+            new PickData(10, 10, 10, 1, 0, ElementType: 4),
+            new PickData(11, 11, 11, 1, 0, ElementType: 4),
+            new PickData(12, 12, 12, 0, 0, ElementType: 1),
+            new PickData(13, 13, 13, 0, 9, ElementType: 2),
+            new PickData(14, 14, 14, 0, 0, ElementType: 3),
+            new PickData(15, 15, 15, 0, 0, ElementType: 4));
+        if (benchBoost)
+        {
+            var picks = fixture.PicksByEntry[101];
+            fixture.PicksByEntry[101] = new EntryEventPicksResponse
+            {
+                ActiveChip = "bboost",
+                EntryHistory = picks.EntryHistory,
+                Picks = picks.Picks,
+                AutomaticSubstitutions = picks.AutomaticSubstitutions
+            };
+        }
+
+        return fixture;
+    }
+
     private static void AddManager(
         CalculationFixture fixture,
         int entryId,
@@ -661,7 +824,8 @@ public sealed class FplLiveInsightsCalculationServiceTests
         foreach (var data in pickData)
         {
             AddPlayer(fixture, data.PlayerId, data.TeamId, data.Name ?? $"Player {data.PlayerId}",
-                data.Points);
+                data.Points,
+                elementType: data.ElementType);
         }
     }
 
@@ -671,12 +835,14 @@ public sealed class FplLiveInsightsCalculationServiceTests
         int teamId,
         string name,
         int points,
-        int minutes = 90)
+        int minutes = 90,
+        int elementType = 2)
     {
         fixture.Players[playerId] = new PremierLeagueElement
         {
             Id = playerId,
             TeamId = teamId,
+            ElementType = elementType,
             WebName = name
         };
         fixture.LivePlayers[playerId] = Stats(points, minutes);
@@ -742,6 +908,7 @@ public sealed class FplLiveInsightsCalculationServiceTests
         int Position,
         int Multiplier,
         int Points,
+        int ElementType = 2,
         bool IsCaptain = false,
         bool IsViceCaptain = false,
         string? Name = null);
