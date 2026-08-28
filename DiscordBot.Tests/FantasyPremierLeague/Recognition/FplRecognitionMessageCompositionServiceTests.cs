@@ -191,6 +191,15 @@ public sealed class FplRecognitionMessageCompositionServiceTests
     }
 
     [Test]
+    public void ComposeManagerNotFound_SanitizesQuery()
+    {
+        var message = _composer.ComposeManagerNotFound("@everyone");
+
+        message.Should().NotContain("@everyone");
+        message.Should().Contain("@\u200Beveryone");
+    }
+
+    [Test]
     public void ComposeAmbiguousManager_ListsCandidates()
     {
         var message = _composer.ComposeAmbiguousManager("bob",
@@ -208,6 +217,6 @@ public sealed class FplRecognitionMessageCompositionServiceTests
     public void ComposeNoData_ReturnsFriendlyMessage()
     {
         _composer.ComposeNoData()
-            .Should().Be("📭 Данные об достижениях пока недоступны. Попробуйте ещё раз позже.");
+            .Should().Be("📭 Данные о достижениях пока недоступны. Попробуйте ещё раз позже.");
     }
 }

@@ -290,7 +290,8 @@ public class FplRecognitionQueryService(
         foreach (var category in categories)
         {
             var countsByManager = awards
-                .Where(award => award.AchievementKey == category)
+                .Where(award => award.AchievementKey == category &&
+                    latestManagers.ContainsKey(award.EntryId))
                 .GroupBy(award => award.EntryId)
                 .ToDictionary(group => group.Key, group => group.Count());
             if (countsByManager.Count == 0)
@@ -305,18 +306,12 @@ public class FplRecognitionQueryService(
             }
 
             var leaders = countsByManager
-                .Where(pair => pair.Value == maximumCount &&
-                    latestManagers.ContainsKey(pair.Key))
+                .Where(pair => pair.Value == maximumCount)
                 .Select(pair => new FplManagerReference(
                     pair.Key,
                     latestManagers[pair.Key].EntryName,
                     latestManagers[pair.Key].ManagerName))
                 .ToArray();
-
-            if (leaders.Length == 0)
-            {
-                continue;
-            }
 
             rankings.Add(new FplAchievementCategoryRanking(
                 category,
@@ -337,7 +332,8 @@ public class FplRecognitionQueryService(
         {
             var maximumScore = snapshot.Managers.Max(manager => manager.EventScore);
             foreach (var manager in snapshot.Managers.Where(
-                         manager => manager.EventScore == maximumScore))
+                         manager => manager.EventScore == maximumScore &&
+                             latestManagers.ContainsKey(manager.EntryId)))
             {
                 winsByManager.TryGetValue(manager.EntryId, out var current);
                 winsByManager[manager.EntryId] = current + 1;

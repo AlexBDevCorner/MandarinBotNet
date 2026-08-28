@@ -7,7 +7,7 @@ namespace DiscordBot.FantasyPremierLeague.Recognition;
 public sealed class FplRecognitionMessageCompositionService
 {
     private const string NoDataMessage =
-        "📭 Данные об достижениях пока недоступны. Попробуйте ещё раз позже.";
+        "📭 Данные о достижениях пока недоступны. Попробуйте ещё раз позже.";
     private const string TotalAwardsHeading = "🎖️ Больше всего наград";
     private const string GameweekWinsHeading = "👑 Победы в турах";
     private const string TrackingPrefix = "📍 Достижения отслеживаются с GW";
@@ -108,7 +108,8 @@ public sealed class FplRecognitionMessageCompositionService
             return "🤷 Укажите название команды или имя менеджера.";
         }
 
-        return $"🤷 Не удалось найти менеджера \"{query}\".";
+        var safeQuery = DiscordTextSafety.SanitizeExternalName(query);
+        return $"🤷 Не удалось найти менеджера \"{safeQuery}\".";
     }
 
     public string ComposeAmbiguousManager(

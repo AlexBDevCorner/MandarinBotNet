@@ -314,6 +314,48 @@ public sealed class FplRecognitionQueryServiceTests
         service.GetSeasonSummary().Should().BeNull();
     }
 
+    [Test]
+    public void GetSeasonSummary_PerAchievementLeaderWhoLeftLeague_IsIgnored()
+    {
+        var awards = new[]
+        {
+            Award(1, 99, "Departed FC", FplAchievementKeys.BenchWarmer, true),
+            Award(2, 99, "Departed FC", FplAchievementKeys.BenchWarmer, true),
+            Award(3, 99, "Departed FC", FplAchievementKeys.BenchWarmer, true),
+            Award(1, 10, "Bobrov FC", FplAchievementKeys.BenchWarmer, true),
+            Award(2, 10, "Bobrov FC", FplAchievementKeys.BenchWarmer, true)
+        };
+        var (service, _) = CreateService(
+            latest: Snapshot(5, Manager(10, "Bobrov FC", "A")),
+            awards: awards);
+
+        var summary = service.GetSeasonSummary();
+
+        var category = summary!.PerAchievementLeaders
+            .Single(x => x.AchievementKey == FplAchievementKeys.BenchWarmer);
+        category.Count.Should().Be(2);
+        category.Leaders.Single().EntryId.Should().Be(10);
+    }
+
+    [Test]
+    public void GetSeasonSummary_GameweekWinLeaderWhoLeftLeague_IsIgnored()
+    {
+        var snapshots = new[]
+        {
+            Snapshot(1, Manager(99, "Departed FC", "Z", eventScore: 100)),
+            Snapshot(2, Manager(10, "Bobrov FC", "A", eventScore: 90))
+        };
+        var (service, _) = CreateService(
+            latest: snapshots[^1],
+            extraSnapshots: snapshots[..^1],
+            awards: []);
+
+        var summary = service.GetSeasonSummary();
+
+        summary!.GameweekWinTopCount.Should().Be(1);
+        summary.GameweekWinLeaders.Single().EntryId.Should().Be(10);
+    }
+
     private static (
         FplRecognitionQueryService Service,
         FakeRecognitionStore Store)

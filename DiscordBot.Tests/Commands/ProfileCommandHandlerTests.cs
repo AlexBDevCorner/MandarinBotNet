@@ -60,7 +60,7 @@ public sealed class ProfileCommandHandlerTests
         await handler.HandleAsync(interaction);
 
         interaction.Messages.Should().ContainSingle()
-            .Which.Should().Contain("Данные об достижениях пока недоступны");
+            .Which.Should().Contain("Данные о достижениях пока недоступны");
     }
 
     [Test]
