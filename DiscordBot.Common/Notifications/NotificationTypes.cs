@@ -12,5 +12,16 @@ namespace DiscordBot.Notifications
         public const string FplGameweekRecap = "fpl-gameweek-recap";
         public const string FplLiveInsights = "fpl-live-insights";
         public const string FplPriceChanges = "fpl-price-changes";
+
+        private static readonly HashSet<string> EveryoneMentionAllowedTypes =
+        [
+            Deadline24Hours,
+            Deadline1Hour,
+            UclDeadline24Hours,
+            UclDeadline1Hour
+        ];
+
+        public static bool AllowsEveryoneMention(string notificationType) =>
+            EveryoneMentionAllowedTypes.Contains(notificationType);
     }
 }

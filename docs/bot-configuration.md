@@ -216,5 +216,9 @@ Bot__Notifications__Targets__1__MentionEveryone=true
 
 `MentionEveryone` defaults to `false` for every target. Set it to `true` only
 where broadcasts are intentional and the bot has permission to mention
-everyone. Jobs never enumerate all guilds and never fall back to channel display
-names.
+everyone. When enabled, the `@everyone` mention is added **only** for
+notification types that are explicitly permitted to broadcast. Currently the
+permitted types are the FPL and UCL 24-hour and 1-hour deadline reminders
+(`fpl-deadline-*` and `ucl-deadline-*`); all other notification types are sent
+without a mention. Jobs never enumerate all guilds and never fall back to
+channel display names.

@@ -1,5 +1,6 @@
 using AwesomeAssertions;
 using DiscordBot.Commands;
+using DiscordBot.Notifications;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -410,25 +411,25 @@ public sealed class MandarinBotOptionsTests
             });
     }
 
-    [TestCase(false, "League update")]
-    [TestCase(true, "@everyone League update")]
-    public void FormatMessage_MentionEveryoneSetting_UsesPerTargetOptIn(
-        bool mentionEveryone,
-        string expected)
+    [TestCase(NotificationTypes.Deadline24Hours, true)]
+    [TestCase(NotificationTypes.Deadline1Hour, true)]
+    [TestCase(NotificationTypes.UclDeadline24Hours, true)]
+    [TestCase(NotificationTypes.UclDeadline1Hour, true)]
+    [TestCase(NotificationTypes.ClassicStandings, false)]
+    [TestCase(NotificationTypes.HeadToHeadStandings, false)]
+    [TestCase(NotificationTypes.BenchWarmingStandings, false)]
+    [TestCase(NotificationTypes.FplGameweekRecap, false)]
+    [TestCase(NotificationTypes.FplLiveInsights, false)]
+    [TestCase(NotificationTypes.FplPriceChanges, false)]
+    public void AllowsEveryoneMention_ReturnsExpectedPolicyForNotificationType(
+        string notificationType,
+        bool expected)
     {
-        // Arrange
-        var target = new NotificationTargetOptions
-        {
-            GuildId = 100,
-            ChannelId = 101,
-            MentionEveryone = mentionEveryone
-        };
-
         // Act
-        var message = target.FormatMessage("League update");
+        var allowsMention = NotificationTypes.AllowsEveryoneMention(notificationType);
 
         // Assert
-        message.Should().Be(expected);
+        allowsMention.Should().Be(expected);
     }
 
     private static MandarinBotOptions CreateValidOptions(

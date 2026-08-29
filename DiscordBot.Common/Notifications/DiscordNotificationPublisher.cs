@@ -111,8 +111,10 @@ public sealed class DiscordNotificationPublisher(
             notificationType);
 
         const string everyonePrefix = "@everyone ";
+        var mentionEveryone = target.MentionEveryone &&
+            NotificationTypes.AllowsEveryoneMention(notificationType);
         var contentLimit = DiscordConfig.MaxMessageSize -
-            (target.MentionEveryone ? everyonePrefix.Length : 0);
+            (mentionEveryone ? everyonePrefix.Length : 0);
         var chunks = DiscordMessageChunker.Split(message, contentLimit);
         var sentAny = false;
 
@@ -132,12 +134,12 @@ public sealed class DiscordNotificationPublisher(
                 async () =>
                 {
                     var isFirstChunk = chunkIndex == 0;
-                    var content = isFirstChunk
-                        ? target.FormatMessage(chunks[chunkIndex])
+                    var content = isFirstChunk && mentionEveryone
+                        ? $"{everyonePrefix}{chunks[chunkIndex]}"
                         : chunks[chunkIndex];
                     await destination.Channel.SendMessageAsync(
                         content,
-                        target.MentionEveryone && isFirstChunk);
+                        mentionEveryone && isFirstChunk);
                 },
                 cancellationToken);
             sentAny |= sent;
