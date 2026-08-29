@@ -84,7 +84,7 @@ public sealed class DiscordNotificationPublisherTests
     }
 
     [Test]
-    public async Task PublishOnceAsync_MultipartMessage_MentionsEveryoneOnlyInFirstPart()
+    public async Task PublishOnceAsync_MultipartDeadlineMessage_MentionsEveryoneOnlyInFirstPart()
     {
         // Arrange
         var channel = new FakeNotificationChannel();
@@ -97,7 +97,7 @@ public sealed class DiscordNotificationPublisherTests
         var result = await publisher.PublishOnceAsync(
             CreateTarget(mentionEveryone: true),
             "event-42",
-            NotificationTypes.ClassicStandings,
+            NotificationTypes.Deadline24Hours,
             message,
             CancellationToken.None);
 
@@ -113,6 +113,32 @@ public sealed class DiscordNotificationPublisherTests
         channel.SentMessages[1].AllowEveryoneMention.Should().BeFalse();
         channel.SentMessages.Should().OnlyContain(message =>
             message.Content.Length <= DiscordConfig.MaxMessageSize);
+    }
+
+    [Test]
+    public async Task PublishOnceAsync_NotificationTypeNotAllowedToMentionEveryone_DoesNotMentionEveryone()
+    {
+        // Arrange
+        var channel = new FakeNotificationChannel();
+        var resolver = new FakeChannelResolver(
+            new DiscordNotificationDestination(true, channel));
+        var publisher = CreatePublisher(resolver);
+        var message = "Standings update";
+
+        // Act
+        var result = await publisher.PublishOnceAsync(
+            CreateTarget(mentionEveryone: true),
+            "event-42",
+            NotificationTypes.ClassicStandings,
+            message,
+            CancellationToken.None);
+
+        // Assert
+        result.Should().BeTrue();
+        channel.SentMessages.Should().ContainSingle();
+        channel.SentMessages[0].Content.Should().Be(message);
+        channel.SentMessages[0].AllowEveryoneMention.Should().BeFalse();
+        channel.SentMessages[0].Content.Should().NotStartWith("@everyone ");
     }
 
     [Test]

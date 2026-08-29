@@ -134,12 +134,6 @@ public sealed class NotificationTargetOptions
     public ulong ChannelId { get; init; }
 
     public bool MentionEveryone { get; init; }
-
-    public string FormatMessage(string message)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(message);
-        return MentionEveryone ? $"@everyone {message}" : message;
-    }
 }
 
 public sealed class WelcomeMessageOptions
