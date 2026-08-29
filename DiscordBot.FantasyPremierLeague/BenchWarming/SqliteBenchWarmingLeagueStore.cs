@@ -171,6 +171,116 @@ public sealed class SqliteBenchWarmingLeagueStore : IBenchWarmingLeagueStore
         return standings;
     }
 
+    public IReadOnlyList<BenchWarmingEntryRoundStanding> GetSeasonRoundStandings(string season)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(season);
+
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandTimeout = CommandTimeoutSeconds;
+        command.CommandText =
+            """
+            SELECT event_id,
+                   entry_id,
+                   entry_name,
+                   SUM(points) AS total_points
+            FROM bench_warming_bench_points
+            WHERE season = $season
+            GROUP BY event_id, entry_id, entry_name
+            ORDER BY event_id ASC,
+                     total_points DESC,
+                     entry_name COLLATE NOCASE;
+            """;
+        command.Parameters.AddWithValue("$season", season);
+
+        var standings = new List<BenchWarmingEntryRoundStanding>();
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            standings.Add(new BenchWarmingEntryRoundStanding(
+                Convert.ToInt32(reader.GetInt64(0)),
+                Convert.ToInt32(reader.GetInt64(1)),
+                reader.GetString(2),
+                Convert.ToInt32(reader.GetInt64(3))));
+        }
+
+        return standings;
+    }
+
+    public BenchWarmingTrackingInfo? GetTrackingInfo(string season)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(season);
+
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandTimeout = CommandTimeoutSeconds;
+        command.CommandText =
+            """
+            SELECT MIN(event_id),
+                   MAX(event_id),
+                   COUNT(*)
+            FROM bench_warming_rounds
+            WHERE season = $season;
+            """;
+        command.Parameters.AddWithValue("$season", season);
+
+        using var reader = command.ExecuteReader();
+        if (!reader.Read() || reader.IsDBNull(2))
+        {
+            return null;
+        }
+
+        var trackedRoundCount = Convert.ToInt32(reader.GetInt64(2));
+        if (trackedRoundCount == 0)
+        {
+            return null;
+        }
+
+        return new BenchWarmingTrackingInfo(
+            Convert.ToInt32(reader.GetInt64(0)),
+            Convert.ToInt32(reader.GetInt64(1)),
+            trackedRoundCount);
+    }
+
+    public IReadOnlyList<BenchWarmingPlayerPoints> GetRoundBenchPoints(
+        string season,
+        int eventId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(season);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(eventId);
+
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandTimeout = CommandTimeoutSeconds;
+        command.CommandText =
+            """
+            SELECT entry_id,
+                   entry_name,
+                   player_id,
+                   player_web_name,
+                   points
+            FROM bench_warming_bench_points
+            WHERE season = $season
+              AND event_id = $event_id;
+            """;
+        command.Parameters.AddWithValue("$season", season);
+        command.Parameters.AddWithValue("$event_id", eventId);
+
+        var benchPoints = new List<BenchWarmingPlayerPoints>();
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            benchPoints.Add(new BenchWarmingPlayerPoints(
+                Convert.ToInt32(reader.GetInt64(0)),
+                reader.GetString(1),
+                Convert.ToInt32(reader.GetInt64(2)),
+                reader.GetString(3),
+                Convert.ToInt32(reader.GetInt64(4))));
+        }
+
+        return benchPoints;
+    }
+
     public string? GetLatestSeason()
     {
         using var connection = OpenConnection();

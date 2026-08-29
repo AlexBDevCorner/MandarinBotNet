@@ -85,6 +85,7 @@ public static class MandarinBotServiceCollectionExtensions
         services.AddSingleton<IDeadlineCommandHandler, DeadlineCommandHandler>();
         services.AddSingleton<IStandingsCommandHandler, StandingsCommandHandler>();
         services.AddSingleton<IBenchLeagueCommandHandler, BenchLeagueCommandHandler>();
+        services.AddSingleton<BenchWarmingQueryService>();
         services.AddSingleton<BenchWarmingMessageComposer>();
         services.AddSingleton<BenchWarmingLeagueCalculationService>();
         services.AddSingleton<FplStatisticsCollectionService>();
