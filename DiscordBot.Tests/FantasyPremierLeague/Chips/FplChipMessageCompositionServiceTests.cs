@@ -28,9 +28,9 @@ public sealed class FplChipMessageCompositionServiceTests
     {
         var message = Compose();
 
-        message.Should().Contain("два набора")
+        message.Should().Contain("две фишки")
             .And.Contain("GW19")
-            .And.Contain("не переносятся");
+            .And.Contain("сгорает");
     }
 
     [Test]
@@ -47,6 +47,15 @@ public sealed class FplChipMessageCompositionServiceTests
         var message = Compose();
 
         message.Should().Contain("возвращается предыдущ");
+    }
+
+    [Test]
+    public void Compose_FreeHit_ExplainsAvailabilityRestrictions()
+    {
+        var message = Compose();
+
+        message.Should().Contain("после GW1")
+            .And.Contain("два тура подряд");
     }
 
     [Test]

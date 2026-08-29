@@ -11,9 +11,10 @@ public sealed class FplChipMessageCompositionService
         builder.AppendLine("## 🃏 Фишки Fantasy Premier League");
         builder.AppendLine();
         builder.AppendLine(
-            "В сезоне 2026/27 у тебя два набора фишек: " +
-            "по одному Wildcard, Free Hit, Bench Boost и Triple Captain " +
-            "на каждую половину сезона (GW1–19 и GW20+).");
+            "В сезоне 2026/27 доступно по две фишки каждого типа: " +
+            "Wildcard, Free Hit, Bench Boost и Triple Captain. " +
+            "Первый набор предназначен для первой половины сезона " +
+            "и сгорает после дедлайна GW19.");
         builder.AppendLine(
             "⚠️ Первый набор нужно использовать до дедлайна GW19 — " +
             "неиспользованные фишки не переносятся во вторую половину.");
