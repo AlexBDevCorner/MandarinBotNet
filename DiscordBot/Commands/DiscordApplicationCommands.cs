@@ -52,6 +52,18 @@ public static class DiscordApplicationCommands
             new SlashCommandBuilder()
                 .WithName(BenchLeagueName)
                 .WithDescription("Показывает таблицу Лиги обогревателей скамейки. 🔥")
+                .AddOption(
+                    new SlashCommandOptionBuilder()
+                        .WithName("gw")
+                        .WithType(ApplicationCommandOptionType.Integer)
+                        .WithDescription("Показать результаты конкретного тура")
+                        .WithMinValue(1)
+                        .WithMaxValue(38))
+                .AddOption(
+                    new SlashCommandOptionBuilder()
+                        .WithName("team")
+                        .WithType(ApplicationCommandOptionType.String)
+                        .WithDescription("Показать статистику конкретной команды"))
                 .Build(),
             new SlashCommandBuilder()
                 .WithName(LiveInsightsName)

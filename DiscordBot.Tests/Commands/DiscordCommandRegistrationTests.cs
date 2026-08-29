@@ -158,6 +158,38 @@ public sealed class DiscordCommandRegistrationTests
     }
 
     [Test]
+    public async Task SynchronizeAsync_BenchLeagueCommand_HasGwAndTeamOptions()
+    {
+        // Arrange
+        var commandClient = new TestApplicationCommandClient();
+        var synchronizer = new DiscordCommandSynchronizer(
+            new DiscordCommandRegistrationOptions(
+                DiscordCommandRegistrationMode.Global,
+                GuildId: null),
+            commandClient,
+            new TestLogger<DiscordCommandSynchronizer>());
+
+        // Act
+        await synchronizer.SynchronizeAsync(CancellationToken.None);
+
+        // Assert
+        var benchLeague = commandClient.Commands!.Cast<SlashCommandProperties>()
+            .Single(command => command.Name.Value == DiscordApplicationCommands.BenchLeagueName);
+        benchLeague.Options.IsSpecified.Should().BeTrue();
+        var options = benchLeague.Options.Value;
+
+        var gw = options.Single(option => option.Name == "gw");
+        gw.Type.Should().Be(ApplicationCommandOptionType.Integer);
+        gw.IsRequired.Should().NotBeTrue();
+        gw.MinValue.Should().Be(1d);
+        gw.MaxValue.Should().Be(38d);
+
+        var team = options.Single(option => option.Name == "team");
+        team.Type.Should().Be(ApplicationCommandOptionType.String);
+        team.IsRequired.Should().NotBeTrue();
+    }
+
+    [Test]
     public async Task SynchronizeAsync_GuildMode_BulkOverwritesConfiguredGuild()
     {
         // Arrange

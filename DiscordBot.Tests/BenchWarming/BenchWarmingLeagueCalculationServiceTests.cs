@@ -67,6 +67,62 @@ public sealed class BenchWarmingLeagueCalculationServiceTests
     }
 
     [Test]
+    public async Task CalculateLatestFinishedRoundAsync_BenchBoostManager_PersistsZeroEntryRound()
+    {
+        // Arrange
+        var client = new TestFantasyPremierLeagueClient
+        {
+            Bootstrap = CreateBootstrap(
+                elements:
+                [
+                    CreateElement(1, "Haaland"),
+                    CreateElement(2, "Salah"),
+                    CreateElement(3, "Kepa"),
+                    CreateElement(4, "Palmer")
+                ],
+                events:
+                [
+                    CreateEvent(id: 5, isFinished: true),
+                    CreateEvent(id: 6, isFinished: false)
+                ]),
+            Standings = new ClassicStandingsResponse
+            {
+                Standings = new ClassicStandings
+                {
+                    Results =
+                    [
+                        new ClassicStanding { Entry = 100, EntryName = "Team A" },
+                        new ClassicStanding { Entry = 200, EntryName = "Team B" },
+                        new ClassicStanding { Entry = 300, EntryName = "Team C" }
+                    ]
+                }
+            },
+            Live = CreateLive((1, 15), (2, 7), (3, 0), (4, 9)),
+            PicksByEntry = new Dictionary<int, EntryEventPicksResponse>
+            {
+                [100] = CreatePicks((1, 0), (2, 1)),
+                [200] = CreatePicks((3, 0)),
+                [300] = CreatePicks("bboost", (4, 1))
+            }
+        };
+        var store = new SqliteBenchWarmingLeagueStore(_databasePath);
+        var service = CreateService(client, store);
+
+        // Act
+        var round = await service.CalculateLatestFinishedRoundAsync(
+            CancellationToken.None);
+
+        // Assert
+        round!.BenchPoints.Should().NotContain(benchPoint => benchPoint.EntryId == 300);
+        round.RoundStandings.Should().Contain(
+            new BenchWarmingEntryStanding(300, "Team C", 0));
+
+        var entryRounds = store.GetSeasonRoundStandings("2026/27");
+        entryRounds.Should().Contain(
+            new BenchWarmingEntryRoundStanding(5, 300, "Team C", 0, "bboost"));
+    }
+
+    [Test]
     public async Task CalculateLatestFinishedRoundAsync_AlreadyCalculated_SkipsWithoutRefetching()
     {
         // Arrange
@@ -215,9 +271,15 @@ public sealed class BenchWarmingLeagueCalculationServiceTests
     }
 
     private static EntryEventPicksResponse CreatePicks(params (int Element, int Multiplier)[] picks)
+        => CreatePicks(null, picks);
+
+    private static EntryEventPicksResponse CreatePicks(
+        string? activeChip,
+        params (int Element, int Multiplier)[] picks)
     {
         return new EntryEventPicksResponse
         {
+            ActiveChip = activeChip,
             Picks = picks
                 .Select(pick => new EntryEventPick
                 {
@@ -267,6 +329,12 @@ public sealed class BenchWarmingLeagueCalculationServiceTests
             (2, 7),
             (3, 0));
 
+        public Dictionary<int, EntryEventPicksResponse> PicksByEntry { get; init; } = new()
+        {
+            [100] = CreatePicks((1, 0), (2, 1)),
+            [200] = CreatePicks((3, 0))
+        };
+
         public int EntryPicksCallCount { get; private set; }
 
         public int RequestedEventId { get; private set; }
@@ -298,12 +366,7 @@ public sealed class BenchWarmingLeagueCalculationServiceTests
         {
             EntryPicksCallCount++;
             RequestedEventId = eventId;
-            return Task.FromResult(entryId switch
-            {
-                100 => CreatePicks((1, 0), (2, 1)),
-                200 => CreatePicks((3, 0)),
-                _ => throw new NotSupportedException()
-            });
+            return Task.FromResult(PicksByEntry[entryId]);
         }
 
         public Task<EventLiveResponse> GetEventLiveAsync(
