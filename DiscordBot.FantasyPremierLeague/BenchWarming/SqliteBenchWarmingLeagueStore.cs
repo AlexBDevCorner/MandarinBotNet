@@ -62,6 +62,10 @@ public sealed class SqliteBenchWarmingLeagueStore : IBenchWarmingLeagueStore
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(eventId);
         ArgumentNullException.ThrowIfNull(benchPoints);
 
+        // The legacy player-only path cannot know whether the full manager/GW
+        // snapshot is present (e.g. a Bench Boost manager stores no bench players),
+        // so it must never mark the round as complete. The dashboard filters out
+        // incomplete rounds, preventing entries from being silently dropped.
         var entryRounds = benchPoints
             .GroupBy(benchPoint => benchPoint.EntryId)
             .Select(group => new BenchWarmingEntryRoundStanding(
@@ -71,7 +75,7 @@ public sealed class SqliteBenchWarmingLeagueStore : IBenchWarmingLeagueStore
                 group.Sum(benchPoint => benchPoint.Points)))
             .ToArray();
 
-        SaveRound(season, eventId, entryRounds, benchPoints, calculatedAtUtc);
+        SaveRound(season, eventId, entryRounds, benchPoints, calculatedAtUtc, complete: false);
     }
 
     public void SaveRound(
@@ -86,6 +90,17 @@ public sealed class SqliteBenchWarmingLeagueStore : IBenchWarmingLeagueStore
         ArgumentNullException.ThrowIfNull(entryRounds);
         ArgumentNullException.ThrowIfNull(benchPoints);
 
+        SaveRound(season, eventId, entryRounds, benchPoints, calculatedAtUtc, complete: true);
+    }
+
+    private void SaveRound(
+        string season,
+        int eventId,
+        IReadOnlyList<BenchWarmingEntryRoundStanding> entryRounds,
+        IReadOnlyList<BenchWarmingPlayerPoints> benchPoints,
+        DateTimeOffset calculatedAtUtc,
+        bool complete)
+    {
         using var connection = OpenConnection();
         using var transaction = connection.BeginTransaction();
 
@@ -107,17 +122,20 @@ public sealed class SqliteBenchWarmingLeagueStore : IBenchWarmingLeagueStore
                         $season,
                         $event_id,
                         $calculated_at_utc,
-                        1
+                        $entry_rounds_complete
                     )
                     ON CONFLICT (season, event_id) DO UPDATE SET
                         calculated_at_utc = excluded.calculated_at_utc,
-                        entry_rounds_complete = 1;
+                        entry_rounds_complete = MAX(entry_rounds_complete, excluded.entry_rounds_complete);
                     """;
                 roundCommand.Parameters.AddWithValue("$season", season);
                 roundCommand.Parameters.AddWithValue("$event_id", eventId);
                 roundCommand.Parameters.AddWithValue(
                     "$calculated_at_utc",
                     calculatedAtUtc.UtcDateTime.ToString("O"));
+                roundCommand.Parameters.AddWithValue(
+                    "$entry_rounds_complete",
+                    complete ? 1 : 0);
                 roundCommand.ExecuteNonQuery();
             }
 

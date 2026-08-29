@@ -79,17 +79,19 @@ public sealed class SqliteBenchWarmingLeagueStoreTests
             "2026/27",
             5,
             [
-                CreatePlayerPoints(entryId: 100, entryName: "Team A", playerId: 1, points: 12),
-                CreatePlayerPoints(entryId: 200, entryName: "Team B", playerId: 2, points: 5)
+                new BenchWarmingEntryRoundStanding(5, 100, "Team A", 12),
+                new BenchWarmingEntryRoundStanding(5, 200, "Team B", 5)
             ],
+            [],
             DateTimeOffset.UtcNow);
         store.SaveRound(
             "2026/27",
             6,
             [
-                CreatePlayerPoints(entryId: 100, entryName: "Team A", playerId: 3, points: 8),
-                CreatePlayerPoints(entryId: 200, entryName: "Team B", playerId: 4, points: 30)
+                new BenchWarmingEntryRoundStanding(6, 100, "Team A", 8),
+                new BenchWarmingEntryRoundStanding(6, 200, "Team B", 30)
             ],
+            [],
             DateTimeOffset.UtcNow);
 
         // Act
@@ -298,24 +300,26 @@ public sealed class SqliteBenchWarmingLeagueStoreTests
             "2026/27",
             5,
             [
-                CreatePlayerPoints(entryId: 100, entryName: "Team A", playerId: 1, points: 8),
-                CreatePlayerPoints(entryId: 100, entryName: "Team A", playerId: 2, points: 4),
-                CreatePlayerPoints(entryId: 200, entryName: "Team B", playerId: 3, points: 5)
+                new BenchWarmingEntryRoundStanding(5, 100, "Team A", 12),
+                new BenchWarmingEntryRoundStanding(5, 200, "Team B", 5)
             ],
+            [],
             DateTimeOffset.UtcNow);
         store.SaveRound(
             "2026/27",
             6,
             [
-                CreatePlayerPoints(entryId: 100, entryName: "Team A", playerId: 4, points: 2)
+                new BenchWarmingEntryRoundStanding(6, 100, "Team A", 2)
             ],
+            [],
             DateTimeOffset.UtcNow);
         store.SaveRound(
             "2027/28",
             5,
             [
-                CreatePlayerPoints(entryId: 900, entryName: "Other", playerId: 9, points: 99)
+                new BenchWarmingEntryRoundStanding(5, 900, "Other", 99)
             ],
+            [],
             DateTimeOffset.UtcNow);
 
         // Act
@@ -366,12 +370,14 @@ public sealed class SqliteBenchWarmingLeagueStoreTests
         store.SaveRound(
             "2026/27",
             5,
-            [CreatePlayerPoints(entryId: 100, playerId: 1, points: 12)],
+            [new BenchWarmingEntryRoundStanding(5, 100, "Test Team", 12)],
+            [],
             DateTimeOffset.UtcNow);
         store.SaveRound(
             "2027/28",
             5,
-            [CreatePlayerPoints(entryId: 900, playerId: 9, points: 99)],
+            [new BenchWarmingEntryRoundStanding(5, 900, "Test Team", 99)],
+            [],
             DateTimeOffset.UtcNow);
 
         // Act
@@ -391,17 +397,20 @@ public sealed class SqliteBenchWarmingLeagueStoreTests
         store.SaveRound(
             "2026/27",
             5,
-            [CreatePlayerPoints(entryId: 100, playerId: 1, points: 1)],
+            [new BenchWarmingEntryRoundStanding(5, 100, "Test Team", 1)],
+            [],
             DateTimeOffset.UtcNow);
         store.SaveRound(
             "2026/27",
             6,
-            [CreatePlayerPoints(entryId: 100, playerId: 2, points: 1)],
+            [new BenchWarmingEntryRoundStanding(6, 100, "Test Team", 1)],
+            [],
             DateTimeOffset.UtcNow);
         store.SaveRound(
             "2026/27",
             8,
-            [CreatePlayerPoints(entryId: 100, playerId: 3, points: 1)],
+            [new BenchWarmingEntryRoundStanding(8, 100, "Test Team", 1)],
+            [],
             DateTimeOffset.UtcNow);
 
         // Act
@@ -409,6 +418,29 @@ public sealed class SqliteBenchWarmingLeagueStoreTests
 
         // Assert
         tracking.Should().Be(new BenchWarmingTrackingInfo(5, 8, 3));
+    }
+
+    [Test]
+    public void SaveRound_LegacyPlayerOnlyOverload_DoesNotMarkRoundComplete()
+    {
+        // Arrange: the legacy API path has only player-level bench data and
+        // cannot know that Team B (a Bench Boost manager) is missing.
+        var store = CreateStore();
+        store.SaveRound(
+            "2026/27",
+            5,
+            [CreatePlayerPoints(entryId: 100, playerId: 1, points: 12)],
+            DateTimeOffset.UtcNow);
+
+        // Act
+        var isCalculated = store.IsRoundCalculated("2026/27", 5);
+        var tracking = store.GetTrackingInfo("2026/27");
+        var seasonRoundStandings = store.GetSeasonRoundStandings("2026/27");
+
+        // Assert: the round exists, but is not trusted as a complete dashboard GW.
+        isCalculated.Should().BeTrue();
+        tracking.Should().BeNull();
+        seasonRoundStandings.Should().BeEmpty();
     }
 
     [Test]
