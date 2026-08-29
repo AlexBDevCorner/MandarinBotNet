@@ -21,11 +21,15 @@ public sealed record BenchWarmingStreakRecord(
     int StartEventId,
     int EndEventId);
 
+public sealed record BenchWarmingTeamCandidate(
+    int EntryId,
+    string EntryName);
+
 public sealed record BenchWarmingTeamProfile(
     string Season,
     int EntryId,
     string EntryName,
-    int TrackingStartedEventId,
+    int FirstTrackedEventId,
     int TotalPoints,
     double AveragePoints,
     int HighestRoundPoints,
@@ -45,7 +49,7 @@ public enum BenchWarmingTeamLookupOutcome
 public sealed record BenchWarmingTeamLookupResult(
     BenchWarmingTeamLookupOutcome Outcome,
     BenchWarmingTeamProfile? Profile = null,
-    IReadOnlyList<string>? Candidates = null)
+    IReadOnlyList<BenchWarmingTeamCandidate>? Candidates = null)
 {
     public static BenchWarmingTeamLookupResult ForNoData()
         => new(BenchWarmingTeamLookupOutcome.NoData);
@@ -54,7 +58,7 @@ public sealed record BenchWarmingTeamLookupResult(
         => new(BenchWarmingTeamLookupOutcome.NotFound);
 
     public static BenchWarmingTeamLookupResult ForAmbiguous(
-        IReadOnlyList<string> candidates)
+        IReadOnlyList<BenchWarmingTeamCandidate> candidates)
         => new(BenchWarmingTeamLookupOutcome.Ambiguous, Candidates: candidates);
 
     public static BenchWarmingTeamLookupResult ForAvailable(

@@ -16,7 +16,8 @@ public sealed record BenchWarmingEntryRoundStanding(
     int EventId,
     int EntryId,
     string EntryName,
-    int Points);
+    int Points,
+    string? ActiveChip = null);
 
 public sealed record BenchWarmingTrackingInfo(
     int FirstEventId,
@@ -38,6 +39,13 @@ public interface IBenchWarmingLeagueStore
     void SaveRound(
         string season,
         int eventId,
+        IReadOnlyList<BenchWarmingPlayerPoints> benchPoints,
+        DateTimeOffset calculatedAtUtc);
+
+    void SaveRound(
+        string season,
+        int eventId,
+        IReadOnlyList<BenchWarmingEntryRoundStanding> entryRounds,
         IReadOnlyList<BenchWarmingPlayerPoints> benchPoints,
         DateTimeOffset calculatedAtUtc);
 

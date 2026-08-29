@@ -221,6 +221,14 @@ public sealed class BenchLeagueCommandHandlerTests
             DateTimeOffset calculatedAtUtc) =>
             throw new NotSupportedException();
 
+        public void SaveRound(
+            string season,
+            int eventId,
+            IReadOnlyList<BenchWarmingEntryRoundStanding> entryRounds,
+            IReadOnlyList<BenchWarmingPlayerPoints> benchPoints,
+            DateTimeOffset calculatedAtUtc) =>
+            throw new NotSupportedException();
+
         public IReadOnlyList<BenchWarmingEntryStanding> GetSeasonStandings(string season) =>
             throw new NotSupportedException();
 

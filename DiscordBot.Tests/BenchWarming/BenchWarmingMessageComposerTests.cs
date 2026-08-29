@@ -226,7 +226,7 @@ public sealed class BenchWarmingMessageComposerTests
         // Assert
         message.Should().Be(
             "🔥 Лига Обогревателей Скамейки — Bobrov FC — скамейка 2026/27" +
-            "\n📍 Статистика с GW2" +
+            "\n📍 Данные команды с GW2" +
             "\n\n💺 Всего оставлено: 47 очков" +
             "\n📊 Среднее: 9.4 очка/GW" +
             "\n💥 Рекорд: 18 очков — GW4" +
@@ -252,19 +252,22 @@ public sealed class BenchWarmingMessageComposerTests
     }
 
     [Test]
-    public void ComposeAmbiguousTeam_ListsCandidates()
+    public void ComposeAmbiguousTeam_ListsCandidatesWithIds()
     {
         // Act
         var message = _composer.ComposeAmbiguousTeam(
             "United",
-            ["Fraud United", "Maguire United"]);
+            [
+                new BenchWarmingTeamCandidate(12345, "Fraud United"),
+                new BenchWarmingTeamCandidate(67890, "Maguire United")
+            ]);
 
         // Assert
         message.Should().Be(
             "Не удалось однозначно найти команду \"United\"." +
             "\n\nВозможные варианты:" +
-            "\n• Fraud United" +
-            "\n• Maguire United");
+            "\n• Fraud United — ID 12345" +
+            "\n• Maguire United — ID 67890");
     }
 
     [Test]

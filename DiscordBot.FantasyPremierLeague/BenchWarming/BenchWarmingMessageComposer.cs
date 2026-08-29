@@ -124,8 +124,8 @@ public sealed class BenchWarmingMessageComposer
             .Append(DiscordTextSafety.SanitizeExternalName(profile.EntryName))
             .Append(" — скамейка ")
             .Append(profile.Season);
-        summary.Append("\n📍 Статистика с GW")
-            .Append(profile.TrackingStartedEventId.ToString(CultureInfo.InvariantCulture));
+        summary.Append("\n📍 Данные команды с GW")
+            .Append(profile.FirstTrackedEventId.ToString(CultureInfo.InvariantCulture));
 
         summary.Append("\n\n💺 Всего оставлено: ")
             .Append(profile.TotalPoints.ToString(CultureInfo.InvariantCulture))
@@ -170,7 +170,7 @@ public sealed class BenchWarmingMessageComposer
 
     public string ComposeAmbiguousTeam(
         string query,
-        IReadOnlyList<string> candidates)
+        IReadOnlyList<BenchWarmingTeamCandidate> candidates)
     {
         ArgumentNullException.ThrowIfNull(candidates);
 
@@ -181,7 +181,9 @@ public sealed class BenchWarmingMessageComposer
         foreach (var candidate in candidates)
         {
             summary.Append("\n• ")
-                .Append(DiscordTextSafety.SanitizeExternalName(candidate));
+                .Append(DiscordTextSafety.SanitizeExternalName(candidate.EntryName))
+                .Append(" — ID ")
+                .Append(candidate.EntryId.ToString(CultureInfo.InvariantCulture));
         }
 
         return summary.ToString();
@@ -193,8 +195,24 @@ public sealed class BenchWarmingMessageComposer
     {
         ArgumentNullException.ThrowIfNull(tracking);
 
-        return $"🔥 Данных Лиги обогревателей за GW{eventId.ToString(CultureInfo.InvariantCulture)} нет.\n" +
-            $"📍 Отслеживание началось с GW{tracking.FirstEventId.ToString(CultureInfo.InvariantCulture)}.";
+        var header = $"🔥 Данных Лиги обогревателей за GW{eventId.ToString(CultureInfo.InvariantCulture)} нет.";
+
+        if (eventId < tracking.FirstEventId)
+        {
+            return header + "\n" +
+                $"📍 Отслеживание началось с GW{tracking.FirstEventId.ToString(CultureInfo.InvariantCulture)}.";
+        }
+
+        if (eventId > tracking.LatestEventId)
+        {
+            return header + "\n" +
+                $"📍 Последний учтённый тур — GW{tracking.LatestEventId.ToString(CultureInfo.InvariantCulture)}.";
+        }
+
+        return header + "\n" +
+            $"📍 Отслеживание охватывает GW{tracking.FirstEventId.ToString(CultureInfo.InvariantCulture)}" +
+            $"–GW{tracking.LatestEventId.ToString(CultureInfo.InvariantCulture)} " +
+            "(в этом туре данных нет).";
     }
 
     private static void AppendSeasonRecords(

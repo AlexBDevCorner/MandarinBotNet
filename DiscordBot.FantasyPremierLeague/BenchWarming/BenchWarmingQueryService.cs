@@ -18,6 +18,8 @@ public class BenchWarmingQueryService(IBenchWarmingLeagueStore store)
 
         var roundStandings = store.GetSeasonRoundStandings(season);
 
+        var latestEntryNames = GetLatestEntryNames(roundStandings);
+
         var latestEventId = tracking.LatestEventId;
         var latestRoundStandings = roundStandings
             .Where(standing => standing.EventId == latestEventId)
@@ -25,7 +27,7 @@ public class BenchWarmingQueryService(IBenchWarmingLeagueStore store)
             .ThenBy(standing => standing.EntryName, StringComparer.OrdinalIgnoreCase)
             .Select(standing => new BenchWarmingEntryStanding(
                 standing.EntryId,
-                standing.EntryName,
+                latestEntryNames.GetValueOrDefault(standing.EntryId, standing.EntryName),
                 standing.Points))
             .ToArray();
 
@@ -33,13 +35,13 @@ public class BenchWarmingQueryService(IBenchWarmingLeagueStore store)
             .GroupBy(standing => standing.EntryId)
             .Select(group => new BenchWarmingEntryStanding(
                 group.Key,
-                group.First().EntryName,
+                latestEntryNames.GetValueOrDefault(group.Key, group.First().EntryName),
                 group.Sum(standing => standing.Points)))
             .OrderByDescending(standing => standing.Points)
             .ThenBy(standing => standing.EntryName, StringComparer.OrdinalIgnoreCase)
             .ToArray();
 
-        var records = BuildSeasonRecords(roundStandings);
+        var records = BuildSeasonRecords(roundStandings, latestEntryNames);
 
         return new BenchWarmingSeasonOverview(
             season,
@@ -64,18 +66,12 @@ public class BenchWarmingQueryService(IBenchWarmingLeagueStore store)
             return BenchWarmingRoundSummaryResult.ForNoData();
         }
 
-        if (eventId < tracking.FirstEventId || eventId > tracking.LatestEventId)
+        if (!store.IsRoundCalculated(season, eventId))
         {
             return BenchWarmingRoundSummaryResult.ForNotTracked(tracking);
         }
 
         var roundStandings = store.GetSeasonRoundStandings(season);
-        var isTracked = roundStandings.Any(standing => standing.EventId == eventId);
-        if (!isTracked)
-        {
-            return BenchWarmingRoundSummaryResult.ForNotTracked(tracking);
-        }
-
         var standings = roundStandings
             .Where(standing => standing.EventId == eventId)
             .OrderByDescending(standing => standing.Points)
@@ -129,9 +125,6 @@ public class BenchWarmingQueryService(IBenchWarmingLeagueStore store)
         }
 
         var entryId = resolution.EntryId!.Value;
-        var tracking = store.GetTrackingInfo(season);
-        var trackingStartedEventId = tracking?.FirstEventId
-            ?? roundStandings.Min(standing => standing.EventId);
 
         var teamRounds = roundStandings
             .Where(standing => standing.EntryId == entryId)
@@ -150,20 +143,27 @@ public class BenchWarmingQueryService(IBenchWarmingLeagueStore store)
         var highestRoundPoints = record.Points;
         var highestRoundEventId = record.EventId;
 
+        var teamLatestNames = new Dictionary<int, string>
+        {
+            [entryId] = teamRounds[^1].EntryName
+        };
+
         var longestEightPlusStreak = FindLongestStreak(
                 teamRounds,
-                points => points >= 8)?
+                teamLatestNames,
+                round => round.Points >= 8)?
             .Length ?? 0;
         var longestCleanBenchStreak = FindLongestStreak(
                 teamRounds,
-                points => points == 0)?
+                teamLatestNames,
+                round => round.Points == 0 && !IsBenchBoost(round.ActiveChip))?
             .Length ?? 0;
 
         var profile = new BenchWarmingTeamProfile(
             season,
             teamRounds[0].EntryId,
-            teamRounds[0].EntryName,
-            trackingStartedEventId,
+            teamRounds[^1].EntryName,
+            teamRounds[0].EventId,
             totalPoints,
             averagePoints,
             highestRoundPoints,
@@ -175,14 +175,37 @@ public class BenchWarmingQueryService(IBenchWarmingLeagueStore store)
         return BenchWarmingTeamLookupResult.ForAvailable(profile);
     }
 
-    private static BenchWarmingSeasonRecords BuildSeasonRecords(
+    private static IReadOnlyDictionary<int, string> GetLatestEntryNames(
         IReadOnlyList<BenchWarmingEntryRoundStanding> roundStandings)
+    {
+        return roundStandings
+            .GroupBy(standing => standing.EntryId)
+            .ToDictionary(
+                group => group.Key,
+                group => group
+                    .OrderByDescending(standing => standing.EventId)
+                    .First()
+                    .EntryName);
+    }
+
+    private static BenchWarmingSeasonRecords BuildSeasonRecords(
+        IReadOnlyList<BenchWarmingEntryRoundStanding> roundStandings,
+        IReadOnlyDictionary<int, string> latestEntryNames)
     {
         var biggestBenchDisaster = roundStandings
             .OrderByDescending(standing => standing.Points)
             .ThenBy(standing => standing.EventId)
             .ThenBy(standing => standing.EntryName, StringComparer.OrdinalIgnoreCase)
             .FirstOrDefault();
+        if (biggestBenchDisaster is not null)
+        {
+            biggestBenchDisaster = biggestBenchDisaster with
+            {
+                EntryName = latestEntryNames.GetValueOrDefault(
+                    biggestBenchDisaster.EntryId,
+                    biggestBenchDisaster.EntryName)
+            };
+        }
 
         var average = roundStandings.Count == 0
             ? 0d
@@ -191,10 +214,12 @@ public class BenchWarmingQueryService(IBenchWarmingLeagueStore store)
 
         var longestEightPlusStreak = FindLongestStreak(
             roundStandings,
-            points => points >= 8);
+            latestEntryNames,
+            round => round.Points >= 8);
         var longestCleanBenchStreak = FindLongestStreak(
             roundStandings,
-            points => points == 0);
+            latestEntryNames,
+            round => round.Points == 0 && !IsBenchBoost(round.ActiveChip));
 
         return new BenchWarmingSeasonRecords(
             biggestBenchDisaster,
@@ -206,7 +231,7 @@ public class BenchWarmingQueryService(IBenchWarmingLeagueStore store)
     private static (
         BenchWarmingTeamLookupOutcome Outcome,
         int? EntryId,
-        IReadOnlyList<string>? Candidates) ResolveTeam(
+        IReadOnlyList<BenchWarmingTeamCandidate>? Candidates) ResolveTeam(
         IReadOnlyList<BenchWarmingEntryRoundStanding> roundStandings,
         string query)
     {
@@ -222,11 +247,31 @@ public class BenchWarmingQueryService(IBenchWarmingLeagueStore store)
             })
             .ToArray();
 
-        var exact = entries.FirstOrDefault(entry =>
-            string.Equals(entry.EntryName, query, StringComparison.OrdinalIgnoreCase));
-        if (exact is not null)
+        if (int.TryParse(query, out var numericEntryId))
         {
-            return (BenchWarmingTeamLookupOutcome.Available, exact.EntryId, null);
+            var byId = entries.Where(entry => entry.EntryId == numericEntryId).ToArray();
+            return byId.Length == 1
+                ? (BenchWarmingTeamLookupOutcome.Available, byId[0].EntryId, null)
+                : (BenchWarmingTeamLookupOutcome.NotFound, null, null);
+        }
+
+        var exactMatches = entries
+            .Where(entry => string.Equals(
+                entry.EntryName,
+                query,
+                StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+        if (exactMatches.Length == 1)
+        {
+            return (BenchWarmingTeamLookupOutcome.Available, exactMatches[0].EntryId, null);
+        }
+
+        if (exactMatches.Length > 1)
+        {
+            return (
+                BenchWarmingTeamLookupOutcome.Ambiguous,
+                null,
+                ToCandidates(exactMatches.Select(entry => (entry.EntryId, entry.EntryName))));
         }
 
         var partial = entries
@@ -241,19 +286,28 @@ public class BenchWarmingQueryService(IBenchWarmingLeagueStore store)
 
         if (partial.Length > 1)
         {
-            var candidates = partial
-                .Select(entry => entry.EntryName)
-                .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
-                .ToArray();
-            return (BenchWarmingTeamLookupOutcome.Ambiguous, null, candidates);
+            return (
+                BenchWarmingTeamLookupOutcome.Ambiguous,
+                null,
+                ToCandidates(partial.Select(entry => (entry.EntryId, entry.EntryName))));
         }
 
         return (BenchWarmingTeamLookupOutcome.Available, partial[0].EntryId, null);
     }
 
+    private static IReadOnlyList<BenchWarmingTeamCandidate> ToCandidates(
+        IEnumerable<(int EntryId, string EntryName)> entries)
+    {
+        return entries
+            .Select(entry => new BenchWarmingTeamCandidate(entry.EntryId, entry.EntryName))
+            .OrderBy(candidate => candidate.EntryName, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
+
     private static BenchWarmingStreakRecord? FindLongestStreak(
         IEnumerable<BenchWarmingEntryRoundStanding> rounds,
-        Func<int, bool> qualifies)
+        IReadOnlyDictionary<int, string> latestEntryNames,
+        Func<BenchWarmingEntryRoundStanding, bool> qualifies)
     {
         BenchWarmingStreakRecord? best = null;
 
@@ -262,12 +316,13 @@ public class BenchWarmingQueryService(IBenchWarmingLeagueStore store)
             var ordered = group
                 .OrderBy(standing => standing.EventId)
                 .ToArray();
+            var latestName = latestEntryNames.GetValueOrDefault(group.Key, ordered[0].EntryName);
 
             var index = 0;
             while (index < ordered.Length)
             {
                 var start = ordered[index];
-                if (!qualifies(start.Points))
+                if (!qualifies(start))
                 {
                     index++;
                     continue;
@@ -276,7 +331,7 @@ public class BenchWarmingQueryService(IBenchWarmingLeagueStore store)
                 var endIndex = index;
                 while (endIndex + 1 < ordered.Length &&
                        ordered[endIndex + 1].EventId == ordered[endIndex].EventId + 1 &&
-                       qualifies(ordered[endIndex + 1].Points))
+                       qualifies(ordered[endIndex + 1]))
                 {
                     endIndex++;
                 }
@@ -284,7 +339,7 @@ public class BenchWarmingQueryService(IBenchWarmingLeagueStore store)
                 var length = endIndex - index + 1;
                 var record = new BenchWarmingStreakRecord(
                     start.EntryId,
-                    start.EntryName,
+                    latestName,
                     length,
                     start.EventId,
                     ordered[endIndex].EventId);
@@ -295,6 +350,11 @@ public class BenchWarmingQueryService(IBenchWarmingLeagueStore store)
         }
 
         return best;
+    }
+
+    private static bool IsBenchBoost(string? activeChip)
+    {
+        return string.Equals(activeChip, "bboost", StringComparison.OrdinalIgnoreCase);
     }
 
     private static BenchWarmingStreakRecord? PickBetterStreak(

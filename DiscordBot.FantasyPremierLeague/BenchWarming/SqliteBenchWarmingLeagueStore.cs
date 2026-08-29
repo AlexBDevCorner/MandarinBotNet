@@ -62,6 +62,30 @@ public sealed class SqliteBenchWarmingLeagueStore : IBenchWarmingLeagueStore
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(eventId);
         ArgumentNullException.ThrowIfNull(benchPoints);
 
+        var entryRounds = benchPoints
+            .GroupBy(benchPoint => benchPoint.EntryId)
+            .Select(group => new BenchWarmingEntryRoundStanding(
+                eventId,
+                group.Key,
+                group.First().EntryName,
+                group.Sum(benchPoint => benchPoint.Points)))
+            .ToArray();
+
+        SaveRound(season, eventId, entryRounds, benchPoints, calculatedAtUtc);
+    }
+
+    public void SaveRound(
+        string season,
+        int eventId,
+        IReadOnlyList<BenchWarmingEntryRoundStanding> entryRounds,
+        IReadOnlyList<BenchWarmingPlayerPoints> benchPoints,
+        DateTimeOffset calculatedAtUtc)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(season);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(eventId);
+        ArgumentNullException.ThrowIfNull(entryRounds);
+        ArgumentNullException.ThrowIfNull(benchPoints);
+
         using var connection = OpenConnection();
         using var transaction = connection.BeginTransaction();
 
@@ -90,6 +114,41 @@ public sealed class SqliteBenchWarmingLeagueStore : IBenchWarmingLeagueStore
                     "$calculated_at_utc",
                     calculatedAtUtc.UtcDateTime.ToString("O"));
                 roundCommand.ExecuteNonQuery();
+            }
+
+            foreach (var entryRound in entryRounds)
+            {
+                using var entryRoundCommand = connection.CreateCommand();
+                entryRoundCommand.Transaction = transaction;
+                entryRoundCommand.CommandTimeout = CommandTimeoutSeconds;
+                entryRoundCommand.CommandText =
+                    """
+                    INSERT OR REPLACE INTO bench_warming_entry_rounds (
+                        season,
+                        event_id,
+                        entry_id,
+                        entry_name,
+                        points,
+                        active_chip
+                    )
+                    VALUES (
+                        $season,
+                        $event_id,
+                        $entry_id,
+                        $entry_name,
+                        $points,
+                        $active_chip
+                    );
+                    """;
+                entryRoundCommand.Parameters.AddWithValue("$season", season);
+                entryRoundCommand.Parameters.AddWithValue("$event_id", eventId);
+                entryRoundCommand.Parameters.AddWithValue("$entry_id", entryRound.EntryId);
+                entryRoundCommand.Parameters.AddWithValue("$entry_name", entryRound.EntryName);
+                entryRoundCommand.Parameters.AddWithValue("$points", entryRound.Points);
+                entryRoundCommand.Parameters.AddWithValue(
+                    "$active_chip",
+                    (object?)entryRound.ActiveChip ?? DBNull.Value);
+                entryRoundCommand.ExecuteNonQuery();
             }
 
             foreach (var benchPoint in benchPoints)
@@ -151,7 +210,7 @@ public sealed class SqliteBenchWarmingLeagueStore : IBenchWarmingLeagueStore
             SELECT entry_id,
                    entry_name,
                    SUM(points) AS total_points
-            FROM bench_warming_bench_points
+            FROM bench_warming_entry_rounds
             WHERE season = $season
             GROUP BY entry_id, entry_name
             ORDER BY total_points DESC, entry_name COLLATE NOCASE;
@@ -183,12 +242,12 @@ public sealed class SqliteBenchWarmingLeagueStore : IBenchWarmingLeagueStore
             SELECT event_id,
                    entry_id,
                    entry_name,
-                   SUM(points) AS total_points
-            FROM bench_warming_bench_points
+                   points,
+                   active_chip
+            FROM bench_warming_entry_rounds
             WHERE season = $season
-            GROUP BY event_id, entry_id, entry_name
             ORDER BY event_id ASC,
-                     total_points DESC,
+                     points DESC,
                      entry_name COLLATE NOCASE;
             """;
         command.Parameters.AddWithValue("$season", season);
@@ -201,7 +260,8 @@ public sealed class SqliteBenchWarmingLeagueStore : IBenchWarmingLeagueStore
                 Convert.ToInt32(reader.GetInt64(0)),
                 Convert.ToInt32(reader.GetInt64(1)),
                 reader.GetString(2),
-                Convert.ToInt32(reader.GetInt64(3))));
+                Convert.ToInt32(reader.GetInt64(3)),
+                reader.IsDBNull(4) ? null : reader.GetString(4)));
         }
 
         return standings;
@@ -339,6 +399,49 @@ public sealed class SqliteBenchWarmingLeagueStore : IBenchWarmingLeagueStore
             ) WITHOUT ROWID;
             """;
         pointsCommand.ExecuteNonQuery();
+
+        using (var entryRoundsCommand = connection.CreateCommand())
+        {
+            entryRoundsCommand.CommandTimeout = CommandTimeoutSeconds;
+            entryRoundsCommand.CommandText =
+                """
+                CREATE TABLE IF NOT EXISTS bench_warming_entry_rounds (
+                    season TEXT NOT NULL,
+                    event_id INTEGER NOT NULL,
+                    entry_id INTEGER NOT NULL,
+                    entry_name TEXT NOT NULL,
+                    points INTEGER NOT NULL,
+                    active_chip TEXT,
+                    PRIMARY KEY (season, event_id, entry_id)
+                ) WITHOUT ROWID;
+                """;
+            entryRoundsCommand.ExecuteNonQuery();
+        }
+
+        using (var backfillCommand = connection.CreateCommand())
+        {
+            backfillCommand.CommandTimeout = CommandTimeoutSeconds;
+            backfillCommand.CommandText =
+                """
+                INSERT OR IGNORE INTO bench_warming_entry_rounds (
+                    season,
+                    event_id,
+                    entry_id,
+                    entry_name,
+                    points,
+                    active_chip
+                )
+                SELECT season,
+                       event_id,
+                       entry_id,
+                       MAX(entry_name),
+                       SUM(points),
+                       NULL
+                FROM bench_warming_bench_points
+                GROUP BY season, event_id, entry_id;
+                """;
+            backfillCommand.ExecuteNonQuery();
+        }
     }
 
     private SqliteConnection OpenConnection()

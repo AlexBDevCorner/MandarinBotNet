@@ -299,8 +299,177 @@ public sealed class BenchWarmingQueryServiceTests
 
         result.Outcome.Should().Be(BenchWarmingTeamLookupOutcome.Ambiguous);
         result.Candidates.Should().BeEquivalentTo(
-            ["Fraud United", "Maguire United"],
+            [
+                new BenchWarmingTeamCandidate(100, "Fraud United"),
+                new BenchWarmingTeamCandidate(200, "Maguire United")
+            ],
             options => options.WithStrictOrdering());
+    }
+
+    [Test]
+    public void GetTeam_IdenticalLatestNames_AreAmbiguous()
+    {
+        var service = new BenchWarmingQueryService(new FakeStore
+        {
+            Season = "2026/27",
+            Tracking = new BenchWarmingTrackingInfo(2, 5, 4),
+            RoundStandings =
+            [
+                new(2, 100, "United", 6),
+                new(2, 200, "United", 4)
+            ]
+        });
+
+        var result = service.GetTeam("United");
+
+        result.Outcome.Should().Be(BenchWarmingTeamLookupOutcome.Ambiguous);
+        result.Candidates.Should().BeEquivalentTo(
+            [
+                new BenchWarmingTeamCandidate(100, "United"),
+                new BenchWarmingTeamCandidate(200, "United")
+            ],
+            options => options.WithStrictOrdering());
+    }
+
+    [Test]
+    public void GetTeam_NumericEntryId_ResolvesById()
+    {
+        var service = new BenchWarmingQueryService(new FakeStore
+        {
+            Season = "2026/27",
+            Tracking = new BenchWarmingTrackingInfo(2, 5, 4),
+            RoundStandings =
+            [
+                new(2, 100, "Team A", 6),
+                new(2, 200, "Team B", 4)
+            ]
+        });
+
+        var result = service.GetTeam("200");
+
+        result.Outcome.Should().Be(BenchWarmingTeamLookupOutcome.Available);
+        result.Profile!.EntryId.Should().Be(200);
+    }
+
+    [Test]
+    public void GetTeam_NumericEntryId_UnknownId_ReturnsNotFound()
+    {
+        var service = new BenchWarmingQueryService(new FakeStore
+        {
+            Season = "2026/27",
+            Tracking = new BenchWarmingTrackingInfo(2, 5, 4),
+            RoundStandings = [new(2, 100, "Team A", 6)]
+        });
+
+        var result = service.GetTeam("999");
+
+        result.Outcome.Should().Be(BenchWarmingTeamLookupOutcome.NotFound);
+    }
+
+    [Test]
+    public void GetSeasonOverview_TeamRenamed_UsesLatestName()
+    {
+        var service = new BenchWarmingQueryService(new FakeStore
+        {
+            Season = "2026/27",
+            Tracking = new BenchWarmingTrackingInfo(2, 5, 4),
+            RoundStandings =
+            [
+                new(2, 100, "Old Maguire FC", 6),
+                new(5, 100, "Maguire GOAT FC", 18)
+            ]
+        });
+
+        var overview = service.GetSeasonOverview()!;
+
+        overview.SeasonStandings.Should().ContainSingle(
+            standing => standing.EntryId == 100);
+        overview.SeasonStandings[0].EntryName.Should().Be("Maguire GOAT FC");
+    }
+
+    [Test]
+    public void GetTeam_TeamRenamed_ProfileUsesLatestName()
+    {
+        var service = new BenchWarmingQueryService(new FakeStore
+        {
+            Season = "2026/27",
+            Tracking = new BenchWarmingTrackingInfo(2, 5, 4),
+            RoundStandings =
+            [
+                new(2, 100, "Old Maguire FC", 6),
+                new(5, 100, "Maguire GOAT FC", 18)
+            ]
+        });
+
+        var result = service.GetTeam("Maguire GOAT FC");
+
+        result.Outcome.Should().Be(BenchWarmingTeamLookupOutcome.Available);
+        result.Profile!.EntryName.Should().Be("Maguire GOAT FC");
+    }
+
+    [Test]
+    public void GetTeam_LateJoiningManager_FirstTrackedEventIdIsPersonalFirstGw()
+    {
+        var service = new BenchWarmingQueryService(new FakeStore
+        {
+            Season = "2026/27",
+            Tracking = new BenchWarmingTrackingInfo(2, 8, 7),
+            RoundStandings =
+            [
+                new(2, 100, "Early FC", 6),
+                new(6, 300, "Late FC", 4),
+                new(7, 300, "Late FC", 9),
+                new(8, 300, "Late FC", 2)
+            ]
+        });
+
+        var result = service.GetTeam("Late FC");
+
+        result.Outcome.Should().Be(BenchWarmingTeamLookupOutcome.Available);
+        result.Profile!.FirstTrackedEventId.Should().Be(6);
+        result.Profile!.History.Should().HaveCount(3);
+    }
+
+    [Test]
+    public void GetSeasonOverview_AverageIncludesBenchBoostZero()
+    {
+        var service = new BenchWarmingQueryService(new FakeStore
+        {
+            Season = "2026/27",
+            Tracking = new BenchWarmingTrackingInfo(2, 2, 1),
+            RoundStandings =
+            [
+                new(2, 100, "Team A", 10, ActiveChip: null),
+                new(2, 200, "Team B", 0, ActiveChip: "bboost")
+            ]
+        });
+
+        var overview = service.GetSeasonOverview()!;
+
+        overview.Records.AveragePointsPerManagerRound.Should().BeApproximately(5.0, 0.0001);
+        overview.Records.LongestCleanBenchStreak.Should().BeNull();
+    }
+
+    [Test]
+    public void GetRound_TrackedGwWithZeroBenchPlayerRows_RemainsAvailable()
+    {
+        var service = new BenchWarmingQueryService(new FakeStore
+        {
+            Season = "2026/27",
+            Tracking = new BenchWarmingTrackingInfo(2, 5, 4),
+            RoundStandings =
+            [
+                new(5, 100, "Team A", 0, ActiveChip: "bboost"),
+                new(5, 200, "Team B", 5)
+            ],
+            BenchPoints = []
+        });
+
+        var result = service.GetRound(5);
+
+        result.Outcome.Should().Be(BenchWarmingRoundSummaryOutcome.Available);
+        result.Summary!.Standings.Should().Contain(
+            new BenchWarmingEntryStanding(100, "Team A", 0));
     }
 
     [Test]
@@ -435,11 +604,19 @@ public sealed class BenchWarmingQueryServiceTests
         public IReadOnlyList<BenchWarmingPlayerPoints> BenchPoints { get; init; } = [];
 
         public bool IsRoundCalculated(string season, int eventId) =>
+            RoundStandings.Any(standing => standing.EventId == eventId);
+
+        public void SaveRound(
+            string season,
+            int eventId,
+            IReadOnlyList<BenchWarmingPlayerPoints> benchPoints,
+            DateTimeOffset calculatedAtUtc) =>
             throw new NotSupportedException();
 
         public void SaveRound(
             string season,
             int eventId,
+            IReadOnlyList<BenchWarmingEntryRoundStanding> entryRounds,
             IReadOnlyList<BenchWarmingPlayerPoints> benchPoints,
             DateTimeOffset calculatedAtUtc) =>
             throw new NotSupportedException();

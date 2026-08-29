@@ -201,6 +201,33 @@ public sealed class SqliteBenchWarmingLeagueStoreTests
     }
 
     [Test]
+    public void GetSeasonRoundStandings_IncludesBenchBoostManagerWithZeroPoints()
+    {
+        // Arrange
+        var store = CreateStore();
+        store.SaveRound(
+            "2026/27",
+            5,
+            [
+                new BenchWarmingEntryRoundStanding(5, 100, "Team A", 12),
+                new BenchWarmingEntryRoundStanding(5, 200, "Team B", 0, ActiveChip: "bboost")
+            ],
+            [
+                new BenchWarmingPlayerPoints(100, "Team A", 1, "Haaland", 12)
+            ],
+            DateTimeOffset.UtcNow);
+
+        // Act
+        var standings = store.GetSeasonRoundStandings("2026/27");
+
+        // Assert
+        standings.Should().Contain(
+            new BenchWarmingEntryRoundStanding(5, 200, "Team B", 0, "bboost"));
+        standings.Should().Contain(
+            new BenchWarmingEntryRoundStanding(5, 100, "Team A", 12, null));
+    }
+
+    [Test]
     public void GetSeasonRoundStandings_OtherSeason_Excluded()
     {
         // Arrange

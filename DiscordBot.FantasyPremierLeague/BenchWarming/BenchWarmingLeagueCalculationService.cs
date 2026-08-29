@@ -57,6 +57,7 @@ public sealed class BenchWarmingLeagueCalculationService(
             element => element.WebName);
 
         var benchPoints = new List<BenchWarmingPlayerPoints>();
+        var entryRounds = new List<BenchWarmingEntryRoundStanding>();
         foreach (var result in standings.Standings.Results)
         {
             var picks = await premierLeagueClient.GetEntryEventPicksAsync(
@@ -64,7 +65,13 @@ public sealed class BenchWarmingLeagueCalculationService(
                 finishedEvent.Id,
                 cancellationToken);
 
-            foreach (var pick in picks.Picks.Where(pick => pick.Multiplier == 0))
+            var benchedPicks = picks.Picks
+                .Where(pick => pick.Multiplier == 0)
+                .ToArray();
+            var roundBenchPoints = benchedPicks.Sum(
+                pick => livePoints.GetValueOrDefault(pick.Element));
+
+            foreach (var pick in benchedPicks)
             {
                 benchPoints.Add(new BenchWarmingPlayerPoints(
                     result.Entry,
@@ -73,11 +80,19 @@ public sealed class BenchWarmingLeagueCalculationService(
                     playerNames.GetValueOrDefault(pick.Element, string.Empty),
                     livePoints.GetValueOrDefault(pick.Element)));
             }
+
+            entryRounds.Add(new BenchWarmingEntryRoundStanding(
+                finishedEvent.Id,
+                result.Entry,
+                result.EntryName,
+                roundBenchPoints,
+                picks.ActiveChip));
         }
 
         store.SaveRound(
             season,
             finishedEvent.Id,
+            entryRounds,
             benchPoints,
             timeProvider.GetUtcNow());
         logger.LogInformation(
@@ -91,7 +106,7 @@ public sealed class BenchWarmingLeagueCalculationService(
             finishedEvent.Id,
             WasAlreadyCalculated: false,
             BenchPoints: benchPoints,
-            RoundStandings: Summarize(benchPoints),
+            RoundStandings: Summarize(entryRounds),
             SeasonStandings: store.GetSeasonStandings(season));
     }
 
@@ -101,14 +116,14 @@ public sealed class BenchWarmingLeagueCalculationService(
     }
 
     private static IReadOnlyList<BenchWarmingEntryStanding> Summarize(
-        IReadOnlyList<BenchWarmingPlayerPoints> benchPoints)
+        IReadOnlyList<BenchWarmingEntryRoundStanding> entryRounds)
     {
-        return benchPoints
-            .GroupBy(benchPoint => benchPoint.EntryId)
+        return entryRounds
+            .GroupBy(round => round.EntryId)
             .Select(group => new BenchWarmingEntryStanding(
                 group.Key,
                 group.First().EntryName,
-                group.Sum(benchPoint => benchPoint.Points)))
+                group.Sum(round => round.Points)))
             .OrderByDescending(standing => standing.Points)
             .ThenBy(standing => standing.EntryName, StringComparer.OrdinalIgnoreCase)
             .ToList();
