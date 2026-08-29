@@ -164,6 +164,8 @@ public sealed class AchievementsCommandHandlerTests
 
         public string? GetStringOption(string name) => null;
 
+        public long? GetIntegerOption(string name) => null;
+
         public Task RespondAsync(string content)
         {
             Operations.Add("Respond");

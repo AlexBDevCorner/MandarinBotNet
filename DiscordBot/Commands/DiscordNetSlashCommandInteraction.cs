@@ -24,6 +24,20 @@ internal sealed class DiscordNetSlashCommandInteraction(
         return option.Value as string;
     }
 
+    public long? GetIntegerOption(string name)
+    {
+        ArgumentNullException.ThrowIfNull(name);
+
+        var option = command.Data.Options
+            .FirstOrDefault(option => option.Name == name);
+        if (option is null)
+        {
+            return null;
+        }
+
+        return (long?)option.Value;
+    }
+
     public Task RespondAsync(string content)
     {
         return command.RespondAsync(content);

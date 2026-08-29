@@ -3,6 +3,7 @@ using System.Text;
 using DiscordBot.FantasyPremierLeague.Historical;
 using DiscordBot.FantasyPremierLeague.Recap;
 using DiscordBot.FantasyPremierLeague.Recognition;
+using DiscordBot.FantasyPremierLeague.Standings;
 using DiscordBot.Notifications;
 using DiscordBot.Responses;
 
@@ -15,12 +16,15 @@ public sealed class PremierLeagueMessageCompositionService(
 
     private const string ClassicSnapshotHeading =
         "🏆 Турнирная таблица классической лиги:";
+    private const string ClassicAroundHeadingPrefix =
+        "🏆 Классическая лига — вокруг ";
     private const string HeadToHeadSnapshotHeading =
         "⚔️ Турнирная таблица лиги один на один:";
     private const string EmptyStandingsMessage =
         "🤷 Данные о позициях не получены.";
     private const string UnavailableStandingsMessage =
         "⚠️ Эта лига сейчас недоступна.";
+    private const string AroundTargetMarker = "👉 ";
 
     private static readonly CultureInfo RussianCulture = new("ru-RU");
 
@@ -150,29 +154,153 @@ public sealed class PremierLeagueMessageCompositionService(
     }
 
     public string ComposeClassicStandingsSnapshot(
-        IEnumerable<ClassicStanding> standings)
+        FplClassicStandingsView view)
     {
-        ArgumentNullException.ThrowIfNull(standings);
+        ArgumentNullException.ThrowIfNull(view);
 
-        return ComposeStandingsSnapshot(
-            ClassicSnapshotHeading,
-            standings,
-            result => result.Rank,
-            result => result.EntryName,
-            result => result.Total);
+        var summary = new StringBuilder(ClassicSnapshotHeading);
+        AppendClassicRows(summary, view.Rows);
+        return FinishSnapshot(summary);
+    }
+
+    public string ComposeClassicAroundStandings(
+        FplAroundLookupResult result,
+        string query)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+        ArgumentNullException.ThrowIfNull(query);
+
+        var heading = ClassicAroundHeadingPrefix +
+            DiscordTextSafety.SanitizeExternalName(query);
+        var summary = new StringBuilder(heading);
+        AppendClassicRows(summary, result.Rows);
+        return FinishSnapshot(summary);
     }
 
     public string ComposeHeadToHeadStandingsSnapshot(
-        IEnumerable<HeadToHeadStanding> standings)
+        FplHeadToHeadStandingsView view)
     {
-        ArgumentNullException.ThrowIfNull(standings);
+        ArgumentNullException.ThrowIfNull(view);
 
-        return ComposeStandingsSnapshot(
-            HeadToHeadSnapshotHeading,
-            standings,
-            result => result.Rank,
-            result => result.EntryName,
-            result => result.Total);
+        var summary = new StringBuilder(HeadToHeadSnapshotHeading);
+        AppendHeadToHeadRows(summary, view.Rows);
+        return FinishSnapshot(summary);
+    }
+
+    public string ComposeManagerNotFound(string query)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+
+        return
+            $"🤷 Не удалось найти менеджера или команду \"{DiscordTextSafety.SanitizeExternalName(query)}\".";
+    }
+
+    public string ComposeAmbiguousManager(
+        string query,
+        IReadOnlyList<FplClassicCandidate> candidates)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+        ArgumentNullException.ThrowIfNull(candidates);
+
+        var summary = new StringBuilder(
+            $"🤔 Нашлось несколько вариантов для \"{DiscordTextSafety.SanitizeExternalName(query)}\":");
+        foreach (var candidate in candidates)
+        {
+            summary.Append("\n• ");
+            summary.Append(DiscordTextSafety.SanitizeExternalName(candidate.EntryName));
+            summary.Append(" — ");
+            summary.Append(DiscordTextSafety.SanitizeExternalName(candidate.ManagerName));
+        }
+
+        summary.Append("\n\nУточните название команды или имя менеджера.");
+        return summary.ToString();
+    }
+
+    private static string FinishSnapshot(StringBuilder summary)
+    {
+        if (summary.ToString().IndexOf('\n') < 0)
+        {
+            summary.Append('\n');
+            summary.Append(EmptyStandingsMessage);
+        }
+
+        return summary.ToString();
+    }
+
+    private static void AppendClassicRows(
+        StringBuilder summary,
+        IReadOnlyList<FplClassicStandingRow> rows)
+    {
+        foreach (var row in rows)
+        {
+            summary.Append('\n');
+            if (row.IsAroundTarget)
+            {
+                summary.Append(AroundTargetMarker);
+            }
+
+            summary.Append(GetStandingsRankLabel(row.Rank));
+            summary.Append(' ');
+            summary.Append(DiscordTextSafety.SanitizeExternalName(row.EntryName));
+            summary.Append(" — ");
+            summary.Append(FormatTotal(row.TotalPoints));
+            summary.Append(" | GW ");
+            summary.Append(row.GameweekPoints.ToString(CultureInfo.InvariantCulture));
+            AppendMovement(summary, row.Movement, row.MovementDelta);
+            AppendGap(summary, row.HasGap, row.GapToLeader);
+        }
+    }
+
+    private static void AppendHeadToHeadRows(
+        StringBuilder summary,
+        IReadOnlyList<FplHeadToHeadStandingRow> rows)
+    {
+        foreach (var row in rows)
+        {
+            summary.Append('\n');
+            summary.Append(GetStandingsRankLabel(row.Rank));
+            summary.Append(' ');
+            summary.Append(DiscordTextSafety.SanitizeExternalName(row.EntryName));
+            summary.Append(" — ");
+            summary.Append(FormatTotal(row.TotalPoints));
+            AppendMovement(summary, row.Movement, row.MovementDelta);
+            summary.Append(" | ");
+            summary.Append(row.MatchesPlayed.ToString(CultureInfo.InvariantCulture));
+            summary.Append(' ');
+            summary.Append(FormatMatchesNoun(row.MatchesPlayed));
+            AppendGap(summary, row.HasGap, row.GapToLeader);
+        }
+    }
+
+    private static void AppendMovement(
+        StringBuilder summary,
+        FplStandingsMovement movement,
+        int delta)
+    {
+        if (movement == FplStandingsMovement.None || delta <= 0)
+        {
+            return;
+        }
+
+        var arrow = movement == FplStandingsMovement.Up ? '↑' : '↓';
+        summary.Append(' ');
+        summary.Append(arrow);
+        summary.Append(delta.ToString(CultureInfo.InvariantCulture));
+    }
+
+    private static void AppendGap(
+        StringBuilder summary,
+        bool hasGap,
+        int gap)
+    {
+        if (!hasGap)
+        {
+            return;
+        }
+
+        summary.Append(" | ");
+        summary.Append(gap.ToString(CultureInfo.InvariantCulture));
+        summary.Append(" до лидера");
     }
 
     public static string ComposeUnavailableClassicStandings()
@@ -183,24 +311,6 @@ public sealed class PremierLeagueMessageCompositionService(
     public static string ComposeUnavailableHeadToHeadStandings()
     {
         return $"{HeadToHeadSnapshotHeading}\n{UnavailableStandingsMessage}";
-    }
-
-    private static string ComposeStandingsSnapshot<T>(
-        string heading,
-        IEnumerable<T> standings,
-        Func<T, int> rank,
-        Func<T, string?> entryName,
-        Func<T, int> total)
-    {
-        var summary = new StringBuilder(heading);
-        var count = AppendStandings(summary, standings, rank, entryName, total);
-        if (count == 0)
-        {
-            summary.Append('\n');
-            summary.Append(EmptyStandingsMessage);
-        }
-
-        return summary.ToString();
     }
 
     private static int AppendStandings<T>(
@@ -494,6 +604,23 @@ public sealed class PremierLeagueMessageCompositionService(
         }
 
         return "туров";
+    }
+
+    private static string FormatMatchesNoun(int count)
+    {
+        var mod10 = count % 10;
+        var mod100 = count % 100;
+        if (mod10 == 1 && mod100 != 11)
+        {
+            return "матч";
+        }
+
+        if (mod10 is >= 2 and <= 4 && (mod100 < 10 || mod100 >= 20))
+        {
+            return "матча";
+        }
+
+        return "матчей";
     }
 
     private static IReadOnlyList<string> GetCongratulationsMessages(

@@ -23,6 +23,26 @@ public static class DiscordApplicationCommands
             new SlashCommandBuilder()
                 .WithName(StandingsName)
                 .WithDescription("Показывает текущие таблицы лиг FPL. 🏆")
+                .AddOption(
+                    new SlashCommandOptionBuilder()
+                        .WithName("league")
+                        .WithType(ApplicationCommandOptionType.String)
+                        .WithDescription("Какую лигу показать")
+                        .AddChoice("classic", "classic")
+                        .AddChoice("h2h", "h2h"))
+                .AddOption(
+                    new SlashCommandOptionBuilder()
+                        .WithName("top")
+                        .WithType(ApplicationCommandOptionType.Integer)
+                        .WithDescription("Показать только первые N команд")
+                        .WithMinValue(1)
+                        .WithMaxValue(20))
+                .AddOption(
+                    new SlashCommandOptionBuilder()
+                        .WithName("around")
+                        .WithType(ApplicationCommandOptionType.String)
+                        .WithDescription(
+                            "Показать команды рядом с указанным менеджером"))
                 .Build(),
             new SlashCommandBuilder()
                 .WithName(DeadlineName)

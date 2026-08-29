@@ -245,6 +245,8 @@ public sealed class LiveInsightsCommandHandlerTests
 
         public string? GetStringOption(string name) => null;
 
+        public long? GetIntegerOption(string name) => null;
+
         public List<string> Operations { get; } = [];
 
         public List<string> Messages { get; } = [];
