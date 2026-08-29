@@ -82,6 +82,11 @@ public class BenchWarmingQueryService(IBenchWarmingLeagueStore store)
                 standing.Points))
             .ToArray();
 
+        if (standings.Length == 0)
+        {
+            return BenchWarmingRoundSummaryResult.ForNotTracked(tracking);
+        }
+
         var topBenchPlayer = store.GetRoundBenchPoints(season, eventId)
             .Where(player => player.Points > 0)
             .OrderByDescending(player => player.Points)

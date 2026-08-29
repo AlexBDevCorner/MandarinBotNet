@@ -105,6 +105,137 @@ public sealed class SqliteBenchWarmingLeagueStoreTests
     }
 
     [Test]
+    public void GetSeasonStandings_TeamRenamed_AggregatesByEntryIdAndUsesLatestName()
+    {
+        // Arrange
+        var store = CreateStore();
+        store.SaveRound(
+            "2026/27",
+            2,
+            [
+                new BenchWarmingEntryRoundStanding(2, 100, "Old Name", 5),
+                new BenchWarmingEntryRoundStanding(2, 200, "Other Team", 9)
+            ],
+            [],
+            DateTimeOffset.UtcNow);
+        store.SaveRound(
+            "2026/27",
+            3,
+            [
+                new BenchWarmingEntryRoundStanding(3, 100, "New Name", 8),
+                new BenchWarmingEntryRoundStanding(3, 200, "Other Team", 4)
+            ],
+            [],
+            DateTimeOffset.UtcNow);
+
+        // Act
+        var standings = store.GetSeasonStandings("2026/27");
+
+        // Assert
+        standings.Should().BeEquivalentTo(
+            [
+                new BenchWarmingEntryStanding(100, "New Name", 13),
+                new BenchWarmingEntryStanding(200, "Other Team", 13)
+            ],
+            options => options.WithStrictOrdering());
+    }
+
+    [Test]
+    public void GetTrackingInfo_LegacyRoundsWithoutEntryRounds_AreNotReportedAsComplete()
+    {
+        // Arrange: simulate an old-format database that predates bench_warming_entry_rounds.
+        CreateLegacyDatabase(_databasePath, "2026/27", eventId: 5);
+        var store = CreateStore();
+
+        // Act
+        var tracking = store.GetTrackingInfo("2026/27");
+        var seasonStandings = store.GetSeasonStandings("2026/27");
+
+        // Assert: the historical GW is not silently reported as a complete, tracked GW.
+        tracking.Should().BeNull();
+        seasonStandings.Should().BeEmpty();
+    }
+
+    private static void CreateLegacyDatabase(string databasePath, string season, int eventId)
+    {
+        var directory = Path.GetDirectoryName(databasePath)
+            ?? throw new InvalidOperationException("The database path must include a directory.");
+        Directory.CreateDirectory(directory);
+
+        var connectionString = new SqliteConnectionStringBuilder
+        {
+            DataSource = databasePath,
+            Mode = SqliteOpenMode.ReadWriteCreate
+        }.ToString();
+
+        using var connection = new SqliteConnection(connectionString);
+        connection.Open();
+
+        using (var roundsCommand = connection.CreateCommand())
+        {
+            roundsCommand.CommandText =
+                """
+                CREATE TABLE bench_warming_rounds (
+                    season TEXT NOT NULL,
+                    event_id INTEGER NOT NULL,
+                    calculated_at_utc TEXT NOT NULL,
+                    PRIMARY KEY (season, event_id)
+                ) WITHOUT ROWID;
+                """;
+            roundsCommand.ExecuteNonQuery();
+        }
+
+        using (var pointsCommand = connection.CreateCommand())
+        {
+            pointsCommand.CommandText =
+                """
+                CREATE TABLE bench_warming_bench_points (
+                    season TEXT NOT NULL,
+                    event_id INTEGER NOT NULL,
+                    entry_id INTEGER NOT NULL,
+                    entry_name TEXT NOT NULL,
+                    player_id INTEGER NOT NULL,
+                    player_web_name TEXT NOT NULL,
+                    points INTEGER NOT NULL,
+                    PRIMARY KEY (season, event_id, entry_id, player_id)
+                ) WITHOUT ROWID;
+                """;
+            pointsCommand.ExecuteNonQuery();
+        }
+
+        using (var insertRound = connection.CreateCommand())
+        {
+            insertRound.CommandText =
+                "INSERT INTO bench_warming_rounds (season, event_id, calculated_at_utc) " +
+                "VALUES ($season, $event_id, $calculated_at_utc);";
+            insertRound.Parameters.AddWithValue("$season", season);
+            insertRound.Parameters.AddWithValue("$event_id", eventId);
+            insertRound.Parameters.AddWithValue(
+                "$calculated_at_utc",
+                DateTime.UtcNow.ToString("O"));
+            insertRound.ExecuteNonQuery();
+        }
+
+        // Team A benched players exist; a historical Bench Boost manager (Team B)
+        // stored no Multiplier == 0 players, so there is nothing to backfill for it.
+        using (var insertPoints = connection.CreateCommand())
+        {
+            insertPoints.CommandText =
+                "INSERT INTO bench_warming_bench_points " +
+                "(season, event_id, entry_id, entry_name, player_id, player_web_name, points) " +
+                "VALUES ($season, $event_id, $entry_id, $entry_name, $player_id, $player_web_name, $points);";
+            insertPoints.Parameters.AddWithValue("$season", season);
+            insertPoints.Parameters.AddWithValue("$event_id", eventId);
+            insertPoints.Parameters.AddWithValue("$entry_id", 100);
+            insertPoints.Parameters.AddWithValue("$entry_name", "Team A");
+            insertPoints.Parameters.AddWithValue("$player_id", 1);
+            insertPoints.Parameters.AddWithValue("$player_web_name", "Player 1");
+            insertPoints.Parameters.AddWithValue("$points", 12);
+            insertPoints.ExecuteNonQuery();
+        }
+    }
+
+    [Test]
     public void GetSeasonStandings_NewSeasonKey_StartsWithEmptyStandings()
     {
         // Arrange

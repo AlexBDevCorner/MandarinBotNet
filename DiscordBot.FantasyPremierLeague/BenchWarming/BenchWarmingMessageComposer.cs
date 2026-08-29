@@ -285,6 +285,14 @@ public sealed class BenchWarmingMessageComposer
             return " 🔥";
         }
 
+        if (string.Equals(
+                round.ActiveChip,
+                "bboost",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return " 🃏";
+        }
+
         if (round.Points == 0)
         {
             return " 🧼";

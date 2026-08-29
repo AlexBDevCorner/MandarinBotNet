@@ -241,6 +241,31 @@ public sealed class BenchWarmingMessageComposerTests
     }
 
     [Test]
+    public void ComposeTeamProfile_BenchBoostRound_IsMarkedWithBenchBoostNotCleanBench()
+    {
+        // Arrange
+        var profile = new BenchWarmingTeamProfile(
+            "2026/27",
+            100,
+            "Bobrov FC",
+            5,
+            0,
+            0d,
+            0,
+            5,
+            0,
+            0,
+            [new BenchWarmingEntryRoundStanding(5, 100, "Bobrov FC", 0, ActiveChip: "bboost")]);
+
+        // Act
+        var message = _composer.ComposeTeamProfile(profile);
+
+        // Assert
+        message.Should().Contain("GW5 — 0 🃏");
+        message.Should().NotContain("GW5 — 0 🧼");
+    }
+
+    [Test]
     public void ComposeTeamNotFound_ReturnsFriendlyMessage()
     {
         // Act
