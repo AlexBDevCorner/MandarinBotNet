@@ -8,6 +8,7 @@ using DiscordBot.FantasyPremierLeague.Live;
 using DiscordBot.FantasyPremierLeague.PriceChanges;
 using DiscordBot.FantasyPremierLeague.Recap;
 using DiscordBot.FantasyPremierLeague.Recognition;
+using DiscordBot.FantasyPremierLeague.Standings;
 using DiscordBot.Notifications;
 using DiscordBot.PremierLeague;
 using DiscordBot.UclFantasy;
@@ -98,6 +99,7 @@ public static class MandarinBotServiceCollectionExtensions
         services.AddSingleton<FplLiveInsightsMessageComposer>();
         services.AddSingleton<FplPriceChangeService>();
         services.AddSingleton<FplPriceChangeMessageCompositionService>();
+        services.AddSingleton<FplStandingsSelectionService>();
         services.AddSingleton<ILiveInsightsCommandHandler, LiveInsightsCommandHandler>();
         services.AddSingleton<IProfileCommandHandler, ProfileCommandHandler>();
         services.AddSingleton<IAchievementsCommandHandler, AchievementsCommandHandler>();

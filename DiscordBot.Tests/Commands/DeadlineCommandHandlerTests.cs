@@ -168,6 +168,8 @@ public sealed class DeadlineCommandHandlerTests
 
         public string? GetStringOption(string name) => null;
 
+        public long? GetIntegerOption(string name) => null;
+
         public List<string> Messages { get; } = [];
 
         public Task RespondAsync(string content)

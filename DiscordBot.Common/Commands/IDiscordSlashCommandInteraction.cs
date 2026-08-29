@@ -8,6 +8,8 @@ public interface IDiscordSlashCommandInteraction
 
     string? GetStringOption(string name);
 
+    long? GetIntegerOption(string name);
+
     Task RespondAsync(string content);
 
     Task DeferAsync();

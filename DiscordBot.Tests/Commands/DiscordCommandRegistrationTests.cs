@@ -117,6 +117,45 @@ public sealed class DiscordCommandRegistrationTests
     }
 
     [Test]
+    public async Task SynchronizeAsync_StandingsCommand_HasLeagueTopAndAroundOptions()
+    {
+        // Arrange
+        var commandClient = new TestApplicationCommandClient();
+        var synchronizer = new DiscordCommandSynchronizer(
+            new DiscordCommandRegistrationOptions(
+                DiscordCommandRegistrationMode.Global,
+                GuildId: null),
+            commandClient,
+            new TestLogger<DiscordCommandSynchronizer>());
+
+        // Act
+        await synchronizer.SynchronizeAsync(CancellationToken.None);
+
+        // Assert
+        var standings = commandClient.Commands!.Cast<SlashCommandProperties>()
+            .Single(command => command.Name.Value == DiscordApplicationCommands.StandingsName);
+        standings.Options.IsSpecified.Should().BeTrue();
+        var options = standings.Options.Value;
+
+        var league = options.Single(option => option.Name == "league");
+        league.Type.Should().Be(ApplicationCommandOptionType.String);
+        league.IsRequired.Should().NotBeTrue();
+        league.Choices.Should().NotBeNull();
+        league.Choices!.Select(choice => choice.Name).Should()
+            .Equal("classic", "h2h");
+
+        var top = options.Single(option => option.Name == "top");
+        top.Type.Should().Be(ApplicationCommandOptionType.Integer);
+        top.IsRequired.Should().NotBeTrue();
+        top.MinValue.Should().Be(1d);
+        top.MaxValue.Should().Be(20d);
+
+        var around = options.Single(option => option.Name == "around");
+        around.Type.Should().Be(ApplicationCommandOptionType.String);
+        around.IsRequired.Should().NotBeTrue();
+    }
+
+    [Test]
     public async Task SynchronizeAsync_GuildMode_BulkOverwritesConfiguredGuild()
     {
         // Arrange

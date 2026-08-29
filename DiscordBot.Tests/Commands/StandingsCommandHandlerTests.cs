@@ -2,6 +2,7 @@ using System.Net;
 using AwesomeAssertions;
 using DiscordBot.Commands;
 using DiscordBot.FantasyPremierLeague;
+using DiscordBot.FantasyPremierLeague.Standings;
 using DiscordBot.PremierLeague;
 using DiscordBot.Responses;
 using DiscordBot.Tests.PremierLeague;
@@ -20,56 +21,358 @@ public sealed class StandingsCommandHandlerTests
     };
 
     [Test]
-    public async Task HandleAsync_BothLeaguesSucceed_DefersThenFetchesConcurrentlyAndRespondsInOrder()
+    public async Task HandleAsync_NoOptions_FetchesBothLeaguesAndRendersRichRows()
     {
         // Arrange
         var operations = new List<string>();
-        var classicCompletion = new TaskCompletionSource<ClassicStandingsResponse>(
-            TaskCreationOptions.RunContinuationsAsynchronously);
-        var headToHeadCompletion =
-            new TaskCompletionSource<HeadToHeadStandingsResponse>(
-                TaskCreationOptions.RunContinuationsAsynchronously);
         var client = new TestFantasyPremierLeagueClient(operations)
         {
-            ClassicTask = classicCompletion.Task,
-            HeadToHeadTask = headToHeadCompletion.Task
+            ClassicTask = Task.FromResult(CreateClassicResponse(
+                new ClassicStanding
+                {
+                    Rank = 1,
+                    Entry = 1,
+                    EntryName = "Classic Team",
+                    Total = 99,
+                    EventTotal = 63
+                })),
+            HeadToHeadTask = Task.FromResult(CreateHeadToHeadResponse(
+                new HeadToHeadStanding
+                {
+                    Rank = 1,
+                    EntryName = "H2H Team",
+                    Total = 12,
+                    MatchesPlayed = 7
+                }))
         };
         var interaction = new TestSlashCommandInteraction(operations);
         var handler = CreateHandler(client);
 
         // Act
-        var handling = handler.HandleAsync(interaction);
-        await WaitUntilAsync(() => client.ClassicCallCount == 1 &&
-            client.HeadToHeadCallCount == 1);
+        await handler.HandleAsync(interaction);
 
         // Assert
-        operations.Should().Equal("Defer", "FetchClassic", "FetchHeadToHead");
-        handling.IsCompleted.Should().BeFalse();
-        client.ClassicLeagueId.Should().Be(Options.ClassicLeagueId);
-        client.HeadToHeadLeagueId.Should().Be(Options.HeadToHeadLeagueId);
-
-        headToHeadCompletion.SetResult(CreateHeadToHeadResponse(
-            new HeadToHeadStanding { Rank = 2, EntryName = "H2H Team", Total = 7 }));
-        classicCompletion.SetResult(CreateClassicResponse(
-            new ClassicStanding { Rank = 1, EntryName = "Classic Team", Total = 99 }));
-        await handling;
-
+        client.ClassicCallCount.Should().Be(1);
+        client.HeadToHeadCallCount.Should().Be(1);
         interaction.Messages.Should().ContainSingle();
-        interaction.Messages[0].Should().StartWith(
-            "🏆 Турнирная таблица классической лиги:");
-        interaction.Messages[0].Should().Contain(":one: Classic Team 99");
-        interaction.Messages[0].Should().Contain(
-            "⚔️ Турнирная таблица лиги один на один:");
-        interaction.Messages[0].Should().Contain(":two: H2H Team 7");
-        interaction.Messages[0].IndexOf("классической лиги", StringComparison.Ordinal)
+        var message = interaction.Messages[0];
+        message.Should().StartWith("🏆 Турнирная таблица классической лиги:");
+        message.Should().Contain("🥇 Classic Team — 99 | GW 63");
+        message.Should().Contain("⚔️ Турнирная таблица лиги один на один:");
+        message.Should().Contain("🥇 H2H Team — 12 | 7 матчей");
+        message.IndexOf("классической лиги", StringComparison.Ordinal)
             .Should().BeLessThan(
-                interaction.Messages[0].IndexOf(
-                    "лиги один на один",
-                    StringComparison.Ordinal));
+                message.IndexOf("лиги один на один", StringComparison.Ordinal));
     }
 
     [Test]
-    public async Task HandleAsync_ClassicLeagueFails_ReturnsHeadToHeadAndUnavailableWarning()
+    public async Task HandleAsync_LeagueClassic_OnlyClassicRequested()
+    {
+        // Arrange
+        var operations = new List<string>();
+        var client = new TestFantasyPremierLeagueClient(operations)
+        {
+            ClassicTask = Task.FromResult(CreateClassicResponse(
+                new ClassicStanding
+                {
+                    Rank = 1,
+                    Entry = 1,
+                    EntryName = "Classic Team",
+                    Total = 99,
+                    EventTotal = 63
+                }))
+        };
+        var interaction = new TestSlashCommandInteraction(operations);
+        interaction.SetStringOption("league", "classic");
+        var handler = CreateHandler(client);
+
+        // Act
+        await handler.HandleAsync(interaction);
+
+        // Assert
+        client.ClassicCallCount.Should().Be(1);
+        client.HeadToHeadCallCount.Should().Be(0);
+        interaction.Messages.Should().ContainSingle();
+        interaction.Messages[0].Should().Contain("🥇 Classic Team — 99 | GW 63");
+        interaction.Messages[0].Should().NotContain("один на один");
+    }
+
+    [Test]
+    public async Task HandleAsync_LeagueH2H_OnlyHeadToHeadRequested()
+    {
+        // Arrange
+        var operations = new List<string>();
+        var client = new TestFantasyPremierLeagueClient(operations)
+        {
+            HeadToHeadTask = Task.FromResult(CreateHeadToHeadResponse(
+                new HeadToHeadStanding
+                {
+                    Rank = 1,
+                    EntryName = "H2H Team",
+                    Total = 12,
+                    MatchesPlayed = 7
+                }))
+        };
+        var interaction = new TestSlashCommandInteraction(operations);
+        interaction.SetStringOption("league", "h2h");
+        var handler = CreateHandler(client);
+
+        // Act
+        await handler.HandleAsync(interaction);
+
+        // Assert
+        client.ClassicCallCount.Should().Be(0);
+        client.HeadToHeadCallCount.Should().Be(1);
+        interaction.Messages.Should().ContainSingle();
+        interaction.Messages[0].Should().Contain("🥇 H2H Team — 12 | 7 матчей");
+        interaction.Messages[0].Should().NotContain("классической лиги");
+    }
+
+    [Test]
+    public async Task HandleAsync_TopApplied_LimitsClassicRows()
+    {
+        // Arrange
+        var operations = new List<string>();
+        var classicStandings = Enumerable.Range(1, 10)
+            .Select(rank => new ClassicStanding
+            {
+                Rank = rank,
+                Entry = rank,
+                EntryName = $"Team {rank}",
+                Total = 110 - rank,
+                EventTotal = 10
+            })
+            .ToArray();
+        var client = new TestFantasyPremierLeagueClient(operations)
+        {
+            ClassicTask = Task.FromResult(CreateClassicResponse(classicStandings)),
+            HeadToHeadTask = Task.FromResult(CreateHeadToHeadResponse(
+                new HeadToHeadStanding
+                {
+                    Rank = 1,
+                    EntryName = "H2H Team",
+                    Total = 12,
+                    MatchesPlayed = 7
+                }))
+        };
+        var interaction = new TestSlashCommandInteraction(operations);
+        interaction.SetIntegerOption("top", 5);
+        var handler = CreateHandler(client);
+
+        // Act
+        await handler.HandleAsync(interaction);
+
+        // Assert
+        var message = interaction.Messages[0];
+        message.Should().Contain("🥇 Team 1");
+        message.Should().Contain("5. Team 5");
+        message.Should().NotContain("6. Team 6");
+        message.Should().Contain("H2H Team — 12 | 7 матчей");
+    }
+
+    [Test]
+    public async Task HandleAsync_AroundClassic_OnlyClassicRequestedAndRendersWindow()
+    {
+        // Arrange
+        var operations = new List<string>();
+        var classicStandings = Enumerable.Range(1, 10)
+            .Select(rank => new ClassicStanding
+            {
+                Rank = rank,
+                Entry = rank,
+                EntryName = $"Team {rank}",
+                Total = 110 - rank,
+                EventTotal = 10
+            })
+            .ToArray();
+        var client = new TestFantasyPremierLeagueClient(operations)
+        {
+            ClassicTask = Task.FromResult(CreateClassicResponse(classicStandings))
+        };
+        var interaction = new TestSlashCommandInteraction(operations);
+        interaction.SetStringOption("around", "Team 8");
+        var handler = CreateHandler(client);
+
+        // Act
+        await handler.HandleAsync(interaction);
+
+        // Assert
+        client.ClassicCallCount.Should().Be(1);
+        client.HeadToHeadCallCount.Should().Be(0);
+        var message = interaction.Messages[0];
+        message.Should().StartWith("🏆 Классическая лига — вокруг Team 8");
+        message.Should().Contain("👉 8. Team 8");
+        message.Should().Contain("6. Team 6");
+        message.Should().Contain("10. Team 10");
+        message.Should().NotContain("5. Team 5");
+    }
+
+    [Test]
+    public async Task HandleAsync_AroundNotFound_ReturnsNotFoundMessage()
+    {
+        // Arrange
+        var operations = new List<string>();
+        var client = new TestFantasyPremierLeagueClient(operations)
+        {
+            ClassicTask = Task.FromResult(CreateClassicResponse(
+                new ClassicStanding
+                {
+                    Rank = 1,
+                    Entry = 1,
+                    EntryName = "Team 1",
+                    Total = 100
+                }))
+        };
+        var interaction = new TestSlashCommandInteraction(operations);
+        interaction.SetStringOption("around", "Ghost");
+        var handler = CreateHandler(client);
+
+        // Act
+        await handler.HandleAsync(interaction);
+
+        // Assert
+        interaction.Messages.Should().ContainSingle();
+        interaction.Messages[0].Should().Be(
+            "🤷 Не удалось найти менеджера или команду \"Ghost\".");
+    }
+
+    [Test]
+    public async Task HandleAsync_AroundAmbiguous_ReturnsCandidates()
+    {
+        // Arrange
+        var operations = new List<string>();
+        var client = new TestFantasyPremierLeagueClient(operations)
+        {
+            ClassicTask = Task.FromResult(CreateClassicResponse(
+                new ClassicStanding
+                {
+                    Rank = 1,
+                    Entry = 1,
+                    EntryName = "Alex FC",
+                    PlayerName = "Bob",
+                    Total = 100
+                },
+                new ClassicStanding
+                {
+                    Rank = 2,
+                    Entry = 2,
+                    EntryName = "FC Alexander",
+                    PlayerName = "Anna",
+                    Total = 99
+                }))
+        };
+        var interaction = new TestSlashCommandInteraction(operations);
+        interaction.SetStringOption("around", "Alex");
+        var handler = CreateHandler(client);
+
+        // Act
+        await handler.HandleAsync(interaction);
+
+        // Assert
+        interaction.Messages.Should().ContainSingle();
+        interaction.Messages[0].Should().StartWith(
+            "🤔 Нашлось несколько вариантов для \"Alex\":");
+        interaction.Messages[0].Should().Contain("Alex FC");
+        interaction.Messages[0].Should().Contain("FC Alexander");
+        interaction.Messages[0].Should().Contain("Уточните название команды или имя менеджера.");
+    }
+
+    [Test]
+    public async Task HandleAsync_TopAndAround_ValidationErrorAndZeroApiCalls()
+    {
+        // Arrange
+        var operations = new List<string>();
+        var client = new TestFantasyPremierLeagueClient(operations);
+        var interaction = new TestSlashCommandInteraction(operations);
+        interaction.SetIntegerOption("top", 5);
+        interaction.SetStringOption("around", "Bob");
+        var handler = CreateHandler(client);
+
+        // Act
+        await handler.HandleAsync(interaction);
+
+        // Assert
+        client.ClassicCallCount.Should().Be(0);
+        client.HeadToHeadCallCount.Should().Be(0);
+        interaction.Messages.Should().ContainSingle();
+        interaction.Messages[0].Should().Be(
+            "⚠️ Используйте либо top, либо around — эти режимы нельзя комбинировать.");
+    }
+
+    [Test]
+    public async Task HandleAsync_AroundWithH2H_ValidationErrorAndZeroApiCalls()
+    {
+        // Arrange
+        var operations = new List<string>();
+        var client = new TestFantasyPremierLeagueClient(operations);
+        var interaction = new TestSlashCommandInteraction(operations);
+        interaction.SetStringOption("league", "h2h");
+        interaction.SetStringOption("around", "Bob");
+        var handler = CreateHandler(client);
+
+        // Act
+        await handler.HandleAsync(interaction);
+
+        // Assert
+        client.ClassicCallCount.Should().Be(0);
+        client.HeadToHeadCallCount.Should().Be(0);
+        interaction.Messages.Should().ContainSingle();
+        interaction.Messages[0].Should().Be(
+            "⚠️ Режим around пока доступен только для классической лиги.");
+    }
+
+    [Test]
+    public async Task HandleAsync_ClassicOnlyLeagueFails_ReturnsUnavailableClassic()
+    {
+        // Arrange
+        var logger = new RecordingLogger<StandingsCommandHandler>();
+        var client = new TestFantasyPremierLeagueClient([])
+        {
+            ClassicTask = Task.FromException<ClassicStandingsResponse>(
+                CreateApiException(FantasyPremierLeagueFailureKind.Transient))
+        };
+        var interaction = new TestSlashCommandInteraction([]);
+        interaction.SetStringOption("league", "classic");
+        var handler = CreateHandler(client, logger);
+
+        // Act
+        await handler.HandleAsync(interaction);
+
+        // Assert
+        client.HeadToHeadCallCount.Should().Be(0);
+        interaction.Messages.Should().ContainSingle();
+        interaction.Messages[0].Should().Be(
+            "🏆 Турнирная таблица классической лиги:\n⚠️ Эта лига сейчас недоступна.");
+        logger.Entries.Should().Contain(entry =>
+            entry.Level == LogLevel.Warning &&
+            entry.Properties["LeagueType"]!.Equals("Classic"));
+    }
+
+    [Test]
+    public async Task HandleAsync_HeadToHeadOnlyLeagueFails_ReturnsUnavailableHeadToHead()
+    {
+        // Arrange
+        var client = new TestFantasyPremierLeagueClient([])
+        {
+            HeadToHeadTask = Task.FromException<HeadToHeadStandingsResponse>(
+                CreateApiException(FantasyPremierLeagueFailureKind.Transient))
+        };
+        var interaction = new TestSlashCommandInteraction([]);
+        interaction.SetStringOption("league", "h2h");
+        var handler = CreateHandler(client);
+
+        // Act
+        await handler.HandleAsync(interaction);
+
+        // Assert
+        client.ClassicCallCount.Should().Be(0);
+        interaction.Messages.Should().ContainSingle();
+        interaction.Messages[0].Should().Be(
+            "⚔️ Турнирная таблица лиги один на один:\n⚠️ Эта лига сейчас недоступна.");
+    }
+
+    [Test]
+    public async Task HandleAsync_CombinedClassicFails_ReturnsHeadToHeadAndUnavailableWarning()
     {
         // Arrange
         var logger = new RecordingLogger<StandingsCommandHandler>();
@@ -82,7 +385,8 @@ public sealed class StandingsCommandHandlerTests
                 {
                     Rank = 1,
                     EntryName = "Available Team",
-                    Total = 12
+                    Total = 12,
+                    MatchesPlayed = 7
                 }))
         };
         var interaction = new TestSlashCommandInteraction([]);
@@ -95,14 +399,10 @@ public sealed class StandingsCommandHandlerTests
         interaction.Messages.Should().ContainSingle();
         interaction.Messages[0].Should().Contain(
             "🏆 Турнирная таблица классической лиги:\n⚠️ Эта лига сейчас недоступна.");
-        interaction.Messages[0].Should().Contain(":one: Available Team 12");
-        var logEntry = logger.Entries.Should().ContainSingle().Which;
-        logEntry.Level.Should().Be(LogLevel.Warning);
-        logEntry.Properties["LeagueType"].Should().Be("Classic");
-        logEntry.Properties["FailureKind"].Should()
-            .Be(FantasyPremierLeagueFailureKind.Transient);
-        logEntry.Properties["StatusCode"].Should()
-            .Be(HttpStatusCode.ServiceUnavailable);
+        interaction.Messages[0].Should().Contain("🥇 Available Team — 12 | 7 матчей");
+        logger.Entries.Should().Contain(entry =>
+            entry.Level == LogLevel.Warning &&
+            entry.Properties["LeagueType"]!.Equals("Classic"));
     }
 
     [Test]
@@ -163,8 +463,10 @@ public sealed class StandingsCommandHandlerTests
             .Select(rank => new ClassicStanding
             {
                 Rank = rank,
+                Entry = rank,
                 EntryName = $"@everyone Classic team {rank:D2} with a deliberately long name",
-                Total = 1_000 - rank
+                Total = 1_000 - rank,
+                EventTotal = 10
             })
             .ToArray();
         var client = new TestFantasyPremierLeagueClient([])
@@ -175,7 +477,8 @@ public sealed class StandingsCommandHandlerTests
                 {
                     Rank = 1,
                     EntryName = "@here H2H team",
-                    Total = 15
+                    Total = 15,
+                    MatchesPlayed = 7
                 }))
         };
         var interaction = new TestSlashCommandInteraction([]);
@@ -210,6 +513,7 @@ public sealed class StandingsCommandHandlerTests
             client,
             Options,
             new PremierLeagueMessageCompositionService(TestTimeZones.Riga()),
+            new FplStandingsSelectionService(),
             logger ?? new RecordingLogger<StandingsCommandHandler>());
     }
 
@@ -241,15 +545,6 @@ public sealed class StandingsCommandHandlerTests
                 Results = [.. results]
             }
         };
-    }
-
-    private static async Task WaitUntilAsync(Func<bool> condition)
-    {
-        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(2));
-        while (!condition())
-        {
-            await Task.Delay(10, timeout.Token);
-        }
     }
 
     private sealed class TestFantasyPremierLeagueClient(List<string> operations)
@@ -321,11 +616,24 @@ public sealed class StandingsCommandHandlerTests
     private sealed class TestSlashCommandInteraction(List<string> operations)
         : IDiscordSlashCommandInteraction
     {
+        private readonly Dictionary<string, string> _stringOptions = new();
+        private readonly Dictionary<string, long> _integerOptions = new();
+
         public string Name => DiscordApplicationCommands.StandingsName;
 
         public string UserMention => "<@123>";
 
-        public string? GetStringOption(string name) => null;
+        public void SetStringOption(string name, string value) =>
+            _stringOptions[name] = value;
+
+        public void SetIntegerOption(string name, long value) =>
+            _integerOptions[name] = value;
+
+        public string? GetStringOption(string name) =>
+            _stringOptions.TryGetValue(name, out var value) ? value : null;
+
+        public long? GetIntegerOption(string name) =>
+            _integerOptions.TryGetValue(name, out var value) ? value : null;
 
         public List<string> Messages { get; } = [];
 

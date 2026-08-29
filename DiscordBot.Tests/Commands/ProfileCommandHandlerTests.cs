@@ -243,6 +243,8 @@ public sealed class ProfileCommandHandlerTests
         public string? GetStringOption(string name)
             => _options.TryGetValue(name, out var value) ? value : null;
 
+        public long? GetIntegerOption(string name) => null;
+
         public Task RespondAsync(string content)
         {
             Operations.Add("Respond");
