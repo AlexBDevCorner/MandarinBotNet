@@ -69,7 +69,7 @@ public sealed class DiscordCommandRegistrationTests
         // Assert
         commandClient.GlobalCalls.Should().Be(1);
         commandClient.GuildCalls.Should().Be(0);
-        commandClient.Commands.Should().HaveCount(7);
+        commandClient.Commands.Should().HaveCount(8);
         commandClient.Commands!.Select(command => command.Name.Value).Should()
             .Equal(
                 DiscordApplicationCommands.HugMeName,
@@ -78,7 +78,8 @@ public sealed class DiscordCommandRegistrationTests
                 DiscordApplicationCommands.BenchLeagueName,
                 DiscordApplicationCommands.LiveInsightsName,
                 DiscordApplicationCommands.ProfileName,
-                DiscordApplicationCommands.AchievementsName);
+                DiscordApplicationCommands.AchievementsName,
+                DiscordApplicationCommands.ChipsName);
         commandClient.Commands.Cast<SlashCommandProperties>()
             .Select(command => command.Description.Value)
             .Should().Equal(
@@ -88,7 +89,8 @@ public sealed class DiscordCommandRegistrationTests
                 "Показывает таблицу Лиги обогревателей скамейки. 🔥",
                 "Показывает результаты лиги FPL в реальном времени. ⚡",
                 "Показывает профиль и достижения менеджера FPL. 🏅",
-                "Показывает лидеров сезона по достижениям FPL. 🎖️");
+                "Показывает лидеров сезона по достижениям FPL. 🎖️",
+                "Объясняет фишки FPL и подсказывает, когда их использовать. 🃏");
     }
 
     [Test]
@@ -175,7 +177,7 @@ public sealed class DiscordCommandRegistrationTests
         commandClient.GlobalCalls.Should().Be(0);
         commandClient.GuildCalls.Should().Be(1);
         commandClient.GuildId.Should().Be(guildId);
-        commandClient.Commands.Should().HaveCount(7);
+        commandClient.Commands.Should().HaveCount(8);
     }
 
     [Test]
