@@ -11,6 +11,7 @@ public static class DiscordApplicationCommands
     public const string LiveInsightsName = "live";
     public const string ProfileName = "profile";
     public const string AchievementsName = "achievements";
+    public const string ChipsName = "chips";
 
     public static ApplicationCommandProperties[] BuildDesiredSet()
     {
@@ -68,6 +69,10 @@ public static class DiscordApplicationCommands
             new SlashCommandBuilder()
                 .WithName(AchievementsName)
                 .WithDescription("Показывает лидеров сезона по достижениям FPL. 🎖️")
+                .Build(),
+            new SlashCommandBuilder()
+                .WithName(ChipsName)
+                .WithDescription("Объясняет фишки FPL и подсказывает, когда их использовать. 🃏")
                 .Build()
         ];
     }

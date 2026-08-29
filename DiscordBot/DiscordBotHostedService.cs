@@ -18,6 +18,7 @@ namespace DiscordBot
         ILiveInsightsCommandHandler liveInsightsCommandHandler,
         IProfileCommandHandler profileCommandHandler,
         IAchievementsCommandHandler achievementsCommandHandler,
+        IChipsCommandHandler chipsCommandHandler,
         IWelcomeMessageHandler welcomeMessageHandler,
         DiscordNetLogHandler discordLogHandler,
         ILogger<DiscordBotHostedService> logger) : IHostedService
@@ -45,7 +46,8 @@ namespace DiscordBot
                 { DiscordApplicationCommands.BenchLeagueName, benchLeagueCommandHandler.HandleAsync },
                 { DiscordApplicationCommands.LiveInsightsName, liveInsightsCommandHandler.HandleAsync },
                 { DiscordApplicationCommands.ProfileName, profileCommandHandler.HandleAsync },
-                { DiscordApplicationCommands.AchievementsName, achievementsCommandHandler.HandleAsync }
+                { DiscordApplicationCommands.AchievementsName, achievementsCommandHandler.HandleAsync },
+                { DiscordApplicationCommands.ChipsName, chipsCommandHandler.HandleAsync }
             };
 
             gatewayConnection.Log += discordLogHandler.HandleAsync;

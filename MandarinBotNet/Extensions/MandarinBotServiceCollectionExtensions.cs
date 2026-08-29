@@ -3,6 +3,7 @@ using DiscordBot.BenchWarming;
 using DiscordBot.Commands;
 using DiscordBot.Deadlines;
 using DiscordBot.FantasyPremierLeague;
+using DiscordBot.FantasyPremierLeague.Chips;
 using DiscordBot.FantasyPremierLeague.Historical;
 using DiscordBot.FantasyPremierLeague.Live;
 using DiscordBot.FantasyPremierLeague.PriceChanges;
@@ -103,6 +104,9 @@ public static class MandarinBotServiceCollectionExtensions
         services.AddSingleton<ILiveInsightsCommandHandler, LiveInsightsCommandHandler>();
         services.AddSingleton<IProfileCommandHandler, ProfileCommandHandler>();
         services.AddSingleton<IAchievementsCommandHandler, AchievementsCommandHandler>();
+        services.AddSingleton<FplChipCatalog>();
+        services.AddSingleton<FplChipMessageCompositionService>();
+        services.AddSingleton<IChipsCommandHandler, ChipsCommandHandler>();
         services.AddSingleton<WelcomeMessageTemplateRotator>();
         services.AddSingleton<
             IWelcomeMessageDestinationResolver,
