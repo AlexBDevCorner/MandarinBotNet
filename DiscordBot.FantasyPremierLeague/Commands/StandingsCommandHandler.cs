@@ -21,6 +21,8 @@ public sealed class StandingsCommandHandler(
         "⚠️ Используйте либо top, либо around — эти режимы нельзя комбинировать.";
     private const string AroundH2hConflictMessage =
         "⚠️ Режим around пока доступен только для классической лиги.";
+    private const string AroundEmptyMessage =
+        "⚠️ Укажите имя менеджера или название команды для around.";
 
     public async Task HandleAsync(IDiscordSlashCommandInteraction interaction)
     {
@@ -150,11 +152,17 @@ public sealed class StandingsCommandHandler(
     {
         var leagueValue = interaction.GetStringOption("league");
         var topValue = interaction.GetIntegerOption("top");
-        var aroundValue = interaction.GetStringOption("around");
+        var aroundValue = interaction.GetStringOption("around")?.Trim();
 
         if (topValue is not null && aroundValue is not null)
         {
             await interaction.RespondAsync(TopAroundConflictMessage);
+            return null;
+        }
+
+        if (aroundValue is not null && aroundValue.Length == 0)
+        {
+            await interaction.RespondAsync(AroundEmptyMessage);
             return null;
         }
 

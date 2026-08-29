@@ -337,6 +337,64 @@ public sealed class FplStandingsSelectionServiceTests
     }
 
     [Test]
+    public void ResolveAround_MultipleExactPlayerNameMatches_AreAmbiguous()
+    {
+        var standings = new[]
+        {
+            new ClassicStanding
+            {
+                Rank = 1,
+                Entry = 1,
+                EntryName = "Team One",
+                PlayerName = "Alex Smith",
+                Total = 100
+            },
+            new ClassicStanding
+            {
+                Rank = 2,
+                Entry = 2,
+                EntryName = "Team Two",
+                PlayerName = "Alex Smith",
+                Total = 99
+            }
+        };
+
+        var result = Service.ResolveAround(standings, "Alex Smith");
+
+        result.Status.Should().Be(FplAroundLookupStatus.Ambiguous);
+        result.Candidates.Should().HaveCount(2);
+    }
+
+    [Test]
+    public void ResolveAround_SameNameAsTeamAndManager_AreAmbiguous()
+    {
+        var standings = new[]
+        {
+            new ClassicStanding
+            {
+                Rank = 1,
+                Entry = 1,
+                EntryName = "Alex",
+                PlayerName = "Manager One",
+                Total = 100
+            },
+            new ClassicStanding
+            {
+                Rank = 2,
+                Entry = 2,
+                EntryName = "Team Two",
+                PlayerName = "Alex",
+                Total = 99
+            }
+        };
+
+        var result = Service.ResolveAround(standings, "Alex");
+
+        result.Status.Should().Be(FplAroundLookupStatus.Ambiguous);
+        result.Candidates.Should().HaveCount(2);
+    }
+
+    [Test]
     public void ResolveAround_NoMatch_ReturnsNotFound()
     {
         var standings = new[]

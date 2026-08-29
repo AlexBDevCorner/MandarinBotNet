@@ -153,19 +153,28 @@ public sealed class FplStandingsSelectionService
     {
         var lower = query.ToLower(CultureInfo.InvariantCulture);
 
-        ClassicStanding? exact = ordered.FirstOrDefault(entry =>
-            string.Equals(
-                entry.EntryName.Trim(),
-                query,
-                StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(
-                entry.PlayerName.Trim(),
-                query,
-                StringComparison.OrdinalIgnoreCase));
+        var exact = ordered.Where(entry =>
+                string.Equals(
+                    entry.EntryName.Trim(),
+                    query,
+                    StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(
+                    entry.PlayerName.Trim(),
+                    query,
+                    StringComparison.OrdinalIgnoreCase))
+            .ToList();
 
-        if (exact is not null)
+        if (exact.Count == 1)
         {
-            return SingleTarget(exact, ordered);
+            return SingleTarget(exact[0], ordered);
+        }
+
+        if (exact.Count > 1)
+        {
+            return new FplAroundLookupResult(
+                FplAroundLookupStatus.Ambiguous,
+                [],
+                BuildCandidates(exact));
         }
 
         var partial = ordered.Where(entry =>
@@ -186,17 +195,21 @@ public sealed class FplStandingsSelectionService
             return SingleTarget(partial[0], ordered);
         }
 
-        var candidates = partial
+        return new FplAroundLookupResult(
+            FplAroundLookupStatus.Ambiguous,
+            [],
+            BuildCandidates(partial));
+    }
+
+    private static IReadOnlyList<FplClassicCandidate> BuildCandidates(
+        IEnumerable<ClassicStanding> matches)
+    {
+        return matches
             .Take(MaxCandidateCount)
             .Select(entry => new FplClassicCandidate(
                 entry.EntryName,
                 entry.PlayerName))
             .ToList();
-
-        return new FplAroundLookupResult(
-            FplAroundLookupStatus.Ambiguous,
-            [],
-            candidates);
     }
 
     private static FplAroundLookupResult SingleTarget(

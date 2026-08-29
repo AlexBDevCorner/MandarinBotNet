@@ -322,6 +322,28 @@ public sealed class StandingsCommandHandlerTests
     }
 
     [Test]
+    public async Task HandleAsync_WhitespaceAround_ReturnsValidationErrorAndZeroApiCalls()
+    {
+        // Arrange
+        var operations = new List<string>();
+        var client = new TestFantasyPremierLeagueClient(operations);
+        var interaction = new TestSlashCommandInteraction(operations);
+        interaction.SetStringOption("around", "   ");
+        var handler = CreateHandler(client);
+
+        // Act
+        await handler.HandleAsync(interaction);
+
+        // Assert
+        client.ClassicCallCount.Should().Be(0);
+        client.HeadToHeadCallCount.Should().Be(0);
+        operations.Should().NotContain("Defer");
+        interaction.Messages.Should().ContainSingle();
+        interaction.Messages[0].Should().Be(
+            "⚠️ Укажите имя менеджера или название команды для around.");
+    }
+
+    [Test]
     public async Task HandleAsync_ClassicOnlyLeagueFails_ReturnsUnavailableClassic()
     {
         // Arrange
