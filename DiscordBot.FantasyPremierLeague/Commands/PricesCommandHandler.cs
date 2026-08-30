@@ -36,7 +36,7 @@ public sealed class PricesCommandHandler(
             var report = await leaguePriceChangeService.CreateReportAsync(
                 changes,
                 latestChanges?.CheckedAtUtc ?? check.CheckedAtUtc,
-                check.CurrentEventId,
+                latestChanges?.EventId ?? check.CurrentEventId,
                 CancellationToken.None);
             var message = messageComposer.Compose(
                 report,

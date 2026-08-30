@@ -41,12 +41,12 @@ public sealed class PricesCommandHandlerTests
     }
 
     [Test]
-    public async Task HandleAsync_NoNewChanges_ReturnsLastSavedBatch()
+    public async Task HandleAsync_SavedBatchFromPreviousGameweek_UsesSavedGameweekSquads()
     {
         // Arrange
         var client = new TestFantasyPremierLeagueClient
         {
-            Bootstrap = CreateBootstrap(101),
+            Bootstrap = CreateBootstrap(101, eventId: 4),
             Managers = [new ClassicStanding { Entry = 1, EntryName = "Bobrov FC" }]
         };
         client.Picks[1] = new EntryEventPicksResponse
@@ -69,6 +69,7 @@ public sealed class PricesCommandHandlerTests
         // Assert
         interaction.Messages.Should().ContainSingle()
             .Which.Should().StartWith("💰 Последние зафиксированные");
+        client.RequestedPickEventIds.Should().Equal(3);
     }
 
     [Test]
@@ -111,7 +112,9 @@ public sealed class PricesCommandHandlerTests
             new RecordingLogger<PricesCommandHandler>());
     }
 
-    private static BootstrapStaticResponse CreateBootstrap(int cost)
+    private static BootstrapStaticResponse CreateBootstrap(
+        int cost,
+        int eventId = 3)
     {
         return new BootstrapStaticResponse
         {
@@ -119,7 +122,7 @@ public sealed class PricesCommandHandlerTests
             [
                 new PremierLeagueEvent
                 {
-                    Id = 3,
+                    Id = eventId,
                     IsCurrent = true
                 }
             ],
@@ -145,6 +148,8 @@ public sealed class PricesCommandHandlerTests
 
         public Dictionary<int, EntryEventPicksResponse> Picks { get; } = [];
 
+        public List<int> RequestedPickEventIds { get; } = [];
+
         public Task<BootstrapStaticResponse> GetBootstrapStaticAsync(
             CancellationToken cancellationToken)
         {
@@ -166,7 +171,11 @@ public sealed class PricesCommandHandlerTests
         public Task<EntryEventPicksResponse> GetEntryEventPicksAsync(
             int entryId,
             int eventId,
-            CancellationToken cancellationToken) => Task.FromResult(Picks[entryId]);
+            CancellationToken cancellationToken)
+        {
+            RequestedPickEventIds.Add(eventId);
+            return Task.FromResult(Picks[entryId]);
+        }
 
         public Task<HeadToHeadStandingsResponse> GetHeadToHeadStandingsAsync(
             int leagueId,
@@ -206,6 +215,7 @@ public sealed class PricesCommandHandlerTests
             {
                 _latestChanges = new FplPriceChangeBatch(
                     priceCheck.CheckedAtUtc,
+                    priceCheck.CurrentEventId,
                     priceCheck.Changes);
             }
         }

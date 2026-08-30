@@ -76,17 +76,21 @@ public sealed class SqliteFplPriceSnapshotStore : IFplPriceSnapshotStore
         command.CommandText =
             """
             SELECT
-                player_id,
-                player_name,
-                previous_cost,
-                current_cost,
-                checked_at_utc
-            FROM fpl_latest_price_changes
-            ORDER BY player_name COLLATE NOCASE, player_id;
+                changes.player_id,
+                changes.player_name,
+                changes.previous_cost,
+                changes.current_cost,
+                COALESCE(metadata.checked_at_utc, changes.checked_at_utc),
+                metadata.event_id
+            FROM fpl_latest_price_changes AS changes
+            LEFT JOIN fpl_latest_price_change_metadata AS metadata
+                ON metadata.batch_id = 1
+            ORDER BY changes.player_name COLLATE NOCASE, changes.player_id;
             """;
 
         var changes = new List<FplPlayerPriceChange>();
         DateTimeOffset? checkedAtUtc = null;
+        int? eventId = null;
         using var reader = command.ExecuteReader();
         while (reader.Read())
         {
@@ -99,11 +103,15 @@ public sealed class SqliteFplPriceSnapshotStore : IFplPriceSnapshotStore
                 reader.GetString(4),
                 CultureInfo.InvariantCulture,
                 DateTimeStyles.RoundtripKind);
+            if (!reader.IsDBNull(5))
+            {
+                eventId ??= Convert.ToInt32(reader.GetInt64(5));
+            }
         }
 
         return checkedAtUtc is null
             ? null
-            : new FplPriceChangeBatch(checkedAtUtc.Value, changes);
+            : new FplPriceChangeBatch(checkedAtUtc.Value, eventId, changes);
     }
 
     public void SaveSnapshot(IReadOnlyDictionary<int, int> prices)
@@ -123,6 +131,7 @@ public sealed class SqliteFplPriceSnapshotStore : IFplPriceSnapshotStore
                 ? null
                 : new FplPriceChangeBatch(
                     priceCheck.CheckedAtUtc,
+                    priceCheck.CurrentEventId,
                     priceCheck.Changes));
     }
 
@@ -212,6 +221,30 @@ public sealed class SqliteFplPriceSnapshotStore : IFplPriceSnapshotStore
         SqliteTransaction transaction,
         FplPriceChangeBatch batch)
     {
+        using (var metadataCommand = connection.CreateCommand())
+        {
+            metadataCommand.Transaction = transaction;
+            metadataCommand.CommandTimeout = CommandTimeoutSeconds;
+            metadataCommand.CommandText =
+                """
+                INSERT OR REPLACE INTO fpl_latest_price_change_metadata (
+                    batch_id,
+                    checked_at_utc,
+                    event_id
+                )
+                VALUES (1, $checked_at_utc, $event_id);
+                """;
+            metadataCommand.Parameters.AddWithValue(
+                "$checked_at_utc",
+                batch.CheckedAtUtc
+                    .ToUniversalTime()
+                    .ToString("O", CultureInfo.InvariantCulture));
+            metadataCommand.Parameters.AddWithValue(
+                "$event_id",
+                batch.EventId is null ? DBNull.Value : batch.EventId.Value);
+            metadataCommand.ExecuteNonQuery();
+        }
+
         using (var deleteCommand = connection.CreateCommand())
         {
             deleteCommand.Transaction = transaction;
@@ -311,6 +344,12 @@ public sealed class SqliteFplPriceSnapshotStore : IFplPriceSnapshotStore
                 previous_cost INTEGER NOT NULL,
                 current_cost INTEGER NOT NULL,
                 checked_at_utc TEXT NOT NULL
+            ) WITHOUT ROWID;
+
+            CREATE TABLE IF NOT EXISTS fpl_latest_price_change_metadata (
+                batch_id INTEGER NOT NULL PRIMARY KEY CHECK (batch_id = 1),
+                checked_at_utc TEXT NOT NULL,
+                event_id INTEGER NULL CHECK (event_id IS NULL OR event_id > 0)
             ) WITHOUT ROWID;
             """;
         schemaCommand.ExecuteNonQuery();

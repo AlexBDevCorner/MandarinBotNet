@@ -240,6 +240,7 @@ public sealed class FplPriceChangeServiceTests
             {
                 LatestChanges = new FplPriceChangeBatch(
                     priceCheck.CheckedAtUtc,
+                    priceCheck.CurrentEventId,
                     priceCheck.Changes);
             }
         }

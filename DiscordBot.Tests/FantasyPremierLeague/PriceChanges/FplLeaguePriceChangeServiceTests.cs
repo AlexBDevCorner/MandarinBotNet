@@ -81,6 +81,52 @@ public sealed class FplLeaguePriceChangeServiceTests
     }
 
     [Test]
+    public async Task CreateReportAsync_LargeLeague_BoundsConcurrentSquadRequests()
+    {
+        // Arrange
+        var client = new TestFantasyPremierLeagueClient
+        {
+            Managers = Enumerable
+                .Range(1, 12)
+                .Select(entryId => CreateManager(entryId, $"Team {entryId}"))
+                .ToList(),
+            BlockPickRequests = true
+        };
+        foreach (var manager in client.Managers)
+        {
+            client.Picks[manager.Entry] = CreatePicks(10);
+        }
+
+        var service = CreateService(client);
+
+        // Act
+        var reportTask = service.CreateReportAsync(
+            [new FplPlayerPriceChange(10, "Salah", 100, 101)],
+            DateTimeOffset.UtcNow,
+            eventId: 3,
+            CancellationToken.None);
+        try
+        {
+            await client.ConcurrencyLimitReached.Task.WaitAsync(
+                TimeSpan.FromSeconds(2));
+
+            // Assert
+            client.PeakConcurrentPickCalls.Should()
+                .Be(FplLeaguePriceChangeService.SquadFetchConcurrencyLimit);
+            reportTask.IsCompleted.Should().BeFalse();
+        }
+        finally
+        {
+            client.ReleasePickRequests();
+        }
+
+        var report = await reportTask;
+
+        // Assert
+        report.AvailableSquadCount.Should().Be(12);
+    }
+
+    [Test]
     public async Task CreateReportAsync_LeagueNotConfigured_ReturnsGlobalFallback()
     {
         // Arrange
@@ -133,6 +179,11 @@ public sealed class FplLeaguePriceChangeServiceTests
 
     private sealed class TestFantasyPremierLeagueClient : IFantasyPremierLeagueClient
     {
+        private readonly TaskCompletionSource _releasePickRequests =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private int _activePickCalls;
+        private int _peakConcurrentPickCalls;
+
         public List<ClassicStanding> Managers { get; init; } = [];
 
         public Dictionary<int, EntryEventPicksResponse> Picks { get; } = [];
@@ -140,6 +191,18 @@ public sealed class FplLeaguePriceChangeServiceTests
         public HashSet<int> PickFailures { get; } = [];
 
         public int ClassicStandingsCalls { get; private set; }
+
+        public bool BlockPickRequests { get; init; }
+
+        public int PeakConcurrentPickCalls => _peakConcurrentPickCalls;
+
+        public TaskCompletionSource ConcurrencyLimitReached { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public void ReleasePickRequests()
+        {
+            _releasePickRequests.TrySetResult();
+        }
 
         public Task<ClassicStandingsResponse> GetClassicStandingsAsync(
             int leagueId,
@@ -152,15 +215,54 @@ public sealed class FplLeaguePriceChangeServiceTests
             });
         }
 
-        public Task<EntryEventPicksResponse> GetEntryEventPicksAsync(
+        public async Task<EntryEventPicksResponse> GetEntryEventPicksAsync(
             int entryId,
             int eventId,
             CancellationToken cancellationToken)
         {
-            return PickFailures.Contains(entryId)
-                ? Task.FromException<EntryEventPicksResponse>(
-                    new InvalidOperationException("Squad unavailable."))
-                : Task.FromResult(Picks[entryId]);
+            var activeCalls = Interlocked.Increment(ref _activePickCalls);
+            UpdatePeakConcurrentCalls(activeCalls);
+            if (activeCalls >= FplLeaguePriceChangeService.SquadFetchConcurrencyLimit)
+            {
+                ConcurrencyLimitReached.TrySetResult();
+            }
+
+            try
+            {
+                if (BlockPickRequests)
+                {
+                    await _releasePickRequests.Task.WaitAsync(cancellationToken);
+                }
+
+                if (PickFailures.Contains(entryId))
+                {
+                    throw new InvalidOperationException("Squad unavailable.");
+                }
+
+                return Picks[entryId];
+            }
+            finally
+            {
+                Interlocked.Decrement(ref _activePickCalls);
+            }
+        }
+
+        private void UpdatePeakConcurrentCalls(int activeCalls)
+        {
+            var currentPeak = Volatile.Read(ref _peakConcurrentPickCalls);
+            while (activeCalls > currentPeak)
+            {
+                var observedPeak = Interlocked.CompareExchange(
+                    ref _peakConcurrentPickCalls,
+                    activeCalls,
+                    currentPeak);
+                if (observedPeak == currentPeak)
+                {
+                    return;
+                }
+
+                currentPeak = observedPeak;
+            }
         }
 
         public Task<BootstrapStaticResponse> GetBootstrapStaticAsync(

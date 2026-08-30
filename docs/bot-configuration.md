@@ -210,16 +210,18 @@ the current price of every FPL player at the top of each hour from 12:00 through
 since the previous notification. For the configured classic league, the job
 loads the current public squad for each manager, hides price changes that affect
 none of those squads, lists the teams that own each changed player, and totals
-the value change per team. If only some squads load, the message reports its
-coverage; if league data is unavailable, it falls back to the global changes
+the value change per team. Squad lookups run at most five at a time to avoid an
+API request burst in large leagues. If only some squads load, the message reports
+its coverage; if league data is unavailable, it falls back to the global changes
 instead of losing the notification. The first run establishes the baseline and
 does not publish a message.
 
 The last successfully published change batch is stored alongside the current
 price baseline. `/prices` checks for newer changes without advancing that
-baseline, then shows either the new batch or the last published batch with fresh
-league ownership. This keeps the command useful between scheduled checks and
-does not consume a change before the scheduled notification can publish it.
+baseline, then shows either the new batch or the last published batch with
+ownership from that batch's gameweek. This keeps the command useful between
+scheduled checks and does not consume a change before the scheduled notification
+can publish it.
 
 ## Multiple targets and mentions
 

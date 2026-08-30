@@ -22,6 +22,7 @@ public sealed record FplPriceChangeCheck(
 
 public sealed record FplPriceChangeBatch(
     DateTimeOffset CheckedAtUtc,
+    int? EventId,
     IReadOnlyList<FplPlayerPriceChange> Changes);
 
 public sealed record FplLeaguePlayerPriceChange(

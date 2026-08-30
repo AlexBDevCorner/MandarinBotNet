@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using DiscordBot.Responses;
 using Microsoft.Extensions.Logging;
 
@@ -8,6 +9,8 @@ public sealed class FplLeaguePriceChangeService(
     FantasyPremierLeagueOptions options,
     ILogger<FplLeaguePriceChangeService> logger)
 {
+    internal const int SquadFetchConcurrencyLimit = 5;
+
     public async Task<FplLeaguePriceChangeReport> CreateReportAsync(
         IReadOnlyList<FplPlayerPriceChange> changes,
         DateTimeOffset checkedAtUtc,
@@ -51,15 +54,26 @@ public sealed class FplLeaguePriceChangeService(
             return CreateGlobalReport(changes, checkedAtUtc);
         }
 
-        var squadTasks = managers.Select(manager => LoadSquadAsync(
-            manager,
-            eventId.Value,
-            cancellationToken));
-        var squads = await Task.WhenAll(squadTasks);
-        var availableSquads = squads
-            .Where(squad => squad is not null)
-            .Select(squad => squad!)
-            .ToArray();
+        ConcurrentBag<FplManagerSquad> loadedSquads = [];
+        await Parallel.ForEachAsync(
+            managers,
+            new ParallelOptions
+            {
+                CancellationToken = cancellationToken,
+                MaxDegreeOfParallelism = SquadFetchConcurrencyLimit
+            },
+            async (manager, itemCancellationToken) =>
+            {
+                var squad = await LoadSquadAsync(
+                    manager,
+                    eventId.Value,
+                    itemCancellationToken);
+                if (squad is not null)
+                {
+                    loadedSquads.Add(squad);
+                }
+            });
+        var availableSquads = loadedSquads.ToArray();
 
         var playerChanges = changes
             .Select(change => new FplLeaguePlayerPriceChange(
