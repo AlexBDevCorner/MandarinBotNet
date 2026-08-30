@@ -99,6 +99,9 @@ public static class MandarinBotServiceCollectionExtensions
         services.AddSingleton<FplLiveInsightsCalculationService>();
         services.AddSingleton<FplLiveInsightsService>();
         services.AddSingleton<FplLiveInsightsMessageComposer>();
+        services.AddSingleton<FplLiveHighlightDetectionService>();
+        services.AddSingleton<FplLiveNotificationService>();
+        services.AddSingleton<FplLiveHighlightMessageComposer>();
         services.AddSingleton<FplPriceChangeService>();
         services.AddSingleton<FplLeaguePriceChangeService>();
         services.AddSingleton<FplPriceChangeMessageCompositionService>();
@@ -145,6 +148,9 @@ public static class MandarinBotServiceCollectionExtensions
         services.AddSingleton<IFplPriceSnapshotStore>(
             new SqliteFplPriceSnapshotStore(
                 MandarinBotDataPaths.FplPriceSnapshotDatabasePath));
+        services.AddSingleton<IFplLiveNotificationStateStore>(
+            new SqliteFplLiveNotificationStateStore(
+                MandarinBotDataPaths.FplLiveNotificationDatabasePath));
         services.AddSingleton<NotificationDeliveryCoordinator>();
         services.AddSingleton<
             IDiscordNotificationPublisher,

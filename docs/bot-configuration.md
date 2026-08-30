@@ -43,6 +43,9 @@ Bot__FantasyPremierLeague__CaptainSuccessEffectivePointsThreshold=20
 Bot__FantasyPremierLeague__CaptainDisasterPointsThreshold=2
 Bot__FantasyPremierLeague__CaptainDisasterViceCaptainPointsThreshold=8
 Bot__FantasyPremierLeague__TransferCostAchievementThreshold=8
+Bot__FantasyPremierLeague__LiveNotificationCooldownMinutes=60
+Bot__FantasyPremierLeague__SignificantLiveRankChange=2
+Bot__FantasyPremierLeague__AutomaticSubstitutionHighlightPoints=5
 Bot__Schedules__TimeZoneId=Europe/Riga
 Bot__Schedules__PremierLeagueNotifications__Enabled=true
 Bot__Schedules__PremierLeagueNotifications__Cron=0 0/15 * * * ?
@@ -189,17 +192,57 @@ validation. The FPL HTTP client already classifies rate limits and transient ups
 failures for retry; the live service turns an exhausted failure into a safe command
 response and skips the scheduled publication.
 
-The optional `FplLiveInsights` job is disabled by default. When enabled, it runs at
-the configured cron interval and publishes only once for each event/source update
-timestamp per target. Repeated executions with the same source timestamp therefore
-do not spam the channel. Configure the alert thresholds explicitly when changing
-the defaults:
+The optional `FplLiveInsights` job is disabled by default. When enabled, it polls at
+the configured cron interval. The default `0 0/15 * * * ?` schedule gives it four
+observations per hour. Polling frequency and publication frequency are separate.
+The first observation of each gameweek establishes a baseline and sends nothing.
+Later observations compare the current state with the immediately preceding state.
+
+The scheduled job creates highlights only when the league leader changes, a manager
+moves by the configured number of places, a bench or captain-success threshold is
+crossed, a captain disaster becomes final, or an automatic substitution saves enough
+points. It stores the observed snapshot, pending highlights, digest sequence, and
+per-target cooldown in `data/fpl-live.db`. Restarting the bot therefore does not reset
+the cooldown or replay acknowledged highlights.
+
+A leader highlight requires one unique leader to be replaced by another unique
+leader. Transitions into or out of a tie for first stay silent. The reported lead is
+the score difference from the highest strictly lower score group, so several managers
+can share second place.
+
+The first meaningful change after the baseline can publish on the next scheduler
+execution. A successful publication starts the per-target cooldown. Highlights found
+during that cooldown are merged into one short digest. Repeated bench, captain, rank,
+and leader changes replace the pending value instead of adding duplicate lines. A
+failed Discord send leaves the digest pending and does not start the cooldown. At the
+default settings, each target receives at most one successful live digest in any
+rolling 60-minute period.
+
+Removing a Discord target from configuration stops new highlights and publications
+for that target, but keeps its publication sequence and pending state in SQLite. If
+the target is added again during the same gameweek, its next digest continues with a
+new source identifier instead of colliding with an earlier delivery checkpoint.
+
+Routine score changes do not create highlights by themselves. Fixture start and end,
+`Playing` or `YetToPlay` count changes, rank movement below the configured threshold,
+standings metadata, and changing swing insights also remain silent. With the default
+threshold, a one-place move stays silent.
+
+The `/live` slash command is independent of this state. It always calculates and
+returns the complete current dashboard with no cooldown and no dependency on prior
+notifications. Configure the live thresholds explicitly when changing the defaults:
 
 - `LargeBenchPointsThreshold` is the total raw points left on a manager's bench.
 - `CaptainSuccessEffectivePointsThreshold` is the captain's multiplied points.
 - `CaptainDisasterPointsThreshold` is the maximum raw captain points for a disaster.
 - `CaptainDisasterViceCaptainPointsThreshold` is the minimum raw vice-captain points
   required for the same alert.
+- `LiveNotificationCooldownMinutes` is the successful-publication cooldown for each
+  Discord target. The default is `60`.
+- `SignificantLiveRankChange` is the minimum movement between observations. The
+  default is `2` places.
+- `AutomaticSubstitutionHighlightPoints` is the minimum saved-points value for an
+  automatic-substitution highlight. The default is `5`.
 
 ## FPL player price changes
 

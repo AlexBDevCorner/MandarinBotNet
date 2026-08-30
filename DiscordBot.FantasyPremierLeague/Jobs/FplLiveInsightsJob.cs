@@ -1,4 +1,3 @@
-using System.Globalization;
 using DiscordBot.FantasyPremierLeague.Live;
 using DiscordBot.Notifications;
 using Microsoft.Extensions.Logging;
@@ -10,8 +9,10 @@ namespace DiscordBot.Jobs;
 public sealed class FplLiveInsightsJob(
     IDiscordConnectionReadiness discordReadiness,
     FplLiveInsightsService liveInsightsService,
-    FplLiveInsightsMessageComposer messageComposer,
+    FplLiveNotificationService liveNotificationService,
+    FplLiveHighlightMessageComposer messageComposer,
     IDiscordNotificationPublisher notificationPublisher,
+    INotificationCheckpointStore checkpointStore,
     NotificationOptions notificationOptions,
     TimeProvider timeProvider,
     ILogger<FplLiveInsightsJob> logger) : IJob
@@ -44,23 +45,40 @@ public sealed class FplLiveInsightsJob(
 
                 var gameweek = result.Gameweek ?? throw new InvalidDataException(
                     "An available FPL live insights result did not include a gameweek.");
-                var sourceIdentifier = FplLiveInsightsSourceIdentifier.Create(gameweek);
-                execution.SetEvent(sourceIdentifier);
-                var message = messageComposer.Compose(result);
+                var evaluation = liveNotificationService.Observe(
+                    gameweek,
+                    notificationOptions.Targets);
+                execution.SetEvent(evaluation.Outcome.ToString());
                 var deliveredCount = 0;
                 var skippedCount = 0;
                 var failedCount = 0;
 
-                foreach (var target in notificationOptions.Targets)
+                foreach (var digest in evaluation.Digests)
                 {
+                    var target = notificationOptions.Targets.Single(configuredTarget =>
+                        configuredTarget.GuildId == digest.GuildId &&
+                        configuredTarget.ChannelId == digest.ChannelId);
+                    var message = messageComposer.Compose(digest);
+
                     try
                     {
                         var delivered = await notificationPublisher.PublishOnceAsync(
                             target,
-                            sourceIdentifier,
+                            digest.SourceIdentifier,
                             NotificationTypes.FplLiveInsights,
                             message,
                             context.CancellationToken);
+                        var checkpointExists = delivered || checkpointStore.IsDelivered(
+                            new NotificationCheckpoint(
+                                target.GuildId,
+                                target.ChannelId,
+                                digest.SourceIdentifier,
+                                NotificationTypes.FplLiveInsights));
+                        if (checkpointExists)
+                        {
+                            liveNotificationService.MarkPublished(digest);
+                        }
+
                         if (delivered)
                         {
                             deliveredCount++;
@@ -84,7 +102,7 @@ public sealed class FplLiveInsightsJob(
                             "{Event} to Discord guild {GuildId}, channel {ChannelId}, on " +
                             "job attempt {Attempt} with outcome {Outcome}",
                             NotificationTypes.FplLiveInsights,
-                            sourceIdentifier,
+                            digest.SourceIdentifier,
                             target.GuildId,
                             target.ChannelId,
                             execution.Attempt,
