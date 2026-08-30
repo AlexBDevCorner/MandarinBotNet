@@ -1,5 +1,6 @@
 using Discord;
 using Discord.WebSocket;
+using DiscordBot.Commands;
 using Microsoft.Extensions.Logging;
 
 namespace DiscordBot.WelcomeMessages;
@@ -55,16 +56,9 @@ public sealed class WelcomeMessageDestinationResolver(
     }
 }
 
-public sealed class WelcomeMessageTemplateRotator
+public sealed class WelcomeMessageTemplateRotator(
+    BotHelpMessageCompositionService helpMessageComposer)
 {
-    private const string LeagueLinks =
-        "FPL Лига обнимашек:\n\n" +
-        "https://fantasy.premierleague.com/leagues/auto-join/n9ki9b\n\n" +
-        "FPL Лига обнимашек-к-обнимашкам\n\n" +
-        "https://fantasy.premierleague.com/leagues/auto-join/a5gnav\n\n" +
-        "ЛЧ Лига светоча нашего великого и единственного Мессии:\n\n" +
-        "https://gaming.uefa.com/en/uclfantasy/leagues/3gp3eN/004D0061006700750069007200650020004D0065007300730069006100680020004C00650061006700750065/Bebrakungs";
-
     private static readonly string[] Templates =
     [
         "**{user} вошёл на сервер.** Мбаппе — диктатор, у Винисиуса новый подбородок, **Магуайр — свят. Мир стабилен.**",
@@ -92,7 +86,7 @@ public sealed class WelcomeMessageTemplateRotator
             "{user}",
             userMention,
             StringComparison.Ordinal);
-        return $"{welcomeText}\n\n{LeagueLinks}";
+        return $"{welcomeText}\n\n{helpMessageComposer.ComposeWelcomeOnboarding()}";
     }
 }
 

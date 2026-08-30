@@ -9,6 +9,7 @@ namespace DiscordBot.Jobs;
 public sealed class FplPriceChangeJob(
     IDiscordConnectionReadiness discordReadiness,
     FplPriceChangeService priceChangeService,
+    FplLeaguePriceChangeService leaguePriceChangeService,
     FplPriceChangeMessageCompositionService messageComposer,
     IDiscordNotificationPublisher notificationPublisher,
     NotificationOptions notificationOptions,
@@ -38,7 +39,12 @@ public sealed class FplPriceChangeJob(
                     priceCheck.PreviousSnapshotVersion,
                     priceCheck.Changes);
                 execution.SetEvent(sourceIdentifier);
-                var message = messageComposer.Compose(priceCheck.Changes);
+                var report = await leaguePriceChangeService.CreateReportAsync(
+                    priceCheck.Changes,
+                    priceCheck.CheckedAtUtc,
+                    priceCheck.CurrentEventId,
+                    context.CancellationToken);
+                var message = messageComposer.Compose(report);
                 var deliveredCount = 0;
                 var skippedCount = 0;
                 var failedCount = 0;

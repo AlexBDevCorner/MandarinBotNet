@@ -51,6 +51,10 @@ public sealed class DiscordBotHostedServiceIntegrationTests
             TestAchievementsCommandHandler>();
         builder.Services.AddSingleton<IChipsCommandHandler,
             TestChipsCommandHandler>();
+        builder.Services.AddSingleton<IPricesCommandHandler,
+            TestPricesCommandHandler>();
+        builder.Services.AddSingleton<IHelpCommandHandler,
+            TestHelpCommandHandler>();
         builder.Services.AddSingleton<IWelcomeMessageHandler,
             TestWelcomeMessageHandler>();
         builder.Services.AddHostedService<DiscordBotHostedService>();
@@ -312,6 +316,66 @@ public sealed class DiscordBotHostedServiceIntegrationTests
     }
 
     [Test]
+    public async Task HandleSlashCommandAsync_PricesCommand_RoutesToDedicatedHandler()
+    {
+        // Arrange
+        var options = new DiscordOptions
+        {
+            Token = "test-token",
+            ReadinessTimeout = TimeSpan.FromSeconds(5)
+        };
+        var readiness = new DiscordConnectionReadiness(options);
+        var gateway = new TestDiscordGatewayConnection();
+        using var provider = CreateServiceProvider(options, readiness, gateway);
+        var service = provider.GetRequiredService<DiscordBotHostedService>();
+        var handler = provider.GetRequiredService<IPricesCommandHandler>();
+        var interaction = new TestSlashCommandInteraction(
+            DiscordApplicationCommands.PricesName);
+        var startTask = service.StartAsync(CancellationToken.None);
+        await gateway.RaiseReadyAsync();
+        await startTask;
+
+        // Act
+        await service.HandleSlashCommandAsync(interaction);
+
+        // Assert
+        ((TestPricesCommandHandler)handler).Interaction.Should()
+            .BeSameAs(interaction);
+
+        await service.StopAsync(CancellationToken.None);
+    }
+
+    [Test]
+    public async Task HandleSlashCommandAsync_HelpCommand_RoutesToDedicatedHandler()
+    {
+        // Arrange
+        var options = new DiscordOptions
+        {
+            Token = "test-token",
+            ReadinessTimeout = TimeSpan.FromSeconds(5)
+        };
+        var readiness = new DiscordConnectionReadiness(options);
+        var gateway = new TestDiscordGatewayConnection();
+        using var provider = CreateServiceProvider(options, readiness, gateway);
+        var service = provider.GetRequiredService<DiscordBotHostedService>();
+        var handler = provider.GetRequiredService<IHelpCommandHandler>();
+        var interaction = new TestSlashCommandInteraction(
+            DiscordApplicationCommands.HelpName);
+        var startTask = service.StartAsync(CancellationToken.None);
+        await gateway.RaiseReadyAsync();
+        await startTask;
+
+        // Act
+        await service.HandleSlashCommandAsync(interaction);
+
+        // Assert
+        ((TestHelpCommandHandler)handler).Interaction.Should()
+            .BeSameAs(interaction);
+
+        await service.StopAsync(CancellationToken.None);
+    }
+
+    [Test]
     public async Task HandleSlashCommandAsync_UnknownCommand_RespondsInRussian()
     {
         // Arrange
@@ -444,6 +508,10 @@ public sealed class DiscordBotHostedServiceIntegrationTests
             TestAchievementsCommandHandler>();
         services.AddSingleton<IChipsCommandHandler,
             TestChipsCommandHandler>();
+        services.AddSingleton<IPricesCommandHandler,
+            TestPricesCommandHandler>();
+        services.AddSingleton<IHelpCommandHandler,
+            TestHelpCommandHandler>();
         services.AddSingleton<IWelcomeMessageHandler,
             TestWelcomeMessageHandler>();
         services.AddSingleton<DiscordBotHostedService>();
@@ -688,6 +756,28 @@ public sealed class DiscordBotHostedServiceIntegrationTests
     }
 
     private sealed class TestChipsCommandHandler : IChipsCommandHandler
+    {
+        public IDiscordSlashCommandInteraction? Interaction { get; private set; }
+
+        public Task HandleAsync(IDiscordSlashCommandInteraction interaction)
+        {
+            Interaction = interaction;
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class TestPricesCommandHandler : IPricesCommandHandler
+    {
+        public IDiscordSlashCommandInteraction? Interaction { get; private set; }
+
+        public Task HandleAsync(IDiscordSlashCommandInteraction interaction)
+        {
+            Interaction = interaction;
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class TestHelpCommandHandler : IHelpCommandHandler
     {
         public IDiscordSlashCommandInteraction? Interaction { get; private set; }
 

@@ -69,7 +69,7 @@ public sealed class DiscordCommandRegistrationTests
         // Assert
         commandClient.GlobalCalls.Should().Be(1);
         commandClient.GuildCalls.Should().Be(0);
-        commandClient.Commands.Should().HaveCount(8);
+        commandClient.Commands.Should().HaveCount(10);
         commandClient.Commands!.Select(command => command.Name.Value).Should()
             .Equal(
                 DiscordApplicationCommands.HugMeName,
@@ -79,7 +79,9 @@ public sealed class DiscordCommandRegistrationTests
                 DiscordApplicationCommands.LiveInsightsName,
                 DiscordApplicationCommands.ProfileName,
                 DiscordApplicationCommands.AchievementsName,
-                DiscordApplicationCommands.ChipsName);
+                DiscordApplicationCommands.ChipsName,
+                DiscordApplicationCommands.PricesName,
+                DiscordApplicationCommands.HelpName);
         commandClient.Commands.Cast<SlashCommandProperties>()
             .Select(command => command.Description.Value)
             .Should().Equal(
@@ -90,7 +92,9 @@ public sealed class DiscordCommandRegistrationTests
                 "Показывает результаты лиги FPL в реальном времени. ⚡",
                 "Показывает профиль и достижения менеджера FPL. 🏅",
                 "Показывает лидеров сезона по достижениям FPL. 🎖️",
-                "Объясняет фишки FPL и подсказывает, когда их использовать. 🃏");
+                "Объясняет фишки FPL и подсказывает, когда их использовать. 🃏",
+                "Показывает изменения цен в составах нашей лиги FPL. 💰",
+                "Показывает команды, лиги и возможности бота. 🤖");
     }
 
     [Test]
@@ -209,7 +213,7 @@ public sealed class DiscordCommandRegistrationTests
         commandClient.GlobalCalls.Should().Be(0);
         commandClient.GuildCalls.Should().Be(1);
         commandClient.GuildId.Should().Be(guildId);
-        commandClient.Commands.Should().HaveCount(8);
+        commandClient.Commands.Should().HaveCount(10);
     }
 
     [Test]

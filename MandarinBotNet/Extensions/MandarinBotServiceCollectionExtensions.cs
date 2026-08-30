@@ -100,6 +100,7 @@ public static class MandarinBotServiceCollectionExtensions
         services.AddSingleton<FplLiveInsightsService>();
         services.AddSingleton<FplLiveInsightsMessageComposer>();
         services.AddSingleton<FplPriceChangeService>();
+        services.AddSingleton<FplLeaguePriceChangeService>();
         services.AddSingleton<FplPriceChangeMessageCompositionService>();
         services.AddSingleton<FplStandingsSelectionService>();
         services.AddSingleton<ILiveInsightsCommandHandler, LiveInsightsCommandHandler>();
@@ -108,6 +109,9 @@ public static class MandarinBotServiceCollectionExtensions
         services.AddSingleton<FplChipCatalog>();
         services.AddSingleton<FplChipMessageCompositionService>();
         services.AddSingleton<IChipsCommandHandler, ChipsCommandHandler>();
+        services.AddSingleton<IPricesCommandHandler, PricesCommandHandler>();
+        services.AddSingleton<BotHelpMessageCompositionService>();
+        services.AddSingleton<IHelpCommandHandler, HelpCommandHandler>();
         services.AddSingleton<WelcomeMessageTemplateRotator>();
         services.AddSingleton<
             IWelcomeMessageDestinationResolver,

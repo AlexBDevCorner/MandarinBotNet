@@ -21,6 +21,7 @@ public sealed class FplPriceChangeServiceTests
         var service = new FplPriceChangeService(
             client,
             store,
+            TimeProvider.System,
             new RecordingLogger<FplPriceChangeService>());
 
         // Act
@@ -59,6 +60,7 @@ public sealed class FplPriceChangeServiceTests
         var service = new FplPriceChangeService(
             client,
             store,
+            TimeProvider.System,
             new RecordingLogger<FplPriceChangeService>());
 
         // Act
@@ -86,6 +88,7 @@ public sealed class FplPriceChangeServiceTests
         var service = new FplPriceChangeService(
             client,
             store,
+            TimeProvider.System,
             new RecordingLogger<FplPriceChangeService>());
         var changedCheck = await service.CheckAsync(CancellationToken.None);
         service.SaveSnapshot(changedCheck);
@@ -111,6 +114,7 @@ public sealed class FplPriceChangeServiceTests
         var service = new FplPriceChangeService(
             client,
             store,
+            TimeProvider.System,
             new RecordingLogger<FplPriceChangeService>());
 
         // Act
@@ -205,6 +209,8 @@ public sealed class FplPriceChangeServiceTests
     {
         public Dictionary<int, int> Prices { get; } = [];
 
+        public FplPriceChangeBatch? LatestChanges { get; private set; }
+
         public FplPriceSnapshot? GetSnapshot()
         {
             return Version == 0
@@ -213,6 +219,8 @@ public sealed class FplPriceChangeServiceTests
         }
 
         public long Version { get; private set; }
+
+        public FplPriceChangeBatch? GetLatestChanges() => LatestChanges;
 
         public void SaveSnapshot(IReadOnlyDictionary<int, int> prices)
         {
@@ -223,6 +231,18 @@ public sealed class FplPriceChangeServiceTests
             }
 
             Version++;
+        }
+
+        public void SaveSnapshot(FplPriceChangeCheck priceCheck)
+        {
+            SaveSnapshot(priceCheck.CurrentPrices);
+            if (priceCheck.Changes.Count > 0)
+            {
+                LatestChanges = new FplPriceChangeBatch(
+                    priceCheck.CheckedAtUtc,
+                    priceCheck.CurrentEventId,
+                    priceCheck.Changes);
+            }
         }
     }
 }

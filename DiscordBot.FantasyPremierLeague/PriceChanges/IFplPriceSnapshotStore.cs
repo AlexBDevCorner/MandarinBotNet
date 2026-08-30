@@ -8,5 +8,9 @@ public interface IFplPriceSnapshotStore
 {
     FplPriceSnapshot? GetSnapshot();
 
+    FplPriceChangeBatch? GetLatestChanges();
+
     void SaveSnapshot(IReadOnlyDictionary<int, int> prices);
+
+    void SaveSnapshot(FplPriceChangeCheck priceCheck);
 }

@@ -107,9 +107,13 @@ public sealed class DeadlineCommandHandler(
             _ => deadline.RoundName
         };
 
+        var relativeTimestamp = deadline.DeadlineUtc.ToUnixTimeSeconds()
+            .ToString(CultureInfo.InvariantCulture);
+
         return $"⏰ {deadline.CompetitionName} — {roundName} " +
             $"{deadline.RoundNumber.ToString(CultureInfo.InvariantCulture)}: " +
             $"{localDeadline.ToString("dddd, d MMMM yyyy 'в' HH:mm", RussianCulture)} " +
-            $"(Рига, Латвия, {offset}).";
+            $"(Рига, Латвия, {offset}).\n" +
+            $"⏳ <t:{relativeTimestamp}:R>.";
     }
 }

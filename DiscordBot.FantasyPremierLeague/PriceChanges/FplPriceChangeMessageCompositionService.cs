@@ -8,39 +8,111 @@ public sealed class FplPriceChangeMessageCompositionService
 {
     private static readonly CultureInfo RussianCulture = new("ru-RU");
 
-    public string Compose(IEnumerable<FplPlayerPriceChange> changes)
+    public string Compose(
+        FplLeaguePriceChangeReport report,
+        bool isLatestSavedBatch = false)
     {
-        ArgumentNullException.ThrowIfNull(changes);
+        ArgumentNullException.ThrowIfNull(report);
 
-        var priceChanges = changes.ToArray();
-        var summary = new StringBuilder("💰 Изменения цен игроков FPL:");
-        if (priceChanges.Length == 0)
+        var summary = new StringBuilder(
+            isLatestSavedBatch
+                ? "💰 Последние зафиксированные изменения цен FPL:"
+                : "💰 Изменения цен FPL с последней проверки:");
+
+        if (report.PlayerChanges.Count == 0)
         {
             summary.Append("\n🤷 Изменений нет.");
             return summary.ToString();
         }
 
-        foreach (var change in priceChanges)
+        if (!report.LeagueDataAvailable)
         {
-            var isIncrease = change.Difference > 0;
-            var direction = isIncrease ? "📈" : "📉";
-            var verb = isIncrease ? "подорожал" : "подешевел";
-            summary.Append('\n');
-            summary.Append(direction);
-            summary.Append(' ');
-            summary.Append(DiscordTextSafety.SanitizeExternalName(change.PlayerName));
-            summary.Append(' ');
-            summary.Append(verb);
-            summary.Append(": ");
-            summary.Append(FormatPrice(change.PreviousCost));
-            summary.Append(" → ");
-            summary.Append(FormatPrice(change.CurrentCost));
-            summary.Append(" (");
-            summary.Append(FormatSignedPrice(change.Difference));
-            summary.Append(')');
+            foreach (var playerChange in report.PlayerChanges)
+            {
+                AppendPlayerChange(summary, playerChange.Change, []);
+            }
+
+            summary.Append(
+                "\n\n⚠️ Не удалось сопоставить игроков с составами нашей лиги.");
+            return summary.ToString();
+        }
+
+        var ownedChanges = report.PlayerChanges
+            .Where(change => change.OwnerEntryNames.Count > 0)
+            .ToArray();
+        if (ownedChanges.Length == 0)
+        {
+            summary.Append(
+                "\n😌 Цены изменились, но составы нашей лиги это не затронуло.");
+        }
+        else
+        {
+            var leagueDifference = report.TeamImpacts.Sum(impact => impact.Difference);
+            summary.Append("\n💸 Общая стоимость составов: ");
+            summary.Append(FormatSignedPrice(leagueDifference));
+
+            foreach (var playerChange in ownedChanges)
+            {
+                AppendPlayerChange(
+                    summary,
+                    playerChange.Change,
+                    playerChange.OwnerEntryNames);
+            }
+
+            summary.Append("\n\n📋 По командам:");
+            foreach (var impact in report.TeamImpacts)
+            {
+                summary.Append("\n• ");
+                summary.Append(DiscordTextSafety.SanitizeExternalName(impact.EntryName));
+                summary.Append(": ");
+                summary.Append(FormatSignedPrice(impact.Difference));
+            }
+        }
+
+        if (report.AvailableSquadCount < report.LeagueManagerCount)
+        {
+            summary.Append("\n\n⚠️ Составы загружены для ");
+            summary.Append(report.AvailableSquadCount.ToString(CultureInfo.InvariantCulture));
+            summary.Append(" из ");
+            summary.Append(report.LeagueManagerCount.ToString(CultureInfo.InvariantCulture));
+            summary.Append(" менеджеров.");
         }
 
         return summary.ToString();
+    }
+
+    public string ComposeNoHistory()
+    {
+        return "💰 Истории изменений цен пока нет. " +
+            "Она появится после первой плановой проверки цен.";
+    }
+
+    private static void AppendPlayerChange(
+        StringBuilder summary,
+        FplPlayerPriceChange change,
+        IReadOnlyList<string> owners)
+    {
+        var isIncrease = change.Difference > 0;
+        summary.Append('\n');
+        summary.Append(isIncrease ? "📈 " : "📉 ");
+        summary.Append(DiscordTextSafety.SanitizeExternalName(change.PlayerName));
+        summary.Append(": ");
+        summary.Append(FormatPrice(change.PreviousCost));
+        summary.Append(" → ");
+        summary.Append(FormatPrice(change.CurrentCost));
+        summary.Append(" (");
+        summary.Append(FormatSignedPrice(change.Difference));
+        summary.Append(')');
+
+        if (owners.Count == 0)
+        {
+            return;
+        }
+
+        summary.Append("\n  В составах: ");
+        summary.Append(string.Join(
+            ", ",
+            owners.Select(DiscordTextSafety.SanitizeExternalName)));
     }
 
     private static string FormatPrice(int cost)
