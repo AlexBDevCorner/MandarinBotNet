@@ -205,6 +205,11 @@ points. It stores the observed snapshot, pending highlights, digest sequence, an
 per-target cooldown in `data/fpl-live.db`. Restarting the bot therefore does not reset
 the cooldown or replay acknowledged highlights.
 
+A leader highlight requires one unique leader to be replaced by another unique
+leader. Transitions into or out of a tie for first stay silent. The reported lead is
+the score difference from the highest strictly lower score group, so several managers
+can share second place.
+
 The first meaningful change after the baseline can publish on the next scheduler
 execution. A successful publication starts the per-target cooldown. Highlights found
 during that cooldown are merged into one short digest. Repeated bench, captain, rank,
@@ -212,6 +217,11 @@ and leader changes replace the pending value instead of adding duplicate lines. 
 failed Discord send leaves the digest pending and does not start the cooldown. At the
 default settings, each target receives at most one successful live digest in any
 rolling 60-minute period.
+
+Removing a Discord target from configuration stops new highlights and publications
+for that target, but keeps its publication sequence and pending state in SQLite. If
+the target is added again during the same gameweek, its next digest continues with a
+new source identifier instead of colliding with an earlier delivery checkpoint.
 
 Routine score changes do not create highlights by themselves. Fixture start and end,
 `Playing` or `YetToPlay` count changes, rank movement below the configured threshold,

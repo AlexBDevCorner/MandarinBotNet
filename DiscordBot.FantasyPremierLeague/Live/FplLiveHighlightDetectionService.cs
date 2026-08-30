@@ -21,11 +21,24 @@ public sealed class FplLiveHighlightDetectionService(
         var detectedAtUtc = current.CapturedAtUtc.ToUniversalTime();
         var previousByEntry = previous.Managers.ToDictionary(manager => manager.EntryId);
         var highlights = new List<FplLiveHighlight>();
-        var previousLeader = previous.Managers.Single(manager => manager.LiveRank == 1);
-        var currentLeader = current.Managers.Single(manager => manager.LiveRank == 1);
-        var leaderChanged = previousLeader.EntryId != currentLeader.EntryId;
-
-        if (leaderChanged)
+        var previousLeaders = FplLiveLeadership.GetLeaders(previous);
+        var currentLeaders = FplLiveLeadership.GetLeaders(current);
+        var previousLeaderIds = previousLeaders
+            .Select(manager => manager.EntryId)
+            .ToHashSet();
+        var currentLeaderIds = currentLeaders
+            .Select(manager => manager.EntryId)
+            .ToHashSet();
+        var leadershipChanged = !previousLeaderIds.SetEquals(currentLeaderIds);
+        var previousLeader = previousLeaders.Count == 1
+            ? previousLeaders[0]
+            : null;
+        var currentLeader = currentLeaders.Count == 1
+            ? currentLeaders[0]
+            : null;
+        if (leadershipChanged &&
+            previousLeader is not null &&
+            currentLeader is not null)
         {
             highlights.Add(new LeaderChangedHighlight(
                 previousLeader.EntryId,
@@ -33,7 +46,7 @@ public sealed class FplLiveHighlightDetectionService(
                 currentLeader.EntryId,
                 currentLeader.EntryName,
                 currentLeader.LiveTotalPoints,
-                GetLeaderGap(current),
+                FplLiveLeadership.GetGapToNextScoreGroup(current, currentLeader),
                 detectedAtUtc));
         }
 
@@ -45,8 +58,9 @@ public sealed class FplLiveHighlightDetectionService(
             }
 
             var rankChange = Math.Abs(previousManager.LiveRank - currentManager.LiveRank);
-            var involvedInLeaderChange = leaderChanged &&
-                (previousManager.LiveRank == 1 || currentManager.LiveRank == 1);
+            var involvedInLeaderChange = leadershipChanged &&
+                (previousLeaderIds.Contains(currentManager.EntryId) ||
+                 currentLeaderIds.Contains(currentManager.EntryId));
             if (rankChange >= options.SignificantLiveRankChange &&
                 !involvedInLeaderChange)
             {
@@ -118,14 +132,6 @@ public sealed class FplLiveHighlightDetectionService(
         }
 
         return highlights;
-    }
-
-    private static int GetLeaderGap(FplLiveGameweek gameweek)
-    {
-        return gameweek.Managers
-            .Where(manager => manager.LiveRank == 2)
-            .Select(manager => manager.GapToLeader)
-            .SingleOrDefault();
     }
 
     private static FplAutomaticSubstitutionIdentity CreateSubstitutionIdentity(

@@ -44,7 +44,9 @@ public sealed class FplLiveNotificationService(
             current);
         var existingByTarget = state.Targets.ToDictionary(
             target => new FplLiveTargetKey(target.GuildId, target.ChannelId));
-        var nextTargets = new List<FplLiveTargetNotificationState>(targetKeys.Count);
+        var nextByTarget = new Dictionary<
+            FplLiveTargetKey,
+            FplLiveTargetNotificationState>(existingByTarget);
 
         foreach (var targetKey in targetKeys.Keys)
         {
@@ -61,11 +63,19 @@ public sealed class FplLiveNotificationService(
 
             pending = ReconcilePendingHighlights(pending.Values, current);
 
-            nextTargets.Add(existing with
+            nextByTarget[targetKey] = existing with
             {
                 PendingHighlights = OrderHighlights(pending.Values)
-            });
+            };
         }
+
+        var nextTargets = nextByTarget.Values
+            .OrderBy(target => target.GuildId)
+            .ThenBy(target => target.ChannelId)
+            .ToArray();
+        var activeTargets = targetKeys.Keys
+            .Select(targetKey => nextByTarget[targetKey])
+            .ToArray();
 
         var nextState = state with
         {
@@ -76,14 +86,14 @@ public sealed class FplLiveNotificationService(
 
         var now = timeProvider.GetUtcNow();
         var cooldown = TimeSpan.FromMinutes(options.LiveNotificationCooldownMinutes);
-        var digests = nextTargets
+        var digests = activeTargets
             .Where(target => target.PendingHighlights.Count > 0)
             .Where(target =>
                 target.LastPublishedAtUtc is null ||
                 now >= target.LastPublishedAtUtc.Value + cooldown)
             .Select(target => CreateDigest(nextState, target))
             .ToArray();
-        var hasPending = nextTargets.Any(target => target.PendingHighlights.Count > 0);
+        var hasPending = activeTargets.Any(target => target.PendingHighlights.Count > 0);
 
         return new FplLiveNotificationEvaluation(
             digests.Length > 0
@@ -177,7 +187,13 @@ public sealed class FplLiveNotificationService(
         LeaderChangedHighlight highlight,
         FplLiveGameweek current)
     {
-        var currentLeader = current.Managers.Single(manager => manager.LiveRank == 1);
+        var currentLeaders = FplLiveLeadership.GetLeaders(current);
+        if (currentLeaders.Count != 1)
+        {
+            return null;
+        }
+
+        var currentLeader = currentLeaders[0];
         if (currentLeader.EntryId == highlight.PreviousLeaderEntryId)
         {
             return null;
@@ -188,7 +204,7 @@ public sealed class FplLiveNotificationService(
             NewLeaderEntryId = currentLeader.EntryId,
             NewLeaderName = currentLeader.EntryName,
             NewLeaderPoints = currentLeader.LiveTotalPoints,
-            Gap = GetLeaderGap(current)
+            Gap = FplLiveLeadership.GetGapToNextScoreGroup(current, currentLeader)
         };
     }
 
@@ -433,14 +449,6 @@ public sealed class FplLiveNotificationService(
             AutomaticSubstitutionHighlight => 5,
             _ => 6
         };
-    }
-
-    private static int GetLeaderGap(FplLiveGameweek gameweek)
-    {
-        return gameweek.Managers
-            .Where(manager => manager.LiveRank == 2)
-            .Select(manager => manager.GapToLeader)
-            .SingleOrDefault();
     }
 
     private static Dictionary<FplLiveTargetKey, NotificationTargetOptions>

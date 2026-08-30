@@ -216,6 +216,35 @@ public sealed class FplLiveNotificationServiceTests
     }
 
     [Test]
+    public void Observe_PendingLeaderBecomesTied_RemovesLeaderHighlight()
+    {
+        // Arrange
+        var service = CreateService();
+        service.Observe(CreateCaptainGameweek(18), [_firstTarget]);
+        var firstDigest = service.Observe(CreateCaptainGameweek(20), [_firstTarget])
+            .Digests.Single();
+        service.MarkPublished(firstDigest);
+        _timeProvider.UtcNow = FplLiveTestData.CapturedAtUtc.AddMinutes(15);
+        service.Observe(
+            CreateScoreGameweek(15, 120, 125, 110, 105),
+            [_firstTarget]);
+        _timeProvider.UtcNow = FplLiveTestData.CapturedAtUtc.AddMinutes(30);
+        service.Observe(
+            CreateScoreGameweek(30, 120, 125, 125, 105),
+            [_firstTarget]);
+        _timeProvider.UtcNow = FplLiveTestData.CapturedAtUtc.AddMinutes(60);
+
+        // Act
+        var evaluation = service.Observe(
+            CreateScoreGameweek(60, 120, 125, 125, 105),
+            [_firstTarget]);
+
+        // Assert
+        evaluation.Outcome.Should().Be(FplLiveNotificationOutcome.NothingInteresting);
+        evaluation.Digests.Should().BeEmpty();
+    }
+
+    [Test]
     public void Observe_WithoutPublicationAcknowledgement_RetriesPendingDigest()
     {
         // Arrange
@@ -313,6 +342,29 @@ public sealed class FplLiveNotificationServiceTests
     }
 
     [Test]
+    public void Observe_TargetRemovedAndReadded_PreservesNextDigestSequence()
+    {
+        // Arrange
+        var service = CreateService();
+        service.Observe(CreateBenchGameweek(7), [_firstTarget]);
+        var firstDigest = service.Observe(CreateBenchGameweek(8), [_firstTarget])
+            .Digests.Single();
+        service.MarkPublished(firstDigest);
+        _timeProvider.UtcNow = FplLiveTestData.CapturedAtUtc.AddMinutes(15);
+        service.Observe(CreateBenchGameweek(9), []);
+        _timeProvider.UtcNow = FplLiveTestData.CapturedAtUtc.AddMinutes(60);
+
+        // Act
+        var evaluation = service.Observe(CreateCaptainGameweek(20), [_firstTarget]);
+
+        // Assert
+        evaluation.Digests.Should().ContainSingle();
+        evaluation.Digests[0].Sequence.Should().Be(2);
+        evaluation.Digests[0].SourceIdentifier.Should()
+            .Be("2026-27-event-3-live-digest-0002");
+    }
+
+    [Test]
     public void Observe_RankReturnsToOriginalDuringCooldown_RemovesObsoleteHighlight()
     {
         // Arrange
@@ -402,9 +454,43 @@ public sealed class FplLiveNotificationServiceTests
                     ? 1
                     : manager.EntryId < leaderEntryId
                         ? manager.EntryId + 1
-                        : manager.EntryId
+                        : manager.EntryId,
+                LiveTotalPoints = manager.EntryId == leaderEntryId
+                    ? 125
+                    : manager.LiveTotalPoints,
+                GapToLeader = manager.EntryId == leaderEntryId
+                    ? 0
+                    : 125 - manager.LiveTotalPoints
             })
             .ToArray();
+        return FplLiveTestData.CreateGameweek(
+            managers,
+            capturedAtUtc: FplLiveTestData.CapturedAtUtc.AddMinutes(capturedMinute));
+    }
+
+    private static FplLiveGameweek CreateScoreGameweek(
+        int capturedMinute,
+        params int[] scores)
+    {
+        var managers = FplLiveTestData.CreateGameweek().Managers.ToArray();
+        scores.Should().HaveCount(managers.Length);
+        var leaderPoints = scores.Max();
+        var rankByScore = scores
+            .OrderByDescending(score => score)
+            .Select((score, index) => (score, index))
+            .GroupBy(item => item.score)
+            .ToDictionary(group => group.Key, group => group.Min(item => item.index) + 1);
+
+        for (var index = 0; index < managers.Length; index++)
+        {
+            managers[index] = managers[index] with
+            {
+                LiveRank = rankByScore[scores[index]],
+                LiveTotalPoints = scores[index],
+                GapToLeader = leaderPoints - scores[index]
+            };
+        }
+
         return FplLiveTestData.CreateGameweek(
             managers,
             capturedAtUtc: FplLiveTestData.CapturedAtUtc.AddMinutes(capturedMinute));

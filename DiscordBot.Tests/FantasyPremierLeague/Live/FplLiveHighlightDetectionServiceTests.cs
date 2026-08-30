@@ -145,7 +145,12 @@ public sealed class FplLiveHighlightDetectionServiceTests
         var previous = FplLiveTestData.CreateGameweek();
         var currentManagers = previous.Managers.ToArray();
         currentManagers[0] = currentManagers[0] with { LiveRank = 2 };
-        currentManagers[1] = currentManagers[1] with { LiveRank = 1 };
+        currentManagers[1] = currentManagers[1] with
+        {
+            LiveRank = 1,
+            LiveTotalPoints = 123,
+            GapToLeader = 0
+        };
 
         // Act
         var highlights = service.Detect(
@@ -155,6 +160,68 @@ public sealed class FplLiveHighlightDetectionServiceTests
         // Assert
         highlights.Should().ContainSingle()
             .Which.Should().BeOfType<LeaderChangedHighlight>();
+    }
+
+    [Test]
+    public void Detect_UniqueLeaderBecomesTied_SuppressesLeaderHighlight()
+    {
+        // Arrange
+        var previous = CreateGameweekWithScores(120, 117, 110, 105);
+        var current = CreateGameweekWithScores(120, 120, 110, 105);
+
+        // Act
+        var highlights = _service.Detect(previous, current);
+
+        // Assert
+        highlights.Should().NotContain(highlight =>
+            highlight is LeaderChangedHighlight);
+    }
+
+    [Test]
+    public void Detect_TiedLeadersBecomeUnique_SuppressesLeaderHighlight()
+    {
+        // Arrange
+        var previous = CreateGameweekWithScores(120, 120, 110, 105);
+        var current = CreateGameweekWithScores(120, 123, 110, 105);
+
+        // Act
+        var highlights = _service.Detect(previous, current);
+
+        // Assert
+        highlights.Should().NotContain(highlight =>
+            highlight is LeaderChangedHighlight);
+    }
+
+    [Test]
+    public void Detect_TiedLeaderSetChanges_SuppressesLeaderHighlight()
+    {
+        // Arrange
+        var previous = CreateGameweekWithScores(120, 120, 110, 105);
+        var current = CreateGameweekWithScores(110, 125, 125, 105);
+
+        // Act
+        var highlights = _service.Detect(previous, current);
+
+        // Assert
+        highlights.Should().NotContain(highlight =>
+            highlight is LeaderChangedHighlight);
+    }
+
+    [Test]
+    public void Detect_UniqueLeaderChangesWithTiedSecond_ReturnsScoreGroupGap()
+    {
+        // Arrange
+        var previous = CreateGameweekWithScores(123, 117, 117, 105);
+        var current = CreateGameweekWithScores(120, 125, 120, 105);
+
+        // Act
+        var highlights = _service.Detect(previous, current);
+
+        // Assert
+        var leader = highlights.Should().ContainSingle()
+            .Which.Should().BeOfType<LeaderChangedHighlight>().Which;
+        leader.NewLeaderEntryId.Should().Be(2);
+        leader.Gap.Should().Be(5);
     }
 
     [Test]
@@ -288,6 +355,30 @@ public sealed class FplLiveHighlightDetectionServiceTests
                 CaptainEffectivePoints = captainEffectivePoints
             }
         };
+        return FplLiveTestData.CreateGameweek(managers);
+    }
+
+    private static FplLiveGameweek CreateGameweekWithScores(params int[] scores)
+    {
+        var managers = FplLiveTestData.CreateGameweek().Managers.ToArray();
+        scores.Should().HaveCount(managers.Length);
+        var leaderPoints = scores.Max();
+        var rankByScore = scores
+            .OrderByDescending(score => score)
+            .Select((score, index) => (score, index))
+            .GroupBy(item => item.score)
+            .ToDictionary(group => group.Key, group => group.Min(item => item.index) + 1);
+
+        for (var index = 0; index < managers.Length; index++)
+        {
+            managers[index] = managers[index] with
+            {
+                LiveRank = rankByScore[scores[index]],
+                LiveTotalPoints = scores[index],
+                GapToLeader = leaderPoints - scores[index]
+            };
+        }
+
         return FplLiveTestData.CreateGameweek(managers);
     }
 }

@@ -140,4 +140,40 @@ public sealed class SqliteFplLiveNotificationStateStoreTests
         restored.Targets[0].PendingHighlights.Should().BeEmpty();
         restored.Targets[0].NextDigestSequence.Should().Be(2);
     }
+
+    [Test]
+    public void Save_StateOmitsTarget_PreservesItsPublicationHistory()
+    {
+        // Arrange
+        var gameweek = FplLiveTestData.CreateGameweek();
+        var store = new SqliteFplLiveNotificationStateStore(_databasePath);
+        var retainedTarget = new FplLiveTargetNotificationState(
+            10,
+            100,
+            FplLiveTestData.CapturedAtUtc,
+            2,
+            []);
+        var activeTarget = new FplLiveTargetNotificationState(
+            20,
+            200,
+            null,
+            1,
+            []);
+        var state = new FplLiveNotificationState(
+            123,
+            "2026/27",
+            3,
+            gameweek,
+            [retainedTarget, activeTarget]);
+        store.Save(state);
+
+        // Act
+        store.Save(state with { Targets = [activeTarget] });
+
+        // Assert
+        var restored = store.Get(123, "2026/27", 3)!;
+        restored.Targets.Should().HaveCount(2);
+        restored.Targets.Single(target => target.GuildId == 10)
+            .NextDigestSequence.Should().Be(2);
+    }
 }

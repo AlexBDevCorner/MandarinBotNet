@@ -117,6 +117,40 @@ public sealed class FplLiveInsightsJobTests
     }
 
     [Test]
+    public async Task Execute_TargetRemovedAndReadded_UsesNextSequenceAndDelivers()
+    {
+        // Arrange
+        var fixture = new JobFixture
+        {
+            Client = { BenchPlayerPoints = 7 }
+        };
+        await fixture.Job.Execute(CreateContext());
+        fixture.Client.BenchPlayerPoints = 8;
+        await fixture.Job.Execute(CreateContext());
+        fixture.NotificationOptions.Targets.Clear();
+        fixture.TimeProvider.UtcNow = fixture.TimeProvider.UtcNow.AddMinutes(15);
+        fixture.Client.BenchPlayerPoints = 9;
+        await fixture.Job.Execute(CreateContext());
+        fixture.NotificationOptions.Targets.Add(new NotificationTargetOptions
+        {
+            GuildId = 10,
+            ChannelId = 100
+        });
+        fixture.TimeProvider.UtcNow = fixture.TimeProvider.UtcNow.AddMinutes(45);
+        fixture.Client.CaptainPoints = 10;
+
+        // Act
+        await fixture.Job.Execute(CreateContext());
+
+        // Assert
+        fixture.Publisher.Publications.Should().HaveCount(2);
+        fixture.Publisher.Publications.Select(publication => publication.SourceIdentifier)
+            .Should().Equal(
+                "2026-27-event-3-live-digest-0001",
+                "2026-27-event-3-live-digest-0002");
+    }
+
+    [Test]
     public async Task Execute_NoActiveGameweek_PublishesNothing()
     {
         // Arrange
@@ -186,6 +220,7 @@ public sealed class FplLiveInsightsJobTests
                     ChannelId = (ulong)(index * 100)
                 })
                 .ToList();
+            NotificationOptions = new NotificationOptions { Targets = targets };
             var detector = new FplLiveHighlightDetectionService(Options);
             var notificationService = new FplLiveNotificationService(
                 Options,
@@ -204,7 +239,7 @@ public sealed class FplLiveInsightsJobTests
                 new FplLiveHighlightMessageComposer(),
                 Publisher,
                 CheckpointStore,
-                new NotificationOptions { Targets = targets },
+                NotificationOptions,
                 TimeProvider,
                 new RecordingLogger<FplLiveInsightsJob>());
         }
@@ -218,6 +253,8 @@ public sealed class FplLiveInsightsJobTests
         public InMemoryCheckpointStore CheckpointStore { get; }
 
         public TestNotificationPublisher Publisher { get; }
+
+        public NotificationOptions NotificationOptions { get; }
 
         public MutableTimeProvider TimeProvider { get; }
 
@@ -487,7 +524,11 @@ public sealed class FplLiveInsightsJobTests
                 return Task.FromResult(false);
             }
 
-            Publications.Add(new Publication(target.GuildId, notificationType, message));
+            Publications.Add(new Publication(
+                target.GuildId,
+                sourceIdentifier,
+                notificationType,
+                message));
             checkpointStore.RecordDelivered(checkpoint, DateTimeOffset.UtcNow);
             return Task.FromResult(true);
         }
@@ -495,6 +536,7 @@ public sealed class FplLiveInsightsJobTests
 
     private sealed record Publication(
         ulong GuildId,
+        string SourceIdentifier,
         string NotificationType,
         string Message);
 

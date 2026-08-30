@@ -74,7 +74,6 @@ public sealed class SqliteFplLiveNotificationStateStore
         try
         {
             SaveObservation(connection, transaction, state);
-            DeleteTargetState(connection, transaction, state);
             SaveTargets(connection, transaction, state);
             transaction.Commit();
         }
@@ -232,25 +231,6 @@ public sealed class SqliteFplLiveNotificationStateStore
         command.ExecuteNonQuery();
     }
 
-    private static void DeleteTargetState(
-        SqliteConnection connection,
-        SqliteTransaction transaction,
-        FplLiveNotificationState state)
-    {
-        using var command = connection.CreateCommand();
-        command.Transaction = transaction;
-        command.CommandTimeout = CommandTimeoutSeconds;
-        command.CommandText =
-            """
-            DELETE FROM fpl_live_publication_state
-            WHERE league_id = $league_id
-              AND season = $season
-              AND event_id = $event_id;
-            """;
-        AddGameweekKeyParameters(command, state.ClassicLeagueId, state.Season, state.EventId);
-        command.ExecuteNonQuery();
-    }
-
     private static void SaveTargets(
         SqliteConnection connection,
         SqliteTransaction transaction,
@@ -259,6 +239,7 @@ public sealed class SqliteFplLiveNotificationStateStore
         foreach (var target in state.Targets)
         {
             SaveTarget(connection, transaction, state, target);
+            DeletePendingHighlights(connection, transaction, state, target);
             foreach (var highlight in target.PendingHighlights)
             {
                 SaveHighlight(connection, transaction, state, target, highlight);
@@ -294,7 +275,16 @@ public sealed class SqliteFplLiveNotificationStateStore
                 $channel_id,
                 $last_published_at_utc,
                 $next_digest_sequence
-            );
+            )
+            ON CONFLICT (
+                league_id,
+                season,
+                event_id,
+                guild_id,
+                channel_id
+            ) DO UPDATE SET
+                last_published_at_utc = excluded.last_published_at_utc,
+                next_digest_sequence = excluded.next_digest_sequence;
             """;
         AddGameweekKeyParameters(command, state.ClassicLeagueId, state.Season, state.EventId);
         AddTargetParameters(command, target.GuildId, target.ChannelId);
@@ -306,6 +296,33 @@ public sealed class SqliteFplLiveNotificationStateStore
         command.Parameters.AddWithValue(
             "$next_digest_sequence",
             target.NextDigestSequence);
+        command.ExecuteNonQuery();
+    }
+
+    private static void DeletePendingHighlights(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        FplLiveNotificationState state,
+        FplLiveTargetNotificationState target)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandTimeout = CommandTimeoutSeconds;
+        command.CommandText =
+            """
+            DELETE FROM fpl_live_pending_highlights
+            WHERE league_id = $league_id
+              AND season = $season
+              AND event_id = $event_id
+              AND guild_id = $guild_id
+              AND channel_id = $channel_id;
+            """;
+        AddGameweekKeyParameters(
+            command,
+            state.ClassicLeagueId,
+            state.Season,
+            state.EventId);
+        AddTargetParameters(command, target.GuildId, target.ChannelId);
         command.ExecuteNonQuery();
     }
 
