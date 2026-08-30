@@ -39,6 +39,12 @@ public sealed class MandarinBotOptionsTests
             FantasyPremierLeagueOptions.DefaultRecognitionRuleVersion);
         options.FantasyPremierLeague.TransferCostAchievementThreshold.Should().Be(
             FantasyPremierLeagueOptions.DefaultTransferCostAchievementThreshold);
+        options.FantasyPremierLeague.LiveNotificationCooldownMinutes.Should().Be(
+            FantasyPremierLeagueOptions.DefaultLiveNotificationCooldownMinutes);
+        options.FantasyPremierLeague.SignificantLiveRankChange.Should().Be(
+            FantasyPremierLeagueOptions.DefaultSignificantLiveRankChange);
+        options.FantasyPremierLeague.AutomaticSubstitutionHighlightPoints.Should().Be(
+            FantasyPremierLeagueOptions.DefaultAutomaticSubstitutionHighlightPoints);
     }
 
     [Test]
@@ -254,7 +260,10 @@ public sealed class MandarinBotOptionsTests
                 CaptainSuccessEffectivePointsThreshold = 0,
                 CaptainDisasterPointsThreshold = 10,
                 CaptainDisasterViceCaptainPointsThreshold = 10,
-                TransferCostAchievementThreshold = 0
+                TransferCostAchievementThreshold = 0,
+                LiveNotificationCooldownMinutes = 0,
+                SignificantLiveRankChange = 0,
+                AutomaticSubstitutionHighlightPoints = 0
             });
         var validator = new MandarinBotOptionsValidator(
             requireOperationalConfiguration: true);
@@ -272,6 +281,12 @@ public sealed class MandarinBotOptionsTests
             failure.Contains("CaptainDisasterViceCaptainPointsThreshold"));
         result.Failures.Should().Contain(failure =>
             failure.Contains("TransferCostAchievementThreshold"));
+        result.Failures.Should().Contain(failure =>
+            failure.Contains("LiveNotificationCooldownMinutes"));
+        result.Failures.Should().Contain(failure =>
+            failure.Contains("SignificantLiveRankChange"));
+        result.Failures.Should().Contain(failure =>
+            failure.Contains("AutomaticSubstitutionHighlightPoints"));
     }
 
     [Test]

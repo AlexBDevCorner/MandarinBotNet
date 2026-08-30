@@ -17,6 +17,9 @@ internal static class MandarinBotDataPaths
     internal static string FplPriceSnapshotDatabasePath =>
         GetDataPath("fpl-price-snapshot.db");
 
+    internal static string FplLiveNotificationDatabasePath =>
+        GetDataPath("fpl-live.db");
+
     internal static string HealthStatePath =>
         GetDataPath("health-state.json");
 

@@ -159,6 +159,24 @@ public sealed class MandarinBotOptionsValidator(bool requireOperationalConfigura
                 "Bot:FantasyPremierLeague:TransferCostAchievementThreshold must be greater than zero.");
         }
 
+        if (options.FantasyPremierLeague.LiveNotificationCooldownMinutes <= 0)
+        {
+            failures.Add(
+                "Bot:FantasyPremierLeague:LiveNotificationCooldownMinutes must be greater than zero.");
+        }
+
+        if (options.FantasyPremierLeague.SignificantLiveRankChange <= 0)
+        {
+            failures.Add(
+                "Bot:FantasyPremierLeague:SignificantLiveRankChange must be greater than zero.");
+        }
+
+        if (options.FantasyPremierLeague.AutomaticSubstitutionHighlightPoints <= 0)
+        {
+            failures.Add(
+                "Bot:FantasyPremierLeague:AutomaticSubstitutionHighlightPoints must be greater than zero.");
+        }
+
         ValidateTargets(options, failures);
 
         return failures.Count == 0

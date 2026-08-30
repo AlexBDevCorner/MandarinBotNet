@@ -43,6 +43,9 @@ public sealed class FantasyPremierLeagueOptions
     public const int DefaultCaptainDisasterPointsThreshold = 2;
     public const int DefaultCaptainDisasterViceCaptainPointsThreshold = 8;
     public const int DefaultTransferCostAchievementThreshold = 8;
+    public const int DefaultLiveNotificationCooldownMinutes = 60;
+    public const int DefaultSignificantLiveRankChange = 2;
+    public const int DefaultAutomaticSubstitutionHighlightPoints = 5;
 
     public int ClassicLeagueId { get; init; }
 
@@ -66,6 +69,15 @@ public sealed class FantasyPremierLeagueOptions
 
     public int TransferCostAchievementThreshold { get; init; } =
         DefaultTransferCostAchievementThreshold;
+
+    public int LiveNotificationCooldownMinutes { get; init; } =
+        DefaultLiveNotificationCooldownMinutes;
+
+    public int SignificantLiveRankChange { get; init; } =
+        DefaultSignificantLiveRankChange;
+
+    public int AutomaticSubstitutionHighlightPoints { get; init; } =
+        DefaultAutomaticSubstitutionHighlightPoints;
 }
 
 public sealed class JobSchedulesOptions
