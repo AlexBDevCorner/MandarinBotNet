@@ -82,7 +82,14 @@ container image.
 in `Bot__WelcomeMessages__GuildId` are handled, and the welcome text plus the
 packaged `pc7n1.jpg` image are sent together to
 `Bot__WelcomeMessages__ChannelId`. Missing or unavailable destination settings
-are logged and skipped without disconnecting the bot.
+are logged and skipped without disconnecting the bot. The message includes a
+short onboarding checklist, the three league join links, and `/help` for the
+full command guide.
+
+Application-command registration publishes `/help`, `/prices`, `/deadline`,
+`/live`, `/standings`, `/profile`, `/achievements`, `/benchleague`, `/chips`,
+and `/hugme`. `/deadline` includes exact Riga civil time for both FPL and UCL
+plus a Discord relative timestamp that keeps counting down in the client.
 
 `MaxStandingsPages` bounds the number of FPL standings pages fetched by each
 job. The default of 10 represents up to 500 league entries while preventing a
@@ -200,8 +207,19 @@ The optional `FplPriceChanges` job is disabled by default. When enabled, it chec
 the current price of every FPL player at the top of each hour from 12:00 through
 22:00 in `Europe/Riga`. It stores the latest successful snapshot in
 `data/fpl-price-snapshot.db` and publishes only the players whose prices changed
-since the previous notification. The first run establishes the baseline and does
-not publish a message.
+since the previous notification. For the configured classic league, the job
+loads the current public squad for each manager, hides price changes that affect
+none of those squads, lists the teams that own each changed player, and totals
+the value change per team. If only some squads load, the message reports its
+coverage; if league data is unavailable, it falls back to the global changes
+instead of losing the notification. The first run establishes the baseline and
+does not publish a message.
+
+The last successfully published change batch is stored alongside the current
+price baseline. `/prices` checks for newer changes without advancing that
+baseline, then shows either the new batch or the last published batch with fresh
+league ownership. This keeps the command useful between scheduled checks and
+does not consume a change before the scheduled notification can publish it.
 
 ## Multiple targets and mentions
 

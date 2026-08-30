@@ -12,6 +12,8 @@ public static class DiscordApplicationCommands
     public const string ProfileName = "profile";
     public const string AchievementsName = "achievements";
     public const string ChipsName = "chips";
+    public const string PricesName = "prices";
+    public const string HelpName = "help";
 
     public static ApplicationCommandProperties[] BuildDesiredSet()
     {
@@ -85,6 +87,14 @@ public static class DiscordApplicationCommands
             new SlashCommandBuilder()
                 .WithName(ChipsName)
                 .WithDescription("Объясняет фишки FPL и подсказывает, когда их использовать. 🃏")
+                .Build(),
+            new SlashCommandBuilder()
+                .WithName(PricesName)
+                .WithDescription("Показывает изменения цен в составах нашей лиги FPL. 💰")
+                .Build(),
+            new SlashCommandBuilder()
+                .WithName(HelpName)
+                .WithDescription("Показывает команды, лиги и возможности бота. 🤖")
                 .Build()
         ];
     }

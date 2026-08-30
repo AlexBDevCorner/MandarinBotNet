@@ -72,7 +72,12 @@ public sealed class FplPriceChangeJobTests
             new FplPriceChangeService(
                 client,
                 store,
+                TimeProvider.System,
                 new RecordingLogger<FplPriceChangeService>()),
+            new FplLeaguePriceChangeService(
+                client,
+                new FantasyPremierLeagueOptions(),
+                new RecordingLogger<FplLeaguePriceChangeService>()),
             new FplPriceChangeMessageCompositionService(),
             publisher,
             new NotificationOptions
@@ -171,6 +176,8 @@ public sealed class FplPriceChangeJobTests
     {
         public Dictionary<int, int> Prices { get; } = [];
 
+        public FplPriceChangeBatch? LatestChanges { get; private set; }
+
         public FplPriceSnapshot? GetSnapshot()
         {
             return Version == 0
@@ -179,6 +186,8 @@ public sealed class FplPriceChangeJobTests
         }
 
         public long Version { get; private set; }
+
+        public FplPriceChangeBatch? GetLatestChanges() => LatestChanges;
 
         public void SaveSnapshot(IReadOnlyDictionary<int, int> prices)
         {
@@ -189,6 +198,17 @@ public sealed class FplPriceChangeJobTests
             }
 
             Version++;
+        }
+
+        public void SaveSnapshot(FplPriceChangeCheck priceCheck)
+        {
+            SaveSnapshot(priceCheck.CurrentPrices);
+            if (priceCheck.Changes.Count > 0)
+            {
+                LatestChanges = new FplPriceChangeBatch(
+                    priceCheck.CheckedAtUtc,
+                    priceCheck.Changes);
+            }
         }
     }
 

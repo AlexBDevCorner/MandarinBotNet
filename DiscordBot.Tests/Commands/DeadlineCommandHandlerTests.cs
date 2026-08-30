@@ -14,10 +14,12 @@ public sealed class DeadlineCommandHandlerTests
 {
     [TestCase(
         "2027-02-02T12:00:00+00:00",
-        "⏰ FPL — тур 42: вторник, 2 февраля 2027 в 14:00 (Рига, Латвия, UTC+02:00).")]
+        "⏰ FPL — тур 42: вторник, 2 февраля 2027 в 14:00 (Рига, Латвия, UTC+02:00).\n" +
+        "⏳ <t:1801569600:R>.")]
     [TestCase(
         "2027-08-02T12:00:00+00:00",
-        "⏰ FPL — тур 42: понедельник, 2 августа 2027 в 15:00 (Рига, Латвия, UTC+03:00).")]
+        "⏰ FPL — тур 42: понедельник, 2 августа 2027 в 15:00 (Рига, Латвия, UTC+03:00).\n" +
+        "⏳ <t:1817208000:R>.")]
     public async Task HandleAsync_UpcomingDeadline_DisplaysRigaCivilTime(
         string deadlineText,
         string expectedMessage)
@@ -72,7 +74,9 @@ public sealed class DeadlineCommandHandlerTests
         operations.Should().Equal("Defer", "Fetch", "Fetch", "Modify");
         interaction.Messages.Should().Equal(
             "⏰ FPL — тур 42: вторник, 2 февраля 2027 в 14:00 (Рига, Латвия, UTC+02:00).\n" +
-            "⏰ UCL — игровой день 1: среда, 3 февраля 2027 в 14:00 (Рига, Латвия, UTC+02:00).");
+            "⏳ <t:1801569600:R>.\n" +
+            "⏰ UCL — игровой день 1: среда, 3 февраля 2027 в 14:00 (Рига, Латвия, UTC+02:00).\n" +
+            "⏳ <t:1801656000:R>.");
     }
 
     [Test]

@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.Data.Sqlite;
 
 namespace DiscordBot.FantasyPremierLeague.PriceChanges;
@@ -67,9 +68,68 @@ public sealed class SqliteFplPriceSnapshotStore : IFplPriceSnapshotStore
         return new FplPriceSnapshot(Convert.ToInt64(versionValue), prices);
     }
 
+    public FplPriceChangeBatch? GetLatestChanges()
+    {
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandTimeout = CommandTimeoutSeconds;
+        command.CommandText =
+            """
+            SELECT
+                player_id,
+                player_name,
+                previous_cost,
+                current_cost,
+                checked_at_utc
+            FROM fpl_latest_price_changes
+            ORDER BY player_name COLLATE NOCASE, player_id;
+            """;
+
+        var changes = new List<FplPlayerPriceChange>();
+        DateTimeOffset? checkedAtUtc = null;
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            changes.Add(new FplPlayerPriceChange(
+                Convert.ToInt32(reader.GetInt64(0)),
+                reader.GetString(1),
+                Convert.ToInt32(reader.GetInt64(2)),
+                Convert.ToInt32(reader.GetInt64(3))));
+            checkedAtUtc ??= DateTimeOffset.Parse(
+                reader.GetString(4),
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.RoundtripKind);
+        }
+
+        return checkedAtUtc is null
+            ? null
+            : new FplPriceChangeBatch(checkedAtUtc.Value, changes);
+    }
+
     public void SaveSnapshot(IReadOnlyDictionary<int, int> prices)
     {
         ArgumentNullException.ThrowIfNull(prices);
+
+        SaveSnapshot(prices, latestChanges: null);
+    }
+
+    public void SaveSnapshot(FplPriceChangeCheck priceCheck)
+    {
+        ArgumentNullException.ThrowIfNull(priceCheck);
+
+        SaveSnapshot(
+            priceCheck.CurrentPrices,
+            priceCheck.Changes.Count == 0
+                ? null
+                : new FplPriceChangeBatch(
+                    priceCheck.CheckedAtUtc,
+                    priceCheck.Changes));
+    }
+
+    private void SaveSnapshot(
+        IReadOnlyDictionary<int, int> prices,
+        FplPriceChangeBatch? latestChanges)
+    {
 
         using var connection = OpenConnection();
         using var transaction = connection.BeginTransaction();
@@ -133,12 +193,82 @@ public sealed class SqliteFplPriceSnapshotStore : IFplPriceSnapshotStore
             metadataCommand.Parameters.AddWithValue("$snapshot_version", nextVersion);
             metadataCommand.ExecuteNonQuery();
 
+            if (latestChanges is not null)
+            {
+                SaveLatestChanges(connection, transaction, latestChanges);
+            }
+
             transaction.Commit();
         }
         catch
         {
             transaction.Rollback();
             throw;
+        }
+    }
+
+    private static void SaveLatestChanges(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        FplPriceChangeBatch batch)
+    {
+        using (var deleteCommand = connection.CreateCommand())
+        {
+            deleteCommand.Transaction = transaction;
+            deleteCommand.CommandTimeout = CommandTimeoutSeconds;
+            deleteCommand.CommandText = "DELETE FROM fpl_latest_price_changes;";
+            deleteCommand.ExecuteNonQuery();
+        }
+
+        using var insertCommand = connection.CreateCommand();
+        insertCommand.Transaction = transaction;
+        insertCommand.CommandTimeout = CommandTimeoutSeconds;
+        insertCommand.CommandText =
+            """
+            INSERT INTO fpl_latest_price_changes (
+                player_id,
+                player_name,
+                previous_cost,
+                current_cost,
+                checked_at_utc
+            )
+            VALUES (
+                $player_id,
+                $player_name,
+                $previous_cost,
+                $current_cost,
+                $checked_at_utc
+            );
+            """;
+        var playerId = insertCommand.Parameters.AddWithValue("$player_id", 0);
+        var playerName = insertCommand.Parameters.AddWithValue(
+            "$player_name",
+            string.Empty);
+        var previousCost = insertCommand.Parameters.AddWithValue(
+            "$previous_cost",
+            0);
+        var currentCost = insertCommand.Parameters.AddWithValue(
+            "$current_cost",
+            0);
+        var checkedAtUtc = insertCommand.Parameters.AddWithValue(
+            "$checked_at_utc",
+            batch.CheckedAtUtc.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture));
+
+        foreach (var change in batch.Changes)
+        {
+            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(change.PlayerId);
+            ArgumentException.ThrowIfNullOrWhiteSpace(change.PlayerName);
+            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(change.PreviousCost);
+            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(change.CurrentCost);
+
+            playerId.Value = change.PlayerId;
+            playerName.Value = change.PlayerName;
+            previousCost.Value = change.PreviousCost;
+            currentCost.Value = change.CurrentCost;
+            checkedAtUtc.Value = batch.CheckedAtUtc
+                .ToUniversalTime()
+                .ToString("O", CultureInfo.InvariantCulture);
+            insertCommand.ExecuteNonQuery();
         }
     }
 
@@ -173,6 +303,14 @@ public sealed class SqliteFplPriceSnapshotStore : IFplPriceSnapshotStore
             CREATE TABLE IF NOT EXISTS fpl_player_price_snapshot (
                 player_id INTEGER NOT NULL PRIMARY KEY,
                 now_cost INTEGER NOT NULL
+            ) WITHOUT ROWID;
+
+            CREATE TABLE IF NOT EXISTS fpl_latest_price_changes (
+                player_id INTEGER NOT NULL PRIMARY KEY,
+                player_name TEXT NOT NULL,
+                previous_cost INTEGER NOT NULL,
+                current_cost INTEGER NOT NULL,
+                checked_at_utc TEXT NOT NULL
             ) WITHOUT ROWID;
             """;
         schemaCommand.ExecuteNonQuery();

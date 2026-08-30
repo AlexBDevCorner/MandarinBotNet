@@ -6,6 +6,7 @@ namespace DiscordBot.FantasyPremierLeague.PriceChanges;
 public sealed class FplPriceChangeService(
     IFantasyPremierLeagueClient premierLeagueClient,
     IFplPriceSnapshotStore snapshotStore,
+    TimeProvider timeProvider,
     ILogger<FplPriceChangeService> logger)
 {
     public async Task<FplPriceChangeCheck> CheckAsync(
@@ -52,7 +53,24 @@ public sealed class FplPriceChangeService(
         return new FplPriceChangeCheck(
             currentPrices,
             changes,
-            previousSnapshot?.Version ?? 0);
+            previousSnapshot?.Version ?? 0,
+            timeProvider.GetUtcNow(),
+            SelectCurrentEventId(bootstrap.Events));
+    }
+
+    public FplPriceChangeBatch? GetLatestChanges()
+    {
+        try
+        {
+            return snapshotStore.GetLatestChanges();
+        }
+        catch (Exception exception)
+        {
+            logger.LogError(
+                exception,
+                "Failed to read the latest detected FPL player price changes.");
+            throw;
+        }
     }
 
     public void SaveSnapshot(FplPriceChangeCheck priceCheck)
@@ -61,7 +79,7 @@ public sealed class FplPriceChangeService(
 
         try
         {
-            snapshotStore.SaveSnapshot(priceCheck.CurrentPrices);
+            snapshotStore.SaveSnapshot(priceCheck);
         }
         catch (Exception exception)
         {
@@ -71,6 +89,22 @@ public sealed class FplPriceChangeService(
                 priceCheck.CurrentPrices.Count);
             throw;
         }
+    }
+
+    private static int? SelectCurrentEventId(
+        IReadOnlyList<PremierLeagueEvent>? events)
+    {
+        if (events is null || events.Count == 0)
+        {
+            return null;
+        }
+
+        return events.FirstOrDefault(gameweek => gameweek.IsCurrent)?.Id
+            ?? events
+                .Where(gameweek => gameweek.IsFinished)
+                .OrderByDescending(gameweek => gameweek.Id)
+                .Select(gameweek => (int?)gameweek.Id)
+                .FirstOrDefault();
     }
 
     private static IReadOnlyDictionary<int, int> CreateCurrentPrices(

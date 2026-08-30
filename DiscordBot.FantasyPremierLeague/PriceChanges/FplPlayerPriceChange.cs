@@ -16,7 +16,30 @@ public sealed record FplPlayerPriceChange(
 public sealed record FplPriceChangeCheck(
     IReadOnlyDictionary<int, int> CurrentPrices,
     IReadOnlyList<FplPlayerPriceChange> Changes,
-    long PreviousSnapshotVersion);
+    long PreviousSnapshotVersion,
+    DateTimeOffset CheckedAtUtc,
+    int? CurrentEventId);
+
+public sealed record FplPriceChangeBatch(
+    DateTimeOffset CheckedAtUtc,
+    IReadOnlyList<FplPlayerPriceChange> Changes);
+
+public sealed record FplLeaguePlayerPriceChange(
+    FplPlayerPriceChange Change,
+    IReadOnlyList<string> OwnerEntryNames);
+
+public sealed record FplTeamPriceImpact(
+    int EntryId,
+    string EntryName,
+    int Difference);
+
+public sealed record FplLeaguePriceChangeReport(
+    DateTimeOffset CheckedAtUtc,
+    IReadOnlyList<FplLeaguePlayerPriceChange> PlayerChanges,
+    IReadOnlyList<FplTeamPriceImpact> TeamImpacts,
+    int LeagueManagerCount,
+    int AvailableSquadCount,
+    bool LeagueDataAvailable);
 
 public static class FplPriceChangeSourceIdentifier
 {

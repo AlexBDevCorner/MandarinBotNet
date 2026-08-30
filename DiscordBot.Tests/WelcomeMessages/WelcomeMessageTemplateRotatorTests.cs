@@ -1,4 +1,5 @@
 using AwesomeAssertions;
+using DiscordBot.Commands;
 using DiscordBot.WelcomeMessages;
 using NUnit.Framework;
 
@@ -7,19 +8,12 @@ namespace DiscordBot.Tests.WelcomeMessages;
 [TestFixture]
 public sealed class WelcomeMessageTemplateRotatorTests
 {
-    private const string LeagueLinks =
-        "FPL Лига обнимашек:\n\n" +
-        "https://fantasy.premierleague.com/leagues/auto-join/n9ki9b\n\n" +
-        "FPL Лига обнимашек-к-обнимашкам\n\n" +
-        "https://fantasy.premierleague.com/leagues/auto-join/a5gnav\n\n" +
-        "ЛЧ Лига светоча нашего великого и единственного Мессии:\n\n" +
-        "https://gaming.uefa.com/en/uclfantasy/leagues/3gp3eN/004D0061006700750069007200650020004D0065007300730069006100680020004C00650061006700750065/Bebrakungs";
-
     [Test]
     public void Next_SixConsecutiveCalls_UsesTemplatesInOrderThenRestarts()
     {
         // Arrange
-        var rotator = new WelcomeMessageTemplateRotator();
+        var rotator = new WelcomeMessageTemplateRotator(
+            new BotHelpMessageCompositionService());
 
         // Act
         var messages = Enumerable.Range(0, 6)
@@ -40,6 +34,10 @@ public sealed class WelcomeMessageTemplateRotatorTests
         messages.Should().OnlyContain(message =>
             message.Contains("<@42>") && !message.Contains("{user}"));
         messages.Should().OnlyContain(message =>
-            message.EndsWith($"\n\n{LeagueLinks}", StringComparison.Ordinal));
+            message.Contains("**С чего начать**") &&
+            message.Contains("`/help`") &&
+            message.Contains(BotHelpMessageCompositionService.FplClassicLeagueUrl) &&
+            message.Contains(BotHelpMessageCompositionService.UclLeagueUrl));
+        messages.Should().OnlyContain(message => message.Length <= 2_000);
     }
 }

@@ -1,4 +1,5 @@
 using AwesomeAssertions;
+using DiscordBot.Commands;
 using DiscordBot.WelcomeMessages;
 using Microsoft.Extensions.Logging;
 using NUnit.Framework;
@@ -177,7 +178,8 @@ public sealed class WelcomeMessageHandlerTests
     {
         return new WelcomeMessageHandler(
             options,
-            new WelcomeMessageTemplateRotator(),
+            new WelcomeMessageTemplateRotator(
+                new BotHelpMessageCompositionService()),
             resolver,
             new WelcomeMessageAsset(_imagePath),
             logger ?? new RecordingLogger<WelcomeMessageHandler>());
