@@ -25,7 +25,9 @@ The synchronized command set currently contains:
 - `/achievements`, which shows the season recognition leaderboards (total
   awards, per-achievement champions and tracked gameweek-win leaders) for the
   configured classic FPL league. It does not perform arbitrary league lookup and
-  does not call the FPL API at command time.
+  does not call the FPL API at command time;
+- `/chipwatch`, which shows chip availability and Free Hit opportunities for the configured classic league. Without arguments it returns a league overview; with `team:<name>` it shows manager details using case-insensitive exact or unique partial matching on team or manager name. `/chipwatch` calls the FPL API at command time;
+- `/chipwatch team:<name>`, optional `team` string for manager details (case-insensitive exact or unique partial team/manager name).
 
 Registration runs once after the Discord gateway first becomes ready during a
 process startup. It uses Discord's bulk-overwrite endpoint, so removed or

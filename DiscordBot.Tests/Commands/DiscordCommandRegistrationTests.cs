@@ -69,7 +69,7 @@ public sealed class DiscordCommandRegistrationTests
         // Assert
         commandClient.GlobalCalls.Should().Be(1);
         commandClient.GuildCalls.Should().Be(0);
-        commandClient.Commands.Should().HaveCount(10);
+        commandClient.Commands.Should().HaveCount(11);
         commandClient.Commands!.Select(command => command.Name.Value).Should()
             .Equal(
                 DiscordApplicationCommands.HugMeName,
@@ -81,6 +81,7 @@ public sealed class DiscordCommandRegistrationTests
                 DiscordApplicationCommands.AchievementsName,
                 DiscordApplicationCommands.ChipsName,
                 DiscordApplicationCommands.PricesName,
+                DiscordApplicationCommands.ChipWatchName,
                 DiscordApplicationCommands.HelpName);
         commandClient.Commands.Cast<SlashCommandProperties>()
             .Select(command => command.Description.Value)
@@ -94,6 +95,7 @@ public sealed class DiscordCommandRegistrationTests
                 "Показывает лидеров сезона по достижениям FPL. 🎖️",
                 "Объясняет фишки FPL и подсказывает, когда их использовать. 🃏",
                 "Показывает изменения цен в составах нашей лиги FPL. 💰",
+                "Проверяет доступные фишки FPL и ищет хорошие моменты для их использования. 🧠",
                 "Показывает команды, лиги и возможности бота. 🤖");
     }
 
@@ -213,7 +215,7 @@ public sealed class DiscordCommandRegistrationTests
         commandClient.GlobalCalls.Should().Be(0);
         commandClient.GuildCalls.Should().Be(1);
         commandClient.GuildId.Should().Be(guildId);
-        commandClient.Commands.Should().HaveCount(10);
+        commandClient.Commands.Should().HaveCount(11);
     }
 
     [Test]

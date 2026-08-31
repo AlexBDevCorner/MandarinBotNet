@@ -13,6 +13,7 @@ public static class DiscordApplicationCommands
     public const string AchievementsName = "achievements";
     public const string ChipsName = "chips";
     public const string PricesName = "prices";
+    public const string ChipWatchName = "chipwatch";
     public const string HelpName = "help";
 
     public static ApplicationCommandProperties[] BuildDesiredSet()
@@ -91,6 +92,17 @@ public static class DiscordApplicationCommands
             new SlashCommandBuilder()
                 .WithName(PricesName)
                 .WithDescription("Показывает изменения цен в составах нашей лиги FPL. 💰")
+                .Build(),
+            new SlashCommandBuilder()
+                .WithName(ChipWatchName)
+                .WithDescription(
+                    "Проверяет доступные фишки FPL и ищет хорошие моменты для их использования. 🧠")
+                .AddOption(
+                    new SlashCommandOptionBuilder()
+                        .WithName("team")
+                        .WithType(ApplicationCommandOptionType.String)
+                        .WithDescription(
+                            "Показать подробности для конкретной команды"))
                 .Build(),
             new SlashCommandBuilder()
                 .WithName(HelpName)

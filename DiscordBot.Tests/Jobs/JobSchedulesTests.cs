@@ -56,6 +56,11 @@ namespace DiscordBot.Tests.Jobs
             {
                 Enabled = true,
                 Cron = "0 0 12-22 * * ?"
+            },
+            FplChipWatch = new ScheduledJobOptions
+            {
+                Enabled = true,
+                Cron = "0 0 6,12,18 * * ?"
             }
         };
 

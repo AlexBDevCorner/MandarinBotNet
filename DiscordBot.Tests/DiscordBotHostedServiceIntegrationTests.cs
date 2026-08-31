@@ -53,6 +53,8 @@ public sealed class DiscordBotHostedServiceIntegrationTests
             TestChipsCommandHandler>();
         builder.Services.AddSingleton<IPricesCommandHandler,
             TestPricesCommandHandler>();
+        builder.Services.AddSingleton<IChipWatchCommandHandler,
+            TestChipWatchCommandHandler>();
         builder.Services.AddSingleton<IHelpCommandHandler,
             TestHelpCommandHandler>();
         builder.Services.AddSingleton<IWelcomeMessageHandler,
@@ -510,6 +512,8 @@ public sealed class DiscordBotHostedServiceIntegrationTests
             TestChipsCommandHandler>();
         services.AddSingleton<IPricesCommandHandler,
             TestPricesCommandHandler>();
+        services.AddSingleton<IChipWatchCommandHandler,
+            TestChipWatchCommandHandler>();
         services.AddSingleton<IHelpCommandHandler,
             TestHelpCommandHandler>();
         services.AddSingleton<IWelcomeMessageHandler,
@@ -778,6 +782,17 @@ public sealed class DiscordBotHostedServiceIntegrationTests
     }
 
     private sealed class TestHelpCommandHandler : IHelpCommandHandler
+    {
+        public IDiscordSlashCommandInteraction? Interaction { get; private set; }
+
+        public Task HandleAsync(IDiscordSlashCommandInteraction interaction)
+        {
+            Interaction = interaction;
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class TestChipWatchCommandHandler : IChipWatchCommandHandler
     {
         public IDiscordSlashCommandInteraction? Interaction { get; private set; }
 

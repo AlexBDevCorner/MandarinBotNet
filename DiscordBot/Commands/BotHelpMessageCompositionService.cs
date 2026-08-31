@@ -21,6 +21,7 @@ public sealed class BotHelpMessageCompositionService
             "`/prices` — последние изменения цен в составах нашей лиги\n" +
             "`/deadline` — ближайшие дедлайны FPL и ЛЧ\n" +
             "`/chips` — справочник по фишкам FPL\n" +
+            "`/chipwatch` — доступные фишки и умные подсказки по их использованию\n" +
             "`/hugme` — священная функция обнимашек\n\n" +
             ComposeLeagueLinks();
     }

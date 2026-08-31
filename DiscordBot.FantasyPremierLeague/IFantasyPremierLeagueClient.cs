@@ -27,4 +27,14 @@ public interface IFantasyPremierLeagueClient
     Task<IReadOnlyList<PremierLeagueFixture>> GetFixturesAsync(
         int eventId,
         CancellationToken cancellationToken);
+
+    Task<EntryHistoryResponse> GetEntryHistoryAsync(
+        int entryId,
+        CancellationToken cancellationToken) =>
+        throw new NotSupportedException("GetEntryHistoryAsync is not implemented in this test double.");
+
+    Task<EntryResponse> GetEntryAsync(
+        int entryId,
+        CancellationToken cancellationToken) =>
+        throw new NotSupportedException("GetEntryAsync is not implemented in this test double.");
 }

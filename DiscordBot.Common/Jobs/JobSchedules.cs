@@ -23,6 +23,8 @@ public static class JobSchedules
         "FplLiveInsightsTrigger";
     public const string FplPriceChangesTriggerName =
         "FplPriceChangesTrigger";
+    public const string FplChipWatchTriggerName =
+        "FplChipWatchTrigger";
 
     public static readonly JobKey PremierLeagueNotificationJobKey =
         new("PremierLeagueNotification");
@@ -50,6 +52,9 @@ public static class JobSchedules
 
     public static readonly JobKey FplPriceChangesJobKey =
         new("FplPriceChanges");
+
+    public static readonly JobKey FplChipWatchJobKey =
+        new("FplChipWatch");
 
     public static TimeZoneInfo GetTimeZone(JobSchedulesOptions options)
     {
@@ -128,6 +133,14 @@ public static class JobSchedules
             options.FplPriceChanges.Cron,
             options.TimeZoneId);
 
+    public static ITrigger CreateFplChipWatchTrigger(
+        JobSchedulesOptions options) =>
+        CreateCronTrigger(
+            FplChipWatchJobKey,
+            FplChipWatchTriggerName,
+            options.FplChipWatch.Cron,
+            options.TimeZoneId);
+
     public static IReadOnlyList<ITrigger> CreateAllTriggers(
         JobSchedulesOptions options) =>
     [
@@ -139,7 +152,8 @@ public static class JobSchedules
         CreateFplStatisticsCollectionTrigger(options),
         CreateFplGameweekRecapTrigger(options),
         CreateFplLiveInsightsTrigger(options),
-        CreateFplPriceChangesTrigger(options)
+        CreateFplPriceChangesTrigger(options),
+        CreateFplChipWatchTrigger(options)
     ];
 
     private static ITrigger CreateCronTrigger(

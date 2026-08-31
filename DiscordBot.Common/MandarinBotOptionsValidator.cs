@@ -67,6 +67,10 @@ public sealed class MandarinBotOptionsValidator(bool requireOperationalConfigura
             "Bot:Schedules:FplPriceChanges",
             options.Schedules.FplPriceChanges,
             failures);
+        ValidateSchedule(
+            "Bot:Schedules:FplChipWatch",
+            options.Schedules.FplChipWatch,
+            failures);
 
         if (requireOperationalConfiguration && !options.Schedules.HasEnabledJobs)
         {
@@ -114,6 +118,13 @@ public sealed class MandarinBotOptionsValidator(bool requireOperationalConfigura
         {
             failures.Add(
                 "Bot:FantasyPremierLeague:ClassicLeagueId is required when the FPL live insights job is enabled.");
+        }
+
+        if (options.Schedules.FplChipWatch.Enabled &&
+            options.FantasyPremierLeague.ClassicLeagueId <= 0)
+        {
+            failures.Add(
+                "Bot:FantasyPremierLeague:ClassicLeagueId is required when the FPL chip watch job is enabled.");
         }
 
         if (options.FantasyPremierLeague.MaxStandingsPages <= 0)
@@ -175,6 +186,32 @@ public sealed class MandarinBotOptionsValidator(bool requireOperationalConfigura
         {
             failures.Add(
                 "Bot:FantasyPremierLeague:AutomaticSubstitutionHighlightPoints must be greater than zero.");
+        }
+
+        if (options.FantasyPremierLeague.ChipWatch.MinimumNotificationScore < 60 ||
+            options.FantasyPremierLeague.ChipWatch.MinimumNotificationScore > 100)
+        {
+            failures.Add(
+                "Bot:FantasyPremierLeague:ChipWatch:MinimumNotificationScore must be between 60 and 100.");
+        }
+
+        if (options.FantasyPremierLeague.ChipWatch.NotificationWindowStartHours <= 0)
+        {
+            failures.Add(
+                "Bot:FantasyPremierLeague:ChipWatch:NotificationWindowStartHours must be greater than zero.");
+        }
+
+        if (options.FantasyPremierLeague.ChipWatch.NotificationWindowEndHours < 0)
+        {
+            failures.Add(
+                "Bot:FantasyPremierLeague:ChipWatch:NotificationWindowEndHours cannot be negative.");
+        }
+
+        if (options.FantasyPremierLeague.ChipWatch.NotificationWindowStartHours <=
+            options.FantasyPremierLeague.ChipWatch.NotificationWindowEndHours)
+        {
+            failures.Add(
+                "Bot:FantasyPremierLeague:ChipWatch:NotificationWindowStartHours must be greater than NotificationWindowEndHours.");
         }
 
         ValidateTargets(options, failures);

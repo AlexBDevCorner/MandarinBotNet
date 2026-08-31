@@ -65,6 +65,11 @@ Bot__Schedules__FplLiveInsights__Enabled=true
 Bot__Schedules__FplLiveInsights__Cron=0 0/15 * * * ?
 Bot__Schedules__FplPriceChanges__Enabled=true
 Bot__Schedules__FplPriceChanges__Cron=0 0 12-22 * * ?
+Bot__Schedules__FplChipWatch__Enabled=true
+Bot__Schedules__FplChipWatch__Cron=0 0 6,12,18 * * ?
+Bot__FantasyPremierLeague__ChipWatch__MinimumNotificationScore=60
+Bot__FantasyPremierLeague__ChipWatch__NotificationWindowStartHours=36
+Bot__FantasyPremierLeague__ChipWatch__NotificationWindowEndHours=18
 Bot__Notifications__Targets__0__GuildId=<FIRST-GUILD-ID>
 Bot__Notifications__Targets__0__ChannelId=<FIRST-CHANNEL-ID>
 Bot__Notifications__Targets__0__MentionEveryone=false
@@ -90,7 +95,7 @@ short onboarding checklist, the three league join links, and `/help` for the
 full command guide.
 
 Application-command registration publishes `/help`, `/prices`, `/deadline`,
-`/live`, `/standings`, `/profile`, `/achievements`, `/benchleague`, `/chips`,
+`/live`, `/standings`, `/profile`, `/achievements`, `/benchleague`, `/chips`, `/chipwatch`,
 and `/hugme`. `/deadline` includes exact Riga civil time for both FPL and UCL
 plus a Discord relative timestamp that keeps counting down in the client.
 
@@ -265,6 +270,31 @@ baseline, then shows either the new batch or the last published batch with
 ownership from that batch's gameweek. This keeps the command useful between
 scheduled checks and does not consume a change before the scheduled notification
 can publish it.
+
+## FPL Chip Watch
+
+The optional `FplChipWatch` job is disabled by default. When enabled, it analyses the configured classic league's managers for chip availability and Free Hit opportunities. It uses the public FPL entry history (`/api/entry/{id}/history/`), the latest publicly visible squad (`/api/entry/{id}/event/{id}/picks/`), bootstrap-static, classic standings, and target-GW fixtures. No authenticated FPL session, external prediction API, or AI service is used; all calculations are deterministic.
+
+- **Chip sets**: first half (GW1–19) and second half (GW20–end). An unused chip from the first half expires after GW19. Final GW is derived from bootstrap-static.
+- **Restrictions**: Wildcard and Free Hit cannot be used in GW1; Free Hit cannot be used in consecutive Gameweeks (e.g., used in GW19 → not available in GW20, next available GW21).
+- **Expiry urgency**: GW17 Low, GW18 High, GW19 Critical for first half; `final-2` Low, `final-1` High, `final` Critical for second half. Only High/Critical trigger scheduled notifications; Low is shown interactively.
+- **Free Hit scoring** (0–100, deterministic): blanks dominate (+12 first 3, +8 additional, cap 60), unavailable non-blank +8 (cap 24), doubtful non-blank +4 (cap 12), difficult fixtures (all fixtures difficulty ≥4) +3 (cap 15). If `blank < 3`, score is capped at 59 so ordinary difficult fixtures cannot create a strong recommendation.
+- **Levels**: 0–39 None, 40–59 Consider, 60–74 Strong, 75–100 VeryStrong. Only Strong/VeryStrong qualify for scheduled alerts.
+- **Squad source**: the newest event before the target whose deadline has already passed (derived from `bootstrap.Events` and `TimeProvider`), never `target-1` blindly. For GW1 no previous public squad exists and only chip expiry is shown. User-facing output explicitly states the source GW and warns that transfers for the upcoming GW are not visible before the deadline.
+- **Scheduled digest**: configurable window `Bot:FantasyPremierLeague:ChipWatch:NotificationWindowStartHours` (default 36) to `NotificationWindowEndHours` (default 18) before the deadline, polling at `Bot:Schedules:FplChipWatch:Cron` (default `0 0 6,12,18 * * ?` in `Europe/Riga`). No message is sent when there are no Strong/VeryStrong Free Hit signals or High/Critical expiry warnings. At most one digest per Discord target per Gameweek is sent via the existing notification checkpoint store (`fpl-chip-watch` type, identifier `fpl-chip-watch-gw-{id}`); failed targets can be retried without duplicating successful ones. Chip Watch never uses `@everyone`, even when `MentionEveryone=true`.
+- **Commands**: `/chipwatch` shows league overview; `/chipwatch team:<name>` shows manager details with exact/unique partial matching (team name, manager name) and sanitized external names. `/chips` remains the static guide.
+
+Key environment variables:
+
+```dotenv
+Bot__Schedules__FplChipWatch__Enabled=false
+Bot__Schedules__FplChipWatch__Cron=0 0 6,12,18 * * ?
+Bot__FantasyPremierLeague__ChipWatch__MinimumNotificationScore=60
+Bot__FantasyPremierLeague__ChipWatch__NotificationWindowStartHours=36
+Bot__FantasyPremierLeague__ChipWatch__NotificationWindowEndHours=18
+```
+
+Smart scoring in v1 covers Free Hit only; Bench Boost, Triple Captain and Wildcard expiry is tracked but their recommendation models are future work. All external FPL names are sanitized with `DiscordTextSafety.SanitizeExternalName`, and messages respect Discord's 2,000-character limit with bounded concurrency (5) for manager data.
 
 ## Multiple targets and mentions
 

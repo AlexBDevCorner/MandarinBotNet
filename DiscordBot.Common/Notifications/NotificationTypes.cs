@@ -12,6 +12,7 @@ namespace DiscordBot.Notifications
         public const string FplGameweekRecap = "fpl-gameweek-recap";
         public const string FplLiveInsights = "fpl-live-insights";
         public const string FplPriceChanges = "fpl-price-changes";
+        public const string FplChipWatch = "fpl-chip-watch";
 
         private static readonly HashSet<string> EveryoneMentionAllowedTypes =
         [
