@@ -32,4 +32,9 @@ public interface IFantasyPremierLeagueClient
         int entryId,
         CancellationToken cancellationToken) =>
         throw new NotSupportedException("GetEntryHistoryAsync is not implemented in this test double.");
+
+    Task<EntryResponse> GetEntryAsync(
+        int entryId,
+        CancellationToken cancellationToken) =>
+        throw new NotSupportedException("GetEntryAsync is not implemented in this test double.");
 }

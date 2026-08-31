@@ -28,27 +28,29 @@ public sealed class FplChipWatchJob(
             {
                 await discordReadiness.WaitUntilReadyAsync(context.CancellationToken);
 
-                var report = await chipWatchService.CreateReportAsync(context.CancellationToken);
-                if (report is null)
+                var chipContext = await chipWatchService.GetUpcomingContextAsync(context.CancellationToken);
+                if (chipContext is null)
                 {
                     execution.SetEvent("SkippedNoUpcomingEvent");
                     return new JobExecutionResult("SkippedNoUpcomingEvent");
                 }
 
-                execution.SetEvent(FplChipWatchSourceIdentifier.Create(report.TargetEventId));
+                execution.SetEvent(FplChipWatchSourceIdentifier.Create(chipContext.TargetEventId));
 
                 var now = timeProvider.GetUtcNow();
-                var withinWindow = eligibilityService.IsWithinWindow(now, report.DeadlineUtc, fantasyOptions.ChipWatch);
+                var withinWindow = eligibilityService.IsWithinWindow(now, chipContext.DeadlineUtc, fantasyOptions.ChipWatch);
                 if (!withinWindow)
                 {
                     logger.LogInformation(
                         "Chip Watch job outside window: now {Now} deadline {Deadline} window {Start}-{End}.",
                         now,
-                        report.DeadlineUtc,
+                        chipContext.DeadlineUtc,
                         fantasyOptions.ChipWatch.NotificationWindowStartHours,
                         fantasyOptions.ChipWatch.NotificationWindowEndHours);
                     return new JobExecutionResult("SkippedOutsideWindow");
                 }
+
+                var report = await chipWatchService.CreateReportAsync(chipContext, context.CancellationToken);
 
                 var hasSignals = eligibilityService.HasMeaningfulSignals(report, fantasyOptions.ChipWatch);
                 if (!hasSignals)
@@ -56,7 +58,7 @@ public sealed class FplChipWatchJob(
                     return new JobExecutionResult("SkippedNoChipWatchSignals");
                 }
 
-                var message = messageComposer.ComposeScheduledDigest(report);
+                var message = messageComposer.ComposeScheduledDigest(report, fantasyOptions.ChipWatch);
                 var sourceIdentifier = FplChipWatchSourceIdentifier.Create(report.TargetEventId);
 
                 var deliveredCount = 0;

@@ -188,11 +188,11 @@ public sealed class MandarinBotOptionsValidator(bool requireOperationalConfigura
                 "Bot:FantasyPremierLeague:AutomaticSubstitutionHighlightPoints must be greater than zero.");
         }
 
-        if (options.FantasyPremierLeague.ChipWatch.MinimumNotificationScore < 0 ||
+        if (options.FantasyPremierLeague.ChipWatch.MinimumNotificationScore < 60 ||
             options.FantasyPremierLeague.ChipWatch.MinimumNotificationScore > 100)
         {
             failures.Add(
-                "Bot:FantasyPremierLeague:ChipWatch:MinimumNotificationScore must be between 0 and 100.");
+                "Bot:FantasyPremierLeague:ChipWatch:MinimumNotificationScore must be between 60 and 100.");
         }
 
         if (options.FantasyPremierLeague.ChipWatch.NotificationWindowStartHours <= 0)

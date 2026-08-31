@@ -5,10 +5,12 @@ namespace DiscordBot.Responses;
 public sealed class EntryHistoryResponse
 {
     [JsonPropertyName("current")]
-    public List<EntryHistoryGameweek> Current { get; init; } = [];
+    [JsonRequired]
+    public List<EntryHistoryGameweek> Current { get; init; } = null!;
 
     [JsonPropertyName("chips")]
-    public List<EntryHistoryChip> Chips { get; init; } = [];
+    [JsonRequired]
+    public List<EntryHistoryChip> Chips { get; init; } = null!;
 }
 
 public sealed class EntryHistoryGameweek

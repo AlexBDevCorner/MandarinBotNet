@@ -7,11 +7,22 @@ public sealed record FplPlayedChip(
     FplChipType Chip,
     int EventId);
 
+public enum FplChipUnavailabilityReason
+{
+    None,
+    UsedInPeriod,
+    OpeningGameweek,
+    ConsecutiveFreeHit,
+    AnotherChipActive
+}
+
 public sealed record FplChipAvailability(
     FplChipType Chip,
     bool IsAvailable,
     int? UsedEventId,
-    FplChipUrgency Urgency);
+    FplChipUrgency Urgency,
+    FplChipUnavailabilityReason UnavailabilityReason = FplChipUnavailabilityReason.None,
+    FplChipType? BlockingChip = null);
 
 public sealed class FplChipUsageService(
     FplChipSeasonRules seasonRules,
@@ -45,8 +56,19 @@ public sealed class FplChipUsageService(
         int finalEventId,
         IReadOnlyCollection<FplPlayedChip> history)
     {
+        // Backward-compatible overload assumes manager started in GW1.
+        return GetAvailabilities(targetEventId, finalEventId, history, managerStartedEventId: 1);
+    }
+
+    public IReadOnlyList<FplChipAvailability> GetAvailabilities(
+        int targetEventId,
+        int finalEventId,
+        IReadOnlyCollection<FplPlayedChip> history,
+        int managerStartedEventId)
+    {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(targetEventId);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(finalEventId);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(managerStartedEventId);
         ArgumentNullException.ThrowIfNull(history);
 
         var period = seasonRules.GetPeriod(targetEventId, finalEventId);
@@ -54,34 +76,77 @@ public sealed class FplChipUsageService(
         var result = new List<FplChipAvailability>();
         foreach (var chipType in Enum.GetValues<FplChipType>())
         {
-            var isAvailable = IsChipAvailable(chipType, targetEventId, period, history, out var usedEventId);
-
-            // Apply GW1 and consecutive FH restrictions
-            if (isAvailable && !seasonRules.CanChipNormallyBePlayed(chipType, targetEventId, history))
-            {
-                isAvailable = false;
-            }
+            var (isAvailable, usedEventId, reason, blockingChip) = EvaluateAvailability(
+                chipType,
+                targetEventId,
+                managerStartedEventId,
+                period,
+                history);
 
             var urgency = seasonRules.GetUrgency(chipType, targetEventId, finalEventId, isAvailable);
-            result.Add(new FplChipAvailability(chipType, isAvailable, usedEventId, urgency));
+            result.Add(new FplChipAvailability(chipType, isAvailable, usedEventId, urgency, reason, blockingChip));
         }
 
         return result;
     }
 
-    private static bool IsChipAvailable(
+    private (bool IsAvailable, int? UsedEventId, FplChipUnavailabilityReason Reason, FplChipType? BlockingChip)
+        EvaluateAvailability(
+            FplChipType chip,
+            int targetEventId,
+            int managerStartedEventId,
+            FplChipPeriod period,
+            IReadOnlyCollection<FplPlayedChip> history)
+    {
+        // 1. Used in period
+        if (IsChipUsedInPeriod(chip, period, history, out var usedInPeriodEventId))
+        {
+            return (false, usedInPeriodEventId, FplChipUnavailabilityReason.UsedInPeriod, null);
+        }
+
+        // 2. Opening Gameweek for WC/FH
+        if (targetEventId == managerStartedEventId &&
+            (chip == FplChipType.Wildcard || chip == FplChipType.FreeHit))
+        {
+            return (false, null, FplChipUnavailabilityReason.OpeningGameweek, null);
+        }
+
+        // 3. Consecutive Free Hit
+        if (chip == FplChipType.FreeHit)
+        {
+            var blocking = history.FirstOrDefault(h => h.Chip == FplChipType.FreeHit && h.EventId == targetEventId - 1);
+            if (blocking is not null)
+            {
+                return (false, blocking.EventId, FplChipUnavailabilityReason.ConsecutiveFreeHit, FplChipType.FreeHit);
+            }
+        }
+
+        // 4. Another chip active in target GW
+        var activeOther = history.FirstOrDefault(h => h.EventId == targetEventId && h.Chip != chip);
+        if (activeOther is not null)
+        {
+            return (false, activeOther.EventId, FplChipUnavailabilityReason.AnotherChipActive, activeOther.Chip);
+        }
+
+        // Also check via season rules for any remaining restrictions (keeps logic centralized)
+        if (!seasonRules.CanChipNormallyBePlayed(chip, targetEventId, managerStartedEventId, history))
+        {
+            // This path is now mostly covered, but keep for safety (e.g., future rules)
+            // Determine reason: if opening or consecutive, we already handled, so fallback to generic
+            return (false, null, FplChipUnavailabilityReason.OpeningGameweek, null);
+        }
+
+        return (true, null, FplChipUnavailabilityReason.None, null);
+    }
+
+    private static bool IsChipUsedInPeriod(
         FplChipType chip,
-        int targetEventId,
         FplChipPeriod period,
         IReadOnlyCollection<FplPlayedChip> history,
         out int? usedEventId)
     {
-        // Determine if any chip of this type was used in the relevant half.
         var relevantHistory = history.Where(h => h.Chip == chip).ToList();
 
-        // Check if consumed in the same period as target.
-        // First half: event <= 19
-        // Second half: event >= 20
         bool InPeriod(int eventId)
         {
             return period == FplChipPeriod.FirstHalf
@@ -93,15 +158,11 @@ public sealed class FplChipUsageService(
         if (usedInPeriod is not null)
         {
             usedEventId = usedInPeriod.EventId;
-            return false;
+            return true;
         }
 
-        // Not used in period => available (subject to other restrictions)
-        // Find any used event for display? The spec says UsedEventId should be exposed.
-        // If consumed in other half, not relevant to current availability but we still don't expose it.
-        // If multiple histories exist, we expose the one in period only.
         usedEventId = null;
-        return true;
+        return false;
     }
 
     private static FplChipType? TryMap(string rawName)

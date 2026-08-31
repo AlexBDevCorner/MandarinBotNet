@@ -116,7 +116,8 @@ public sealed class FantasyPremierLeagueClient(
 
         return await GetAsync<List<PremierLeagueFixture>>(
             $"/api/fixtures/?event={eventId}",
-            _ => true,
+            fixtures => fixtures.Count > 0 &&
+                        fixtures.All(fixture => fixture.EventId == eventId),
             cancellationToken);
     }
 
@@ -130,6 +131,18 @@ public sealed class FantasyPremierLeagueClient(
             $"/api/entry/{entryId}/history/",
             payload => payload.Current is not null &&
                        payload.Chips is not null,
+            cancellationToken);
+    }
+
+    public Task<EntryResponse> GetEntryAsync(
+        int entryId,
+        CancellationToken cancellationToken)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(entryId);
+
+        return GetAsync<EntryResponse>(
+            $"/api/entry/{entryId}/",
+            payload => payload.StartedEvent > 0,
             cancellationToken);
     }
 

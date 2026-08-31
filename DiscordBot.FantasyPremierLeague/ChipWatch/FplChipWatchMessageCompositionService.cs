@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using DiscordBot;
 using DiscordBot.FantasyPremierLeague.Chips;
 using DiscordBot.Notifications;
 
@@ -221,23 +222,46 @@ public sealed class FplChipWatchMessageCompositionService
             }
             else
             {
-                if (chip.UsedEventId is not null)
+                switch (chip.UnavailabilityReason)
                 {
-                    // Check if consecutive FH restriction vs normal used
-                    if (chip.Chip == FplChipType.FreeHit && chip.UsedEventId == targetEventId - 1)
-                    {
-                        builder.Append("⏳ временно недоступен; использован в GW");
-                        builder.Append(chip.UsedEventId.Value.ToString(CultureInfo.InvariantCulture));
-                    }
-                    else
-                    {
+                    case FplChipUnavailabilityReason.UsedInPeriod when chip.UsedEventId is not null:
                         builder.Append("❌ использован в GW");
                         builder.Append(chip.UsedEventId.Value.ToString(CultureInfo.InvariantCulture));
-                    }
-                }
-                else
-                {
-                    builder.Append("❌ недоступен");
+                        break;
+                    case FplChipUnavailabilityReason.ConsecutiveFreeHit when chip.UsedEventId is not null:
+                        builder.Append("⏳ временно недоступен; использован в GW");
+                        builder.Append(chip.UsedEventId.Value.ToString(CultureInfo.InvariantCulture));
+                        break;
+                    case FplChipUnavailabilityReason.OpeningGameweek:
+                        builder.Append("❌ недоступен — открытие сезона");
+                        break;
+                    case FplChipUnavailabilityReason.AnotherChipActive when chip.BlockingChip is not null:
+                        builder.Append("❌ недоступен — другая фишка активна (");
+                        builder.Append(ChipDisplay[chip.BlockingChip.Value].Name);
+                        builder.Append(" в GW");
+                        builder.Append((chip.UsedEventId ?? targetEventId).ToString(CultureInfo.InvariantCulture));
+                        builder.Append(')');
+                        break;
+                    default:
+                        if (chip.UsedEventId is not null)
+                        {
+                            if (chip.Chip == FplChipType.FreeHit && chip.UsedEventId == targetEventId - 1)
+                            {
+                                builder.Append("⏳ временно недоступен; использован в GW");
+                                builder.Append(chip.UsedEventId.Value.ToString(CultureInfo.InvariantCulture));
+                            }
+                            else
+                            {
+                                builder.Append("❌ использован в GW");
+                                builder.Append(chip.UsedEventId.Value.ToString(CultureInfo.InvariantCulture));
+                            }
+                        }
+                        else
+                        {
+                            builder.Append("❌ недоступен");
+                        }
+
+                        break;
                 }
             }
 
@@ -261,35 +285,74 @@ public sealed class FplChipWatchMessageCompositionService
         }
         else if (freeHitChip is not null && !freeHitChip.IsAvailable)
         {
-            if (freeHitChip.UsedEventId is not null)
+            switch (freeHitChip.UnavailabilityReason)
             {
-                // Check period
-                var usedInFirstHalf = freeHitChip.UsedEventId <= FplChipSeasonRules.FirstHalfLastEvent;
-                var targetInFirstHalf = targetEventId <= FplChipSeasonRules.FirstHalfLastEvent;
-                if (usedInFirstHalf && targetInFirstHalf)
-                {
-                    builder.AppendLine("🎯 Free Hit — уже использован в первой половине сезона.");
-                }
-                else if (!usedInFirstHalf && !targetInFirstHalf)
-                {
-                    builder.AppendLine("🎯 Free Hit — уже использован во второй половине сезона.");
-                }
-                else if (freeHitChip.UsedEventId == targetEventId - 1)
-                {
+                case FplChipUnavailabilityReason.OpeningGameweek:
+                    builder.AppendLine("🎯 Free Hit — недоступен — открытие сезона.");
+                    break;
+                case FplChipUnavailabilityReason.ConsecutiveFreeHit when freeHitChip.UsedEventId is not null:
                     builder.Append("🎯 Free Hit — временно недоступен; использован в GW");
                     builder.Append(freeHitChip.UsedEventId.Value.ToString(CultureInfo.InvariantCulture));
                     builder.AppendLine();
-                }
-                else
-                {
-                    builder.Append("🎯 Free Hit — уже использован в GW");
-                    builder.Append(freeHitChip.UsedEventId.Value.ToString(CultureInfo.InvariantCulture));
-                    builder.AppendLine();
-                }
-            }
-            else
-            {
-                builder.AppendLine("🎯 Free Hit — недоступен в этом туре.");
+                    break;
+                case FplChipUnavailabilityReason.AnotherChipActive when freeHitChip.BlockingChip is not null:
+                    builder.Append("🎯 Free Hit — недоступен — другая фишка активна (");
+                    builder.Append(ChipDisplay[freeHitChip.BlockingChip.Value].Name);
+                    builder.Append(" в GW");
+                    builder.Append((freeHitChip.UsedEventId ?? targetEventId).ToString(CultureInfo.InvariantCulture));
+                    builder.AppendLine(").");
+                    break;
+                case FplChipUnavailabilityReason.UsedInPeriod when freeHitChip.UsedEventId is not null:
+                    var usedInFirstHalf = freeHitChip.UsedEventId <= FplChipSeasonRules.FirstHalfLastEvent;
+                    var targetInFirstHalf = targetEventId <= FplChipSeasonRules.FirstHalfLastEvent;
+                    if (usedInFirstHalf && targetInFirstHalf)
+                    {
+                        builder.AppendLine("🎯 Free Hit — уже использован в первой половине сезона.");
+                    }
+                    else if (!usedInFirstHalf && !targetInFirstHalf)
+                    {
+                        builder.AppendLine("🎯 Free Hit — уже использован во второй половине сезона.");
+                    }
+                    else
+                    {
+                        builder.Append("🎯 Free Hit — уже использован в GW");
+                        builder.Append(freeHitChip.UsedEventId.Value.ToString(CultureInfo.InvariantCulture));
+                        builder.AppendLine();
+                    }
+
+                    break;
+                default:
+                    if (freeHitChip.UsedEventId is not null)
+                    {
+                        var usedInFirstHalf2 = freeHitChip.UsedEventId <= FplChipSeasonRules.FirstHalfLastEvent;
+                        var targetInFirstHalf2 = targetEventId <= FplChipSeasonRules.FirstHalfLastEvent;
+                        if (usedInFirstHalf2 && targetInFirstHalf2)
+                        {
+                            builder.AppendLine("🎯 Free Hit — уже использован в первой половине сезона.");
+                        }
+                        else if (!usedInFirstHalf2 && !targetInFirstHalf2)
+                        {
+                            builder.AppendLine("🎯 Free Hit — уже использован во второй половине сезона.");
+                        }
+                        else if (freeHitChip.UsedEventId == targetEventId - 1)
+                        {
+                            builder.Append("🎯 Free Hit — временно недоступен; использован в GW");
+                            builder.Append(freeHitChip.UsedEventId.Value.ToString(CultureInfo.InvariantCulture));
+                            builder.AppendLine();
+                        }
+                        else
+                        {
+                            builder.Append("🎯 Free Hit — уже использован в GW");
+                            builder.Append(freeHitChip.UsedEventId.Value.ToString(CultureInfo.InvariantCulture));
+                            builder.AppendLine();
+                        }
+                    }
+                    else
+                    {
+                        builder.AppendLine("🎯 Free Hit — недоступен в этом туре.");
+                    }
+
+                    break;
             }
         }
         else if (!manager.SquadAvailable)
@@ -389,9 +452,13 @@ public sealed class FplChipWatchMessageCompositionService
         return builder.ToString().TrimEnd();
     }
 
-    public string ComposeScheduledDigest(FplChipWatchReport report)
+    public string ComposeScheduledDigest(FplChipWatchReport report) =>
+        ComposeScheduledDigest(report, new FplChipWatchOptions());
+
+    public string ComposeScheduledDigest(FplChipWatchReport report, FplChipWatchOptions options)
     {
         ArgumentNullException.ThrowIfNull(report);
+        ArgumentNullException.ThrowIfNull(options);
 
         var builder = new StringBuilder();
         builder.Append("🧠 **Chip Watch — GW");
@@ -408,10 +475,10 @@ public sealed class FplChipWatchMessageCompositionService
 
         builder.AppendLine();
 
-        // Free Hit section - only strong/very strong
+        // Free Hit section - only notification-worthy (score >= threshold and Strong/VeryStrong)
         var strongManagers = report.Managers
             .Where(m => m.FreeHitRecommendation is not null &&
-                        m.FreeHitRecommendation.OpportunityScore >= 60 &&
+                        m.FreeHitRecommendation.OpportunityScore >= options.MinimumNotificationScore &&
                         m.FreeHitRecommendation.Level is FplChipOpportunityLevel.Strong or FplChipOpportunityLevel.VeryStrong)
             .OrderByDescending(m => m.FreeHitRecommendation!.OpportunityScore)
             .ThenBy(m => m.EntryName, StringComparer.OrdinalIgnoreCase)

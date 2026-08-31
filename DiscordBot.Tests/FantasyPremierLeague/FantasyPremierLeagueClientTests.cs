@@ -507,6 +507,124 @@ public sealed class FantasyPremierLeagueClientTests
         options.TotalRequestTimeout.Should().BeGreaterThan(options.AttemptTimeout);
     }
 
+    [Test]
+    public async Task GetEntryHistoryAsync_ValidChipsEmpty_Accepted()
+    {
+        var handler = new StubHttpMessageHandler((_, _) =>
+            Task.FromResult(CreateJsonResponse("""{"current":[],"chips":[]}""")));
+        using var provider = CreateProvider(handler);
+        var client = provider.GetRequiredService<IFantasyPremierLeagueClient>();
+        var result = await client.GetEntryHistoryAsync(123, CancellationToken.None);
+        result.Chips.Should().BeEmpty();
+        result.Current.Should().BeEmpty();
+        handler.RequestUris.Should().OnlyContain(uri => uri.PathAndQuery == "/api/entry/123/history/");
+    }
+
+    [Test]
+    public async Task GetEntryHistoryAsync_MissingChips_InvalidPayload()
+    {
+        var handler = new StubHttpMessageHandler((_, _) =>
+            Task.FromResult(CreateJsonResponse("""{"current":[]}""")));
+        using var provider = CreateProvider(handler);
+        var client = provider.GetRequiredService<IFantasyPremierLeagueClient>();
+        Func<Task> act = () => client.GetEntryHistoryAsync(123, CancellationToken.None);
+        var ex = await act.Should().ThrowAsync<FantasyPremierLeagueApiException>();
+        ex.Which.FailureKind.Should().Be(FantasyPremierLeagueFailureKind.InvalidPayload);
+    }
+
+    [Test]
+    public async Task GetEntryHistoryAsync_NullChips_InvalidPayload()
+    {
+        var handler = new StubHttpMessageHandler((_, _) =>
+            Task.FromResult(CreateJsonResponse("""{"current":[],"chips":null}""")));
+        using var provider = CreateProvider(handler);
+        var client = provider.GetRequiredService<IFantasyPremierLeagueClient>();
+        Func<Task> act = () => client.GetEntryHistoryAsync(123, CancellationToken.None);
+        var ex = await act.Should().ThrowAsync<FantasyPremierLeagueApiException>();
+        ex.Which.FailureKind.Should().Be(FantasyPremierLeagueFailureKind.InvalidPayload);
+    }
+
+    [Test]
+    public async Task GetEntryHistoryAsync_ValidChipHistory_Deserializes()
+    {
+        var handler = new StubHttpMessageHandler((_, _) =>
+            Task.FromResult(CreateJsonResponse("""
+                {
+                  "current": [{"event":1,"points":10,"total_points":10,"event_transfers":1,"event_transfers_cost":0}],
+                  "chips": [
+                    {"name":"wildcard","event":6,"time":"2026-08-01T12:00:00Z"},
+                    {"name":"freehit","event":12,"time":"2026-09-01T12:00:00Z"},
+                    {"name":"bboost","event":3,"time":"2026-08-15T12:00:00Z"},
+                    {"name":"3xc","event":9,"time":"2026-08-20T12:00:00Z"}
+                  ]
+                }
+                """)));
+        using var provider = CreateProvider(handler);
+        var client = provider.GetRequiredService<IFantasyPremierLeagueClient>();
+        var result = await client.GetEntryHistoryAsync(123, CancellationToken.None);
+        result.Chips.Should().HaveCount(4);
+        result.Chips.Select(c => c.Name).Should().BeEquivalentTo(["wildcard", "freehit", "bboost", "3xc"]);
+    }
+
+    [Test]
+    public async Task GetFixturesAsync_EmptyList_InvalidPayload()
+    {
+        var handler = new StubHttpMessageHandler((_, _) =>
+            Task.FromResult(CreateJsonResponse("[]")));
+        using var provider = CreateProvider(handler);
+        var client = provider.GetRequiredService<IFantasyPremierLeagueClient>();
+        Func<Task> act = () => client.GetFixturesAsync(12, CancellationToken.None);
+        var ex = await act.Should().ThrowAsync<FantasyPremierLeagueApiException>();
+        ex.Which.FailureKind.Should().Be(FantasyPremierLeagueFailureKind.InvalidPayload);
+    }
+
+    [Test]
+    public async Task GetFixturesAsync_WrongEvent_InvalidPayload()
+    {
+        var handler = new StubHttpMessageHandler((_, _) =>
+            Task.FromResult(CreateJsonResponse("""[{"id":1,"event":99,"team_h":1,"team_a":2,"team_h_difficulty":2,"team_a_difficulty":2}]""")));
+        using var provider = CreateProvider(handler);
+        var client = provider.GetRequiredService<IFantasyPremierLeagueClient>();
+        Func<Task> act = () => client.GetFixturesAsync(12, CancellationToken.None);
+        var ex = await act.Should().ThrowAsync<FantasyPremierLeagueApiException>();
+        ex.Which.FailureKind.Should().Be(FantasyPremierLeagueFailureKind.InvalidPayload);
+    }
+
+    [Test]
+    public async Task GetFixturesAsync_ValidPartialBlankGw_Accepted()
+    {
+        var handler = new StubHttpMessageHandler((_, _) =>
+            Task.FromResult(CreateJsonResponse("""[{"id":1,"event":12,"team_h":1,"team_a":2,"team_h_difficulty":5,"team_a_difficulty":5}]""")));
+        using var provider = CreateProvider(handler);
+        var client = provider.GetRequiredService<IFantasyPremierLeagueClient>();
+        var result = await client.GetFixturesAsync(12, CancellationToken.None);
+        result.Should().ContainSingle();
+    }
+
+    [Test]
+    public async Task GetEntryAsync_Valid_Accepted()
+    {
+        var handler = new StubHttpMessageHandler((_, _) =>
+            Task.FromResult(CreateJsonResponse("""{"id":123,"started_event":5}""")));
+        using var provider = CreateProvider(handler);
+        var client = provider.GetRequiredService<IFantasyPremierLeagueClient>();
+        var result = await client.GetEntryAsync(123, CancellationToken.None);
+        result.StartedEvent.Should().Be(5);
+        handler.RequestUris.Should().OnlyContain(uri => uri.PathAndQuery == "/api/entry/123/");
+    }
+
+    [Test]
+    public async Task GetEntryAsync_MissingStartedEvent_InvalidPayload()
+    {
+        var handler = new StubHttpMessageHandler((_, _) =>
+            Task.FromResult(CreateJsonResponse("""{"id":123}""")));
+        using var provider = CreateProvider(handler);
+        var client = provider.GetRequiredService<IFantasyPremierLeagueClient>();
+        Func<Task> act = () => client.GetEntryAsync(123, CancellationToken.None);
+        var ex = await act.Should().ThrowAsync<FantasyPremierLeagueApiException>();
+        ex.Which.FailureKind.Should().Be(FantasyPremierLeagueFailureKind.InvalidPayload);
+    }
+
     private static ServiceProvider CreateProvider(
         HttpMessageHandler handler,
         FantasyPremierLeagueClientOptions? options = null,

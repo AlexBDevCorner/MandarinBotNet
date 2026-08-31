@@ -6,6 +6,13 @@ using Microsoft.Extensions.Logging;
 
 namespace DiscordBot.FantasyPremierLeague.ChipWatch;
 
+public sealed record FplChipWatchContext(
+    int TargetEventId,
+    DateTimeOffset DeadlineUtc,
+    int FinalEventId,
+    int? SourceSquadEventId,
+    BootstrapStaticResponse Bootstrap);
+
 public sealed class FplChipWatchService(
     IFantasyPremierLeagueClient client,
     FantasyPremierLeagueOptions options,
@@ -17,7 +24,7 @@ public sealed class FplChipWatchService(
 {
     internal const int ManagerConcurrencyLimit = 5;
 
-    public async Task<FplChipWatchReport?> CreateReportAsync(CancellationToken cancellationToken)
+    public async Task<FplChipWatchContext?> GetUpcomingContextAsync(CancellationToken cancellationToken)
     {
         var bootstrap = await client.GetBootstrapStaticAsync(cancellationToken);
         var nextDeadline = deadlineSelection.SelectNext(bootstrap.Events);
@@ -30,14 +37,39 @@ public sealed class FplChipWatchService(
         var targetEventId = nextDeadline.EventId;
         var deadlineUtc = nextDeadline.DeadlineUtc;
         var finalEventId = bootstrap.Events.Max(e => e.Id);
+        var sourceEventId = ResolveSourceEventId(bootstrap.Events, targetEventId, timeProvider.GetUtcNow());
+
+        return new FplChipWatchContext(targetEventId, deadlineUtc, finalEventId, sourceEventId, bootstrap);
+    }
+
+    public async Task<FplChipWatchReport?> CreateReportAsync(CancellationToken cancellationToken)
+    {
+        var context = await GetUpcomingContextAsync(cancellationToken);
+        if (context is null)
+        {
+            return null;
+        }
+
+        return await CreateReportAsync(context, cancellationToken);
+    }
+
+    public async Task<FplChipWatchReport> CreateReportAsync(
+        FplChipWatchContext context,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+
+        var bootstrap = context.Bootstrap;
+        var targetEventId = context.TargetEventId;
+        var deadlineUtc = context.DeadlineUtc;
+        var finalEventId = context.FinalEventId;
+        var sourceEventId = context.SourceSquadEventId;
 
         var fixtures = await client.GetFixturesAsync(targetEventId, cancellationToken);
         var fixturesByTeam = BuildFixturesByTeam(fixtures);
 
         var standings = await client.GetClassicStandingsAsync(options.ClassicLeagueId, cancellationToken);
         var managers = standings.Standings.Results.ToArray();
-
-        var sourceEventId = ResolveSourceEventId(bootstrap.Events, targetEventId, timeProvider.GetUtcNow());
 
         var elementsById = bootstrap.Elements.ToDictionary(e => e.Id);
 
@@ -62,13 +94,39 @@ public sealed class FplChipWatchService(
                 IReadOnlyList<FplChipAvailability>? availabilities = null;
                 EntryEventPicksResponse? picksResponse = null;
                 bool squadAvailable = false;
+                int managerStartedEventId = 1;
+
+                // Fetch entry metadata for opening GW restriction
+                try
+                {
+                    var entryResponse = await client.GetEntryAsync(entryId, ct);
+                    if (entryResponse.StartedEvent > 0)
+                    {
+                        managerStartedEventId = entryResponse.StartedEvent;
+                    }
+                }
+                catch (OperationCanceledException) when (ct.IsCancellationRequested)
+                {
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    logger.LogWarning(
+                        ex,
+                        "Failed to load entry metadata for FPL entry {EntryId}; assuming started GW1.",
+                        entryId);
+                }
 
                 // Fetch history
                 try
                 {
                     var historyResponse = await client.GetEntryHistoryAsync(entryId, ct);
                     history = chipUsageService.MapHistory(historyResponse.Chips);
-                    availabilities = chipUsageService.GetAvailabilities(targetEventId, finalEventId, history);
+                    availabilities = chipUsageService.GetAvailabilities(
+                        targetEventId,
+                        finalEventId,
+                        history,
+                        managerStartedEventId);
                     chipHistoryAvailable = true;
                 }
                 catch (OperationCanceledException) when (ct.IsCancellationRequested)

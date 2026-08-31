@@ -18,6 +18,17 @@ public sealed class FplChipWatchNotificationEligibilityService
         return remaining <= start && remaining >= end;
     }
 
+    public bool IsNotificationWorthy(
+        FplChipRecommendation recommendation,
+        FplChipWatchOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(recommendation);
+        ArgumentNullException.ThrowIfNull(options);
+
+        return recommendation.OpportunityScore >= options.MinimumNotificationScore &&
+               recommendation.Level is FplChipOpportunityLevel.Strong or FplChipOpportunityLevel.VeryStrong;
+    }
+
     public bool HasMeaningfulSignals(
         FplChipWatchReport report,
         FplChipWatchOptions options)
@@ -27,15 +38,12 @@ public sealed class FplChipWatchNotificationEligibilityService
 
         foreach (var manager in report.Managers)
         {
-            // FreeHit strong signal
             if (manager.FreeHitRecommendation is not null &&
-                manager.FreeHitRecommendation.OpportunityScore >= options.MinimumNotificationScore &&
-                manager.FreeHitRecommendation.Level is FplChipOpportunityLevel.Strong or FplChipOpportunityLevel.VeryStrong)
+                IsNotificationWorthy(manager.FreeHitRecommendation, options))
             {
                 return true;
             }
 
-            // Expiry high/critical
             if (manager.Chips.Any(c => c.IsAvailable && (c.Urgency == FantasyPremierLeague.Chips.FplChipUrgency.High || c.Urgency == FantasyPremierLeague.Chips.FplChipUrgency.Critical)))
             {
                 return true;

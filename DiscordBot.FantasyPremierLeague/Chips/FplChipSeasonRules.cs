@@ -32,13 +32,16 @@ public sealed class FplChipSeasonRules
     public bool CanChipNormallyBePlayed(
         FplChipType chip,
         int targetEventId,
+        int managerStartedEventId,
         IReadOnlyCollection<FplPlayedChip> history)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(targetEventId);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(managerStartedEventId);
         ArgumentNullException.ThrowIfNull(history);
 
-        // Wildcard and FreeHit cannot be used in GW1.
-        if (targetEventId == 1 && (chip == FplChipType.Wildcard || chip == FplChipType.FreeHit))
+        // Wildcard and FreeHit cannot be used in the opening Gameweek of that manager's season.
+        if (targetEventId == managerStartedEventId &&
+            (chip == FplChipType.Wildcard || chip == FplChipType.FreeHit))
         {
             return false;
         }
@@ -53,6 +56,18 @@ public sealed class FplChipSeasonRules
         }
 
         return true;
+    }
+
+    public bool CanChipNormallyBePlayed(
+        FplChipType chip,
+        int targetEventId,
+        IReadOnlyCollection<FplPlayedChip> history)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(targetEventId);
+        ArgumentNullException.ThrowIfNull(history);
+
+        // Backward-compatible overload assumes manager started in GW1.
+        return CanChipNormallyBePlayed(chip, targetEventId, 1, history);
     }
 
     public FplChipUrgency GetUrgency(
