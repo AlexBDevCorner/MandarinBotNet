@@ -1,7 +1,7 @@
 using AwesomeAssertions;
 using DiscordBot;
-using DiscordBot.FantasyPremierLeague.ChipWatch;
 using DiscordBot.FantasyPremierLeague.Chips;
+using DiscordBot.FantasyPremierLeague.ChipWatch;
 using NUnit.Framework;
 
 namespace DiscordBot.Tests.FantasyPremierLeague.ChipWatch;

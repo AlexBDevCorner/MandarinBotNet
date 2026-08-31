@@ -94,7 +94,7 @@ public sealed class FplChipWatchService(
                 IReadOnlyList<FplChipAvailability>? availabilities = null;
                 EntryEventPicksResponse? picksResponse = null;
                 bool squadAvailable = false;
-                int managerStartedEventId = 1;
+                int? managerStartedEventId = null;
 
                 // Fetch entry metadata for opening GW restriction
                 try
@@ -113,7 +113,7 @@ public sealed class FplChipWatchService(
                 {
                     logger.LogWarning(
                         ex,
-                        "Failed to load entry metadata for FPL entry {EntryId}; assuming started GW1.",
+                        "Failed to load entry metadata for FPL entry {EntryId}; starting GW unknown, Wildcard/Free Hit will be treated as unavailable.",
                         entryId);
                 }
 

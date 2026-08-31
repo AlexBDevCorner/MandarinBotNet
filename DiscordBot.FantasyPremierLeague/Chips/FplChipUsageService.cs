@@ -13,7 +13,8 @@ public enum FplChipUnavailabilityReason
     UsedInPeriod,
     OpeningGameweek,
     ConsecutiveFreeHit,
-    AnotherChipActive
+    AnotherChipActive,
+    EntryMetadataUnavailable
 }
 
 public sealed record FplChipAvailability(
@@ -54,21 +55,16 @@ public sealed class FplChipUsageService(
     public IReadOnlyList<FplChipAvailability> GetAvailabilities(
         int targetEventId,
         int finalEventId,
-        IReadOnlyCollection<FplPlayedChip> history)
-    {
-        // Backward-compatible overload assumes manager started in GW1.
-        return GetAvailabilities(targetEventId, finalEventId, history, managerStartedEventId: 1);
-    }
-
-    public IReadOnlyList<FplChipAvailability> GetAvailabilities(
-        int targetEventId,
-        int finalEventId,
         IReadOnlyCollection<FplPlayedChip> history,
-        int managerStartedEventId)
+        int? managerStartedEventId)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(targetEventId);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(finalEventId);
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(managerStartedEventId);
+        if (managerStartedEventId is not null)
+        {
+            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(managerStartedEventId.Value);
+        }
+
         ArgumentNullException.ThrowIfNull(history);
 
         var period = seasonRules.GetPeriod(targetEventId, finalEventId);
@@ -94,7 +90,7 @@ public sealed class FplChipUsageService(
         EvaluateAvailability(
             FplChipType chip,
             int targetEventId,
-            int managerStartedEventId,
+            int? managerStartedEventId,
             FplChipPeriod period,
             IReadOnlyCollection<FplPlayedChip> history)
     {
@@ -104,8 +100,15 @@ public sealed class FplChipUsageService(
             return (false, usedInPeriodEventId, FplChipUnavailabilityReason.UsedInPeriod, null);
         }
 
-        // 2. Opening Gameweek for WC/FH
-        if (targetEventId == managerStartedEventId &&
+        // 2. Opening Gameweek for WC/FH – requires known started_event
+        if (managerStartedEventId is null &&
+            (chip == FplChipType.Wildcard || chip == FplChipType.FreeHit))
+        {
+            return (false, null, FplChipUnavailabilityReason.EntryMetadataUnavailable, null);
+        }
+
+        if (managerStartedEventId is not null &&
+            targetEventId == managerStartedEventId.Value &&
             (chip == FplChipType.Wildcard || chip == FplChipType.FreeHit))
         {
             return (false, null, FplChipUnavailabilityReason.OpeningGameweek, null);
@@ -129,10 +132,9 @@ public sealed class FplChipUsageService(
         }
 
         // Also check via season rules for any remaining restrictions (keeps logic centralized)
-        if (!seasonRules.CanChipNormallyBePlayed(chip, targetEventId, managerStartedEventId, history))
+        if (managerStartedEventId is not null &&
+            !seasonRules.CanChipNormallyBePlayed(chip, targetEventId, managerStartedEventId.Value, history))
         {
-            // This path is now mostly covered, but keep for safety (e.g., future rules)
-            // Determine reason: if opening or consecutive, we already handled, so fallback to generic
             return (false, null, FplChipUnavailabilityReason.OpeningGameweek, null);
         }
 

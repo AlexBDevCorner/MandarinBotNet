@@ -58,18 +58,6 @@ public sealed class FplChipSeasonRules
         return true;
     }
 
-    public bool CanChipNormallyBePlayed(
-        FplChipType chip,
-        int targetEventId,
-        IReadOnlyCollection<FplPlayedChip> history)
-    {
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(targetEventId);
-        ArgumentNullException.ThrowIfNull(history);
-
-        // Backward-compatible overload assumes manager started in GW1.
-        return CanChipNormallyBePlayed(chip, targetEventId, 1, history);
-    }
-
     public FplChipUrgency GetUrgency(
         FplChipType chip,
         int targetEventId,

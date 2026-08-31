@@ -39,9 +39,10 @@ public sealed class FplChipWatchMessageCompositionService
 
         builder.AppendLine();
 
-        // Free Hit section
+        // Free Hit section - only actionable (Level != None)
         var freeHitCandidates = report.Managers
-            .Where(m => m.FreeHitRecommendation is not null)
+            .Where(m => m.FreeHitRecommendation is not null &&
+                        m.FreeHitRecommendation.Level != FplChipOpportunityLevel.None)
             .OrderByDescending(m => m.FreeHitRecommendation!.OpportunityScore)
             .ThenBy(m => m.EntryName, StringComparer.OrdinalIgnoreCase)
             .ThenBy(m => m.EntryId)
@@ -62,7 +63,13 @@ public sealed class FplChipWatchMessageCompositionService
             {
                 var rec = manager.FreeHitRecommendation!;
                 var levelWording = GetLevelWording(rec.Level);
-                var icon = rec.Level == FplChipOpportunityLevel.VeryStrong ? "🔥" : "👍";
+                var icon = rec.Level switch
+                {
+                    FplChipOpportunityLevel.VeryStrong => "🔥",
+                    FplChipOpportunityLevel.Strong => "👍",
+                    FplChipOpportunityLevel.Consider => "🤔",
+                    _ => "•"
+                };
                 builder.Append(icon);
                 builder.Append(' ');
                 builder.Append(DiscordTextSafety.SanitizeExternalName(manager.EntryName));
@@ -235,6 +242,9 @@ public sealed class FplChipWatchMessageCompositionService
                     case FplChipUnavailabilityReason.OpeningGameweek:
                         builder.Append("❌ недоступен — открытие сезона");
                         break;
+                    case FplChipUnavailabilityReason.EntryMetadataUnavailable:
+                        builder.Append("❌ недоступен — данные о старте сезона недоступны");
+                        break;
                     case FplChipUnavailabilityReason.AnotherChipActive when chip.BlockingChip is not null:
                         builder.Append("❌ недоступен — другая фишка активна (");
                         builder.Append(ChipDisplay[chip.BlockingChip.Value].Name);
@@ -289,6 +299,9 @@ public sealed class FplChipWatchMessageCompositionService
             {
                 case FplChipUnavailabilityReason.OpeningGameweek:
                     builder.AppendLine("🎯 Free Hit — недоступен — открытие сезона.");
+                    break;
+                case FplChipUnavailabilityReason.EntryMetadataUnavailable:
+                    builder.AppendLine("🎯 Free Hit — недоступен — данные о старте сезона недоступны.");
                     break;
                 case FplChipUnavailabilityReason.ConsecutiveFreeHit when freeHitChip.UsedEventId is not null:
                     builder.Append("🎯 Free Hit — временно недоступен; использован в GW");
