@@ -46,4 +46,13 @@ public sealed class PremierLeagueElement
 
     [JsonPropertyName("now_cost")]
     public int NowCost { get; init; }
+
+    [JsonPropertyName("status")]
+    public string Status { get; init; } = string.Empty;
+
+    [JsonPropertyName("chance_of_playing_next_round")]
+    public int? ChanceOfPlayingNextRound { get; init; }
+
+    [JsonPropertyName("news")]
+    public string News { get; init; } = string.Empty;
 }

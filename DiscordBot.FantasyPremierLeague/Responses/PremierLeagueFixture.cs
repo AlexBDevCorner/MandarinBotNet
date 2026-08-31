@@ -24,4 +24,10 @@ public sealed class PremierLeagueFixture
 
     [JsonPropertyName("finished")]
     public bool? Finished { get; init; }
+
+    [JsonPropertyName("team_h_difficulty")]
+    public int HomeTeamDifficulty { get; init; }
+
+    [JsonPropertyName("team_a_difficulty")]
+    public int AwayTeamDifficulty { get; init; }
 }

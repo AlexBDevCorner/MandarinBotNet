@@ -204,18 +204,22 @@ public sealed class FantasyPremierLeagueClientTests
     public async Task GetBootstrapStaticAsync_CallerCancels_PropagatesWithoutRetrying()
     {
         // Arrange
+        var handlerStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var handler = new StubHttpMessageHandler(async (_, cancellationToken) =>
         {
+            handlerStarted.TrySetResult();
             await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
             return CreateResponse(HttpStatusCode.OK);
         });
         using var provider = CreateProvider(handler);
         var client = provider.GetRequiredService<IFantasyPremierLeagueClient>();
         using var cancellationSource = new CancellationTokenSource();
-        cancellationSource.CancelAfter(TimeSpan.FromMilliseconds(20));
 
         // Act
-        Func<Task> act = () => client.GetBootstrapStaticAsync(cancellationSource.Token);
+        var task = client.GetBootstrapStaticAsync(cancellationSource.Token);
+        await handlerStarted.Task.WaitAsync(TimeSpan.FromSeconds(1));
+        cancellationSource.Cancel();
+        Func<Task> act = () => task;
 
         // Assert
         await act.Should().ThrowAsync<OperationCanceledException>();

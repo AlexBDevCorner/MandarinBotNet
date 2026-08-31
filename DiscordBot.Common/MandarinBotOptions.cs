@@ -78,6 +78,24 @@ public sealed class FantasyPremierLeagueOptions
 
     public int AutomaticSubstitutionHighlightPoints { get; init; } =
         DefaultAutomaticSubstitutionHighlightPoints;
+
+    public FplChipWatchOptions ChipWatch { get; init; } = new();
+}
+
+public sealed class FplChipWatchOptions
+{
+    public const int DefaultMinimumNotificationScore = 60;
+    public const int DefaultNotificationWindowStartHours = 36;
+    public const int DefaultNotificationWindowEndHours = 18;
+
+    public int MinimumNotificationScore { get; init; } =
+        DefaultMinimumNotificationScore;
+
+    public int NotificationWindowStartHours { get; init; } =
+        DefaultNotificationWindowStartHours;
+
+    public int NotificationWindowEndHours { get; init; } =
+        DefaultNotificationWindowEndHours;
 }
 
 public sealed class JobSchedulesOptions
@@ -105,6 +123,11 @@ public sealed class JobSchedulesOptions
         Cron = "0 0 12-22 * * ?"
     };
 
+    public ScheduledJobOptions FplChipWatch { get; init; } = new()
+    {
+        Cron = "0 0 6,12,18 * * ?"
+    };
+
     public bool HasEnabledJobs =>
         PremierLeagueNotifications.Enabled ||
         UclFantasyNotifications.Enabled ||
@@ -114,7 +137,8 @@ public sealed class JobSchedulesOptions
         FplStatisticsCollection.Enabled ||
         FplGameweekRecap.Enabled ||
         FplLiveInsights.Enabled ||
-        FplPriceChanges.Enabled;
+        FplPriceChanges.Enabled ||
+        FplChipWatch.Enabled;
 
     public bool HasEnabledNotificationJobs =>
         PremierLeagueNotifications.Enabled ||
@@ -124,7 +148,8 @@ public sealed class JobSchedulesOptions
         BenchWarmingLeague.Enabled ||
         FplGameweekRecap.Enabled ||
         FplLiveInsights.Enabled ||
-        FplPriceChanges.Enabled;
+        FplPriceChanges.Enabled ||
+        FplChipWatch.Enabled;
 }
 
 public sealed class ScheduledJobOptions

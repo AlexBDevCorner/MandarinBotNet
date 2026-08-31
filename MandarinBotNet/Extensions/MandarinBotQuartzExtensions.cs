@@ -121,6 +121,16 @@ public static class MandarinBotQuartzExtensions
                 schedules.FplPriceChanges.Cron,
                 timeZone);
         }
+
+        if (schedules.FplChipWatch.Enabled)
+        {
+            AddScheduledJob<FplChipWatchJob>(
+                quartzOptions,
+                JobSchedules.FplChipWatchJobKey,
+                JobSchedules.FplChipWatchTriggerName,
+                schedules.FplChipWatch.Cron,
+                timeZone);
+        }
     }
 
     private static void AddScheduledJob<TJob>(

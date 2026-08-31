@@ -120,6 +120,19 @@ public sealed class FantasyPremierLeagueClient(
             cancellationToken);
     }
 
+    public Task<EntryHistoryResponse> GetEntryHistoryAsync(
+        int entryId,
+        CancellationToken cancellationToken)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(entryId);
+
+        return GetAsync<EntryHistoryResponse>(
+            $"/api/entry/{entryId}/history/",
+            payload => payload.Current is not null &&
+                       payload.Chips is not null,
+            cancellationToken);
+    }
+
     private async Task<T> GetAsync<T>(
         string requestPath,
         Func<T, bool> isValid,

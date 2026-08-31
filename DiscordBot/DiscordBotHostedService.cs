@@ -20,6 +20,7 @@ namespace DiscordBot
         IAchievementsCommandHandler achievementsCommandHandler,
         IChipsCommandHandler chipsCommandHandler,
         IPricesCommandHandler pricesCommandHandler,
+        IChipWatchCommandHandler chipWatchCommandHandler,
         IHelpCommandHandler helpCommandHandler,
         IWelcomeMessageHandler welcomeMessageHandler,
         DiscordNetLogHandler discordLogHandler,
@@ -51,6 +52,7 @@ namespace DiscordBot
                 { DiscordApplicationCommands.AchievementsName, achievementsCommandHandler.HandleAsync },
                 { DiscordApplicationCommands.ChipsName, chipsCommandHandler.HandleAsync },
                 { DiscordApplicationCommands.PricesName, pricesCommandHandler.HandleAsync },
+                { DiscordApplicationCommands.ChipWatchName, chipWatchCommandHandler.HandleAsync },
                 { DiscordApplicationCommands.HelpName, helpCommandHandler.HandleAsync }
             };
 
