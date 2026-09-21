@@ -14,12 +14,13 @@ public static class MandarinBotQuartzExtensions
     {
         ArgumentNullException.ThrowIfNull(services);
 
+        services.AddAutonomousWorkDispatcherClient();
         services.AddQuartz();
         services.AddOptions<QuartzOptions>()
             .Configure<IOptions<MandarinBotOptions>>(
                 (quartzOptions, botOptions) => ConfigureScheduledJobs(
                     quartzOptions,
-                    botOptions.Value.Schedules));
+                    botOptions.Value));
         services.AddQuartzHostedService(options =>
             options.WaitForJobsToComplete = true);
 
@@ -28,8 +29,9 @@ public static class MandarinBotQuartzExtensions
 
     private static void ConfigureScheduledJobs(
         QuartzOptions quartzOptions,
-        JobSchedulesOptions schedules)
+        MandarinBotOptions options)
     {
+        var schedules = options.Schedules;
         var timeZone = JobSchedules.GetTimeZone(schedules);
 
         if (schedules.PremierLeagueNotifications.Enabled)
@@ -129,6 +131,16 @@ public static class MandarinBotQuartzExtensions
                 JobSchedules.FplChipWatchJobKey,
                 JobSchedules.FplChipWatchTriggerName,
                 schedules.FplChipWatch.Cron,
+                timeZone);
+        }
+
+        if (options.AutonomousWorkDispatcher.Enabled)
+        {
+            AddScheduledJob<AutonomousWorkDispatcherJob>(
+                quartzOptions,
+                JobSchedules.AutonomousWorkDispatcherJobKey,
+                JobSchedules.AutonomousWorkDispatcherTriggerName,
+                options.AutonomousWorkDispatcher.Cron,
                 timeZone);
         }
     }

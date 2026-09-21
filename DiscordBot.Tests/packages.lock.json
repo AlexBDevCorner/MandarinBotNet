@@ -541,6 +541,16 @@
           "System.Threading.RateLimiting": "8.0.0"
         }
       },
+      "Quartz.Extensions.DependencyInjection": {
+        "type": "Transitive",
+        "resolved": "3.19.1",
+        "contentHash": "6UKrPvWQBgOslVnhD6OgFBjBA3kO7kUc4bM2EXG8b+vSgB/EHqVP8cLOb9RePZQJb5OJeNunN9dNEmGLpg5wuw==",
+        "dependencies": {
+          "Microsoft.Extensions.Configuration.Abstractions": "10.0.0",
+          "Microsoft.Extensions.Options": "10.0.0",
+          "Quartz": "3.19.1"
+        }
+      },
       "SQLite": {
         "type": "Transitive",
         "resolved": "3.53.4",
@@ -585,11 +595,7 @@
           "Microsoft.Data.Sqlite": "[10.0.11, )",
           "Microsoft.Extensions.Diagnostics.HealthChecks.Abstractions": "[10.0.11, )",
           "Microsoft.Extensions.Hosting.Abstractions": "[10.0.11, )",
-          "Microsoft.Extensions.Http": "[10.0.11, )",
-          "Microsoft.Extensions.Http.Resilience": "[10.9.0, )",
-          "Quartz": "[3.19.1, )",
-          "SQLitePCLRaw.bundle_e_sqlite3": "[3.0.5, )",
-          "TimeZoneConverter": "[7.2.0, )"
+          "SQLitePCLRaw.bundle_e_sqlite3": "[3.0.5, )"
         }
       },
       "discordbot.common": {
@@ -598,6 +604,7 @@
           "Discord.Net": "[3.20.1, )",
           "Microsoft.Data.Sqlite": "[10.0.11, )",
           "Microsoft.Extensions.Hosting.Abstractions": "[10.0.11, )",
+          "Microsoft.Extensions.Http": "[10.0.11, )",
           "Microsoft.Extensions.Options.ConfigurationExtensions": "[10.0.11, )",
           "Quartz": "[3.19.1, )",
           "SQLitePCLRaw.bundle_e_sqlite3": "[3.0.5, )",
@@ -626,6 +633,20 @@
           "TimeZoneConverter": "[7.2.0, )"
         }
       },
+      "mandarinbotnet": {
+        "type": "Project",
+        "dependencies": {
+          "DiscordBot": "[1.0.0, )",
+          "DiscordBot.Common": "[1.0.0, )",
+          "DiscordBot.FantasyPremierLeague": "[1.0.0, )",
+          "DiscordBot.UclFantasy": "[1.0.0, )",
+          "Microsoft.Extensions.Diagnostics.HealthChecks": "[10.0.11, )",
+          "Microsoft.Extensions.Hosting": "[10.0.11, )",
+          "Quartz": "[3.19.1, )",
+          "Quartz.Extensions.Hosting": "[3.19.1, )",
+          "TimeZoneConverter": "[7.2.0, )"
+        }
+      },
       "Discord.Net": {
         "type": "CentralTransitive",
         "requested": "[3.20.1, )",
@@ -649,6 +670,18 @@
           "Microsoft.Data.Sqlite.Core": "10.0.11",
           "SQLitePCLRaw.bundle_e_sqlite3": "2.1.12",
           "SQLitePCLRaw.core": "2.1.12"
+        }
+      },
+      "Microsoft.Extensions.Diagnostics.HealthChecks": {
+        "type": "CentralTransitive",
+        "requested": "[10.0.11, )",
+        "resolved": "10.0.11",
+        "contentHash": "fzUGzOCLquuyIxVVvvcw9h8KaUrRZ/cGTai2gBDQ1YxbdH/8eZnSyoOu+PQJYoD+RUcgTTlVe6D4+FrcaUOR9w==",
+        "dependencies": {
+          "Microsoft.Extensions.Diagnostics.HealthChecks.Abstractions": "10.0.11",
+          "Microsoft.Extensions.Hosting.Abstractions": "10.0.11",
+          "Microsoft.Extensions.Logging.Abstractions": "10.0.11",
+          "Microsoft.Extensions.Options": "10.0.11"
         }
       },
       "Microsoft.Extensions.Diagnostics.HealthChecks.Abstractions": {
@@ -715,6 +748,16 @@
         "contentHash": "u+kAlmReZLLpKRG9TcPt8gP0H5e8Nff11fh9tz52e4B+GtXm9cLBOe/bfGcDs4IQftmEcxakpfTzOlsZdv9ekg==",
         "dependencies": {
           "Microsoft.Extensions.Logging.Abstractions": "2.1.1"
+        }
+      },
+      "Quartz.Extensions.Hosting": {
+        "type": "CentralTransitive",
+        "requested": "[3.19.1, )",
+        "resolved": "3.19.1",
+        "contentHash": "gp6EUrreKcU/Az6b2bZNeebxJWMrmlLItXRmR9nX9zUSmMzQTIDWR7NTm3SsdmsoDBbrIU9vhkLD3uv1y5mMzA==",
+        "dependencies": {
+          "Microsoft.Extensions.Hosting.Abstractions": "10.0.0",
+          "Quartz.Extensions.DependencyInjection": "3.19.1"
         }
       },
       "SQLitePCLRaw.bundle_e_sqlite3": {

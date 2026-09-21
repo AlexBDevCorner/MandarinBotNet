@@ -10,6 +10,7 @@
     <PackageReference Include="Discord.Net" />
     <PackageReference Include="Microsoft.Data.Sqlite" />
     <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Http" />
     <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" />
     <PackageReference Include="Quartz" />
     <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" />

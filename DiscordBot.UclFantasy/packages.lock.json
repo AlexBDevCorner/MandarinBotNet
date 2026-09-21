@@ -373,6 +373,7 @@
           "Discord.Net": "[3.20.1, )",
           "Microsoft.Data.Sqlite": "[10.0.11, )",
           "Microsoft.Extensions.Hosting.Abstractions": "[10.0.11, )",
+          "Microsoft.Extensions.Http": "[10.0.11, )",
           "Microsoft.Extensions.Options.ConfigurationExtensions": "[10.0.11, )",
           "Quartz": "[3.19.1, )",
           "SQLitePCLRaw.bundle_e_sqlite3": "[3.0.5, )",

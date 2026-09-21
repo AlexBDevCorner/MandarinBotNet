@@ -15,6 +15,8 @@ public sealed class MandarinBotOptions
     public NotificationOptions Notifications { get; init; } = new();
 
     public WelcomeMessageOptions WelcomeMessages { get; init; } = new();
+
+    public AutonomousWorkDispatcherOptions AutonomousWorkDispatcher { get; init; } = new();
 }
 
 public sealed class DiscordOptions
