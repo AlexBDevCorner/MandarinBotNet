@@ -51,7 +51,7 @@ jobs:
               - 'infra/terraform/**/*.tfvars'
 
   dotnet:
-    name: Restore, build, test, format, and audit
+    name: build-and-test
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
