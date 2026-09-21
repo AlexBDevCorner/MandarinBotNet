@@ -1,0 +1,326 @@
+name: autonomous-worker
+run-name: autonomy ${{ inputs.task_id }} ${{ inputs.attempt_id || 'manual' }}
+on:
+  workflow_dispatch:
+    inputs:
+      task_id:
+        description: Control task ID
+        required: true
+        type: string
+      task_path:
+        description: Authoritative control task path
+        required: true
+        type: string
+      control_repo:
+        description: Approved control repository
+        default: AlexBDevCorner/AutonomousWork
+        required: true
+        type: string
+      control_commit:
+        description: Full control SHA; empty only for manual dispatch
+        default: ''
+        type: string
+      model:
+        description: OpenCode Go model
+        default: opencode-go/muse-spark-1.3-contributor
+        type: string
+      variant:
+        description: OpenCode model reasoning variant
+        default: xhigh
+        type: string
+      attempt_id:
+        description: Persisted attempt UUID; empty for manual dispatch
+        default: ''
+        type: string
+      mode:
+        description: Implementation or bounded review correction
+        type: choice
+        options: [implementation, correction]
+        default: implementation
+      review_id:
+        description: Trusted blocking review ID for correction
+        default: ''
+        type: string
+      expected_head:
+        description: Reviewed PR head SHA for correction
+        default: ''
+        type: string
+concurrency:
+  group: autonomous-worker
+  cancel-in-progress: false
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  actions: read
+jobs:
+  worker:
+    if: github.ref == 'refs/heads/main'
+    runs-on: windows-latest
+    timeout-minutes: 135
+    env:
+      GH_REPO: ${{ github.repository }}
+      TASK_ID: ${{ inputs.task_id }}
+      TASK_PATH: ${{ inputs.task_path }}
+      ATTEMPT_ID: ${{ inputs.attempt_id }}
+      WORK_MODE: ${{ inputs.mode }}
+      REVIEW_ID: ${{ inputs.review_id }}
+      EXPECTED_HEAD: ${{ inputs.expected_head }}
+    steps:
+      - name: Validate dispatch inputs before checkout
+        shell: pwsh
+        env:
+          CONTROL_REPO: ${{ inputs.control_repo }}
+          CONTROL_COMMIT: ${{ inputs.control_commit }}
+        run: |
+          if ($env:CONTROL_REPO -cne 'AlexBDevCorner/AutonomousWork') { throw 'Unapproved control repository' }
+          if ($env:TASK_ID -cnotmatch '^MB-[0-9]+$') { throw 'Invalid task ID' }
+          if ($env:TASK_PATH -cne "projects/mandarinbotnet/tasks/$env:TASK_ID.md") { throw 'Invalid task path' }
+          if ($env:CONTROL_COMMIT -and $env:CONTROL_COMMIT -cnotmatch '^[a-f0-9]{40}$') { throw 'Expected full control SHA' }
+          if ($env:ATTEMPT_ID -and ($env:ATTEMPT_ID -cnotmatch '^[a-f0-9-]{36}$' -or !$env:CONTROL_COMMIT)) { throw 'Invalid claim' }
+          if ($env:WORK_MODE -notin @('implementation', 'correction')) { throw 'Invalid mode' }
+          if ($env:WORK_MODE -eq 'correction' -and (!$env:ATTEMPT_ID -or $env:REVIEW_ID -notmatch '^[0-9]+$' -or $env:EXPECTED_HEAD -cnotmatch '^[a-f0-9]{40}$')) { throw 'Invalid review claim' }
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/checkout@v6
+        with:
+          repository: AlexBDevCorner/AutonomousWork
+          ref: ${{ inputs.control_commit || 'master' }}
+          token: ${{ secrets.CONTROL_REPO_TOKEN }}
+          path: control
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.302
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Build validator and record pin
+        shell: pwsh
+        run: |
+          dotnet build control/tools/AutonomousWork.Cli -c Release --nologo
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $controlSha = git -C control rev-parse HEAD
+          "CONTROL_SHA=$controlSha" >> $env:GITHUB_ENV
+      - name: Verify authorization and bounded execution
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CONTROL_READ_TOKEN: ${{ secrets.CONTROL_REPO_TOKEN }}
+        run: node control/tools/autonomy/worker.mjs guard
+      - name: Mint worker GitHub App token
+        id: worker-token
+        # Short-lived installation token for the OpenCode step. PRs created with
+        # the built-in GITHUB_TOKEN leave pull_request CI runs approval-required,
+        # which would stall unattended autonomy; an App token lets CI run
+        # automatically. Same action pin as the control-repo dispatcher.
+        # Requires vars.AUTONOMOUS_APP_CLIENT_ID plus
+        # secrets.AUTONOMOUS_APP_PRIVATE_KEY in this repository, and the App
+        # installation on MandarinBotNet must grant Contents, Pull requests, and
+        # Issues write.
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ vars.AUTONOMOUS_APP_CLIENT_ID }}
+          private-key: ${{ secrets.AUTONOMOUS_APP_PRIVATE_KEY }}
+          owner: AlexBDevCorner
+          repositories: MandarinBotNet
+          permission-contents: write
+          permission-pull-requests: write
+          permission-issues: write
+      - name: Verify worker GitHub authentication
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ steps.worker-token.outputs.token }}
+        run: |
+          $repo = gh api "repos/$env:GH_REPO" --jq '.full_name'
+
+          if ($LASTEXITCODE -ne 0) {
+            throw 'GitHub CLI authentication failed'
+          }
+
+          if ($repo -cne $env:GH_REPO) {
+            throw "GitHub CLI authenticated against unexpected repository: $repo"
+          }
+      - name: Wire App token into git
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ steps.worker-token.outputs.token }}
+        run: |
+          # use_github_token mode skips OpenCode's own git credential setup, and
+          # the checkouts use persist-credentials: false, so plain `git push`
+          # would otherwise be unauthenticated. Configure gh as the git
+          # credential helper deterministically here instead of leaving it to
+          # the model. No raw token is persisted: git invokes
+          # `gh auth git-credential` on demand, which reads GH_TOKEN at runtime.
+          gh auth setup-git --hostname github.com --force
+          if ($LASTEXITCODE -ne 0) { throw 'gh auth setup-git failed' }
+      - name: Ensure PR labels
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: pwsh
+        run: |
+          foreach ($label in @('autonomous', 'autonomous:opencode', "task:$env:TASK_ID")) {
+            gh label create $label --force --color 0E8A16
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+      # The model runs here. Deterministic verification happens in the separate
+      # verify job on a fresh runner, so files or runner state mutated here
+      # cannot affect the verifier's code or environment.
+      - name: Run OpenCode worker
+        timeout-minutes: 120
+        uses: anomalyco/opencode/github@83abc64a5c4e0e0a5157f2c4435d34131009a404 # pinned 2026-09-19
+        env:
+          OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+          # App installation token, not the built-in GITHUB_TOKEN, so PRs opened
+          # by the worker trigger pull_request CI without manual approval.
+          # OpenCode's use_github_token mode accepts a PAT or another App token
+          # passed as GITHUB_TOKEN.
+          GITHUB_TOKEN: ${{ steps.worker-token.outputs.token }}
+          GH_TOKEN: ${{ steps.worker-token.outputs.token }}
+          # Fail closed by default: unmatched external_directory would otherwise
+          # fall back to OpenCode's interactive `ask`, which hangs an
+          # unattended worker (e.g. synthetic `C:\*` + `_temp` checks combine
+          # into one approval). `*` deny comes first; OpenCode uses the last
+          # matching rule, so the narrow Temp allows below still win.
+          # Edits under temp stay denied, as does shell redirection of runner
+          # command files. Verification runs in a separate job, so tampering
+          # here cannot silently pass the deterministic checks.
+          # Bash keeps a broad `*` allow first so ordinary `gh`/`git` work,
+          # with narrower deny rules after it so credential-recovery patterns
+          # win (OpenCode uses the last matching rule). The denies below cover
+          # obvious token inspection without banning every `credential` string.
+          OPENCODE_CONFIG_CONTENT: '{"permission":{"external_directory":{"*":"deny","**/Temp/**":"allow","**/_temp/**":"allow","**/tmp/**":"allow"},"edit":{"**/Temp/**":"deny","**/_temp/**":"deny","**/tmp/**":"deny"},"bash":{"*":"allow","*GITHUB_ENV*":"deny","*GITHUB_PATH*":"deny","*GITHUB_OUTPUT*":"deny","*GITHUB_STATE*":"deny","*GH_TOKEN*":"deny","*GITHUB_TOKEN*":"deny","*gh auth token*":"deny","*extraheader*":"deny","*AUTHORIZATION*":"deny"},"doom_loop":"deny","question":"deny"}}'
+        with:
+          model: ${{ inputs.model }}
+          variant: ${{ inputs.variant }}
+          share: false
+          use_github_token: true
+          prompt: |
+            Implement only task ${{ inputs.task_id }}. Follow AGENTS.md.
+            Read the authoritative specification at control/${{ inputs.task_path }}.
+            The control checkout is read-only. Never change it, requirements, priorities, or future tasks.
+            Do not access GITHUB_EVENT_PATH or other files outside the repository
+            and control checkout. Runner temporary files may be read only when
+            required by the workflow. If external filesystem access is denied,
+            continue without it rather than requesting permission.
+            GitHub authentication is already provided by the workflow.
+            Use gh normally for GitHub operations.
+            Never inspect, extract, decode, print, or persist GitHub credentials,
+            Git HTTP authorization headers, credential-helper data, or runner
+            credential files. Never run `gh auth token`.
+            If GitHub authentication fails, stop and report the failure rather
+            than attempting to recover credentials from Git configuration.
+            Execution mode: ${{ inputs.mode }}.
+            For implementation: use branch autonomous/${{ inputs.task_id }} from main.
+            Push that branch to origin immediately after creating it.
+            If its open PR exists, reuse that branch and PR. Never create a second branch or PR.
+            Preserve progress remotely throughout the run:
+            - Commit and push after every meaningful milestone.
+            - If a milestone takes longer, make and push a checkpoint at least every 10–15 minutes.
+            - Do not wait until the task is complete before the first commit or push.
+            - Checkpoint commits may be incomplete and should use descriptive messages such as
+              "checkpoint: migrate main window" or "checkpoint: adapt app tests".
+            - Do not squash checkpoint commits just to clean up history; the implementation history is useful.
+            For a new implementation with no existing PR, after the first pushed checkpoint that creates a diff from main,
+            open exactly one draft PR and keep pushing subsequent checkpoints to that same branch and PR.
+            On retries or corrections, reuse the existing PR.
+            A successful worker run MUST leave the task PR ready for review, never draft.
+            After all required verification has run and the task is genuinely ready, explicitly mark the PR ready for review
+            (for example with gh pr ready <number>) before finishing. Do not report success while the PR remains draft.
+            For correction: check out the existing autonomous/${{ inputs.task_id }} branch.
+            Read blocking-review.json in RUNNER_TEMP. Fix only blocking findings from that review.
+            The reviewed head is ${{ inputs.expected_head }}. Do not implement unrelated work.
+            Required verification: dotnet build MandarinBotNet.sln and dotnet test MandarinBotNet.sln.
+            Record real commands and results. Add tests for behavior changes.
+            Open or update the same PR to main, titled [${{ inputs.task_id }}] <description>.
+            Required labels: autonomous, autonomous:opencode, task:${{ inputs.task_id }}.
+            Required body sections: ## Task, ## Control specification, ## Implementation,
+            ## Verification, ## Autonomous execution.
+            Under Control specification record exactly:
+            AlexBDevCorner/AutonomousWork@${{ env.CONTROL_SHA }}: ${{ inputs.task_path }}
+            Under Autonomous execution record OpenCode Go and ${{ inputs.model }}.
+            Never merge, force-push, modify .github/, or commit secrets.
+            Use PowerShell for Windows environment variables.
+  # Deterministic verifier on a fresh runner. It re-checks out the target and
+  # the pinned control SHA and verifies actual GitHub PR state, so the
+  # nondeterministic model step cannot modify the environment in which its own
+  # output is judged. Only this job's success means the worker produced a valid PR.
+  verify:
+    needs: worker
+    if: github.ref == 'refs/heads/main'
+    runs-on: windows-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      pull-requests: read
+      actions: read
+    env:
+      GH_REPO: ${{ github.repository }}
+      TASK_ID: ${{ inputs.task_id }}
+      TASK_PATH: ${{ inputs.task_path }}
+      ATTEMPT_ID: ${{ inputs.attempt_id }}
+      WORK_MODE: ${{ inputs.mode }}
+      REVIEW_ID: ${{ inputs.review_id }}
+      EXPECTED_HEAD: ${{ inputs.expected_head }}
+    steps:
+      - name: Validate dispatch inputs before checkout
+        shell: pwsh
+        env:
+          CONTROL_REPO: ${{ inputs.control_repo }}
+          CONTROL_COMMIT: ${{ inputs.control_commit }}
+        run: |
+          if ($env:CONTROL_REPO -cne 'AlexBDevCorner/AutonomousWork') { throw 'Unapproved control repository' }
+          if ($env:TASK_ID -cnotmatch '^MB-[0-9]+$') { throw 'Invalid task ID' }
+          if ($env:TASK_PATH -cne "projects/mandarinbotnet/tasks/$env:TASK_ID.md") { throw 'Invalid task path' }
+          if ($env:CONTROL_COMMIT -and $env:CONTROL_COMMIT -cnotmatch '^[a-f0-9]{40}$') { throw 'Expected full control SHA' }
+          if ($env:ATTEMPT_ID -and ($env:ATTEMPT_ID -cnotmatch '^[a-f0-9-]{36}$' -or !$env:CONTROL_COMMIT)) { throw 'Invalid claim' }
+          if ($env:WORK_MODE -notin @('implementation', 'correction')) { throw 'Invalid mode' }
+          if ($env:WORK_MODE -eq 'correction' -and (!$env:ATTEMPT_ID -or $env:REVIEW_ID -notmatch '^[0-9]+$' -or $env:EXPECTED_HEAD -cnotmatch '^[a-f0-9]{40}$')) { throw 'Invalid review claim' }
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/checkout@v6
+        with:
+          repository: AlexBDevCorner/AutonomousWork
+          ref: ${{ inputs.control_commit || 'master' }}
+          token: ${{ secrets.CONTROL_REPO_TOKEN }}
+          path: control
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Build validator and record pin
+        shell: pwsh
+        run: |
+          dotnet build control/tools/AutonomousWork.Cli -c Release --nologo
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $controlSha = git -C control rev-parse HEAD
+          if ($env:CONTROL_COMMIT -and $controlSha -cne $env:CONTROL_COMMIT) { throw "Control checkout $controlSha does not match pinned claim" }
+          "CONTROL_SHA=$controlSha" >> $env:GITHUB_ENV
+        env:
+          CONTROL_COMMIT: ${{ inputs.control_commit }}
+      - name: Verify permanent task/PR mapping and metadata
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: pwsh
+        run: |
+          $controlChanges = git -C control status --porcelain
+          if ($LASTEXITCODE -ne 0 -or $controlChanges) { throw 'Control checkout is not clean' }
+          node control/tools/autonomy/worker.mjs verify
+      - name: Record run outcome
+        if: always()
+        shell: pwsh
+        env:
+          RESULT: ${{ job.status }}
+        run: |
+          "Task: $env:TASK_ID; attempt: $env:ATTEMPT_ID; outcome: $env:RESULT" >> $env:GITHUB_STEP_SUMMARY
+          "Run: https://github.com/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID" >> $env:GITHUB_STEP_SUMMARY
