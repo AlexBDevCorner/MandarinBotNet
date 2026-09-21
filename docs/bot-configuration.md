@@ -75,6 +75,50 @@ Bot__Notifications__Targets__0__ChannelId=<FIRST-CHANNEL-ID>
 Bot__Notifications__Targets__0__MentionEveryone=false
 ```
 
+## AutonomousWork dispatcher trigger
+
+The optional `AutonomousWorkDispatcher` uses the existing Quartz scheduler as a
+reliable clock for AutonomousWork. When enabled, a Quartz job fires every 10
+minutes and sends one GitHub workflow-dispatch request for
+`AlexBDevCorner/AutonomousWork/.github/workflows/dispatch.yml` on `master`.
+Task selection, claiming, reconciliation, retries, review handling, and
+target-repository dispatch remain owned by AutonomousWork. The trigger never
+inspects tasks and does not depend on Discord connectivity.
+
+Tracked `appsettings.json` keeps the trigger disabled with safe defaults:
+
+```json
+"AutonomousWorkDispatcher": {
+  "Enabled": false,
+  "Cron": "0 0/10 * * * ?",
+  "Owner": "AlexBDevCorner",
+  "Repository": "AutonomousWork",
+  "Workflow": "dispatch.yml",
+  "Ref": "master"
+}
+```
+
+No token is committed. To enable, configure the non-secret values and supply
+the token only through the runtime secret provider:
+
+```dotenv
+Bot__AutonomousWorkDispatcher__Enabled=true
+Bot__AutonomousWorkDispatcher__Cron=0 0/10 * * * ?
+Bot__AutonomousWorkDispatcher__Owner=AlexBDevCorner
+Bot__AutonomousWorkDispatcher__Repository=AutonomousWork
+Bot__AutonomousWorkDispatcher__Workflow=dispatch.yml
+Bot__AutonomousWorkDispatcher__Ref=master
+Bot__AutonomousWorkDispatcher__Token=<AUTONOMOUSWORK-DISPATCH-TOKEN>
+```
+
+The token is a fine-grained token scoped only to the private
+`AlexBDevCorner/AutonomousWork` repository with the minimum permission required
+to create a workflow dispatch event. Startup validation requires a valid Quartz
+cron always, and requires owner, repository, workflow, ref, and token when
+enabled. A disabled configuration does not require a token. A failed GitHub
+request is logged without the token, fails that Quartz execution, and leaves
+future 10-minute occurrences unchanged; there is no fast retry loop.
+
 Deadline notification jobs run every 15 minutes by default. This provides four
 delivery attempts during the final 70-minute reminder window if an upstream API,
 Discord, or the application is briefly unavailable. Delivery checkpoints still

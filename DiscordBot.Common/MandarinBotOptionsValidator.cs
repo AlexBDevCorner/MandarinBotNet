@@ -71,6 +71,7 @@ public sealed class MandarinBotOptionsValidator(bool requireOperationalConfigura
             "Bot:Schedules:FplChipWatch",
             options.Schedules.FplChipWatch,
             failures);
+        ValidateAutonomousWorkDispatcher(options.AutonomousWorkDispatcher, failures);
 
         if (requireOperationalConfiguration && !options.Schedules.HasEnabledJobs)
         {
@@ -254,6 +255,50 @@ public sealed class MandarinBotOptionsValidator(bool requireOperationalConfigura
             !CronExpression.IsValidExpression(schedule.Cron))
         {
             failures.Add($"{path}:Cron must be a valid Quartz cron expression.");
+        }
+    }
+
+    private static void ValidateAutonomousWorkDispatcher(
+        AutonomousWorkDispatcherOptions dispatcher,
+        List<string> failures)
+    {
+        const string path = "Bot:AutonomousWorkDispatcher";
+
+        if (string.IsNullOrWhiteSpace(dispatcher.Cron) ||
+            !CronExpression.IsValidExpression(dispatcher.Cron))
+        {
+            failures.Add($"{path}:Cron must be a valid Quartz cron expression.");
+        }
+
+        if (!dispatcher.Enabled)
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(dispatcher.Owner))
+        {
+            failures.Add($"{path}:Owner is required when the dispatcher is enabled.");
+        }
+
+        if (string.IsNullOrWhiteSpace(dispatcher.Repository))
+        {
+            failures.Add($"{path}:Repository is required when the dispatcher is enabled.");
+        }
+
+        if (string.IsNullOrWhiteSpace(dispatcher.Workflow))
+        {
+            failures.Add($"{path}:Workflow is required when the dispatcher is enabled.");
+        }
+
+        if (string.IsNullOrWhiteSpace(dispatcher.Ref))
+        {
+            failures.Add($"{path}:Ref is required when the dispatcher is enabled.");
+        }
+
+        if (string.IsNullOrWhiteSpace(dispatcher.Token))
+        {
+            failures.Add(
+                $"{path}:Token is required when the dispatcher is enabled. Supply it through Bot__AutonomousWorkDispatcher__Token in the environment or another secret provider.");
         }
     }
 

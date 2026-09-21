@@ -48,6 +48,11 @@ public static class MandarinBotConfigurationServiceCollectionExtensions
                 .GetRequiredService<IOptions<MandarinBotOptions>>()
                 .Value
                 .WelcomeMessages);
+        services.AddSingleton(
+            services => services
+                .GetRequiredService<IOptions<MandarinBotOptions>>()
+                .Value
+                .AutonomousWorkDispatcher);
 
         return services;
     }
