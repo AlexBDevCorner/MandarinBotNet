@@ -175,7 +175,6 @@ the existing restore/publish topology.
 
 Unless the authoritative task explicitly requires otherwise:
 
-- `.github/` — workflow/bootstrap wiring is operator-owned.
 - `control/` — authoritative read-only task checkout.
 - `global.json`, central package versions, or target frameworks.
 - `infra/` or deployment scripts.
@@ -184,6 +183,6 @@ Unless the authoritative task explicitly requires otherwise:
 - Anything explicitly listed under the task's `Out of scope`.
 
 If the task itself explicitly requires one of the normally protected
-application/configuration areas, follow the task. The worker still must never
-modify `.github/` or `control/`; those remain operator-owned bootstrap and
-authorization boundaries.
+application/configuration areas, follow the task. The worker must still never
+modify `control/`; it remains the authoritative read-only task and authorization
+boundary.
