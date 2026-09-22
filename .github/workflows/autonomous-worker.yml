@@ -56,7 +56,7 @@ permissions:
 jobs:
   worker:
     if: github.ref == 'refs/heads/main'
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     timeout-minutes: 135
     env:
       GH_REPO: ${{ github.repository }}
@@ -68,18 +68,29 @@ jobs:
       EXPECTED_HEAD: ${{ inputs.expected_head }}
     steps:
       - name: Validate dispatch inputs before checkout
-        shell: pwsh
+        shell: bash
         env:
           CONTROL_REPO: ${{ inputs.control_repo }}
           CONTROL_COMMIT: ${{ inputs.control_commit }}
         run: |
-          if ($env:CONTROL_REPO -cne 'AlexBDevCorner/AutonomousWork') { throw 'Unapproved control repository' }
-          if ($env:TASK_ID -cnotmatch '^MB-[0-9]+$') { throw 'Invalid task ID' }
-          if ($env:TASK_PATH -cne "projects/mandarinbotnet/tasks/$env:TASK_ID.md") { throw 'Invalid task path' }
-          if ($env:CONTROL_COMMIT -and $env:CONTROL_COMMIT -cnotmatch '^[a-f0-9]{40}$') { throw 'Expected full control SHA' }
-          if ($env:ATTEMPT_ID -and ($env:ATTEMPT_ID -cnotmatch '^[a-f0-9-]{36}$' -or !$env:CONTROL_COMMIT)) { throw 'Invalid claim' }
-          if ($env:WORK_MODE -notin @('implementation', 'correction')) { throw 'Invalid mode' }
-          if ($env:WORK_MODE -eq 'correction' -and (!$env:ATTEMPT_ID -or $env:REVIEW_ID -notmatch '^[0-9]+$' -or $env:EXPECTED_HEAD -cnotmatch '^[a-f0-9]{40}$')) { throw 'Invalid review claim' }
+          set -euo pipefail
+          fail() { echo "::error::$1" >&2; exit 1; }
+          [[ "$CONTROL_REPO" == 'AlexBDevCorner/AutonomousWork' ]] || fail 'Unapproved control repository'
+          [[ "$TASK_ID" =~ ^MB-[0-9]+$ ]] || fail 'Invalid task ID'
+          [[ "$TASK_PATH" == "projects/mandarinbotnet/tasks/$TASK_ID.md" ]] || fail 'Invalid task path'
+          if [[ -n "$CONTROL_COMMIT" ]]; then
+            [[ "$CONTROL_COMMIT" =~ ^[a-f0-9]{40}$ ]] || fail 'Expected full control SHA'
+          fi
+          if [[ -n "${ATTEMPT_ID:-}" ]]; then
+            [[ "$ATTEMPT_ID" =~ ^[a-f0-9-]{36}$ ]] || fail 'Invalid claim'
+            [[ -n "$CONTROL_COMMIT" ]] || fail 'Invalid claim'
+          fi
+          [[ "$WORK_MODE" == 'implementation' || "$WORK_MODE" == 'correction' ]] || fail 'Invalid mode'
+          if [[ "$WORK_MODE" == 'correction' ]]; then
+            [[ -n "${ATTEMPT_ID:-}" ]] || fail 'Invalid review claim'
+            [[ "$REVIEW_ID" =~ ^[0-9]+$ ]] || fail 'Invalid review claim'
+            [[ "$EXPECTED_HEAD" =~ ^[a-f0-9]{40}$ ]] || fail 'Invalid review claim'
+          fi
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
@@ -100,13 +111,14 @@ jobs:
         with:
           node-version: '22'
       - name: Build validator and record pin
-        shell: pwsh
+        shell: bash
         run: |
+          set -euo pipefail
           dotnet build control/tools/AutonomousWork.Cli -c Release --nologo
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          $controlSha = git -C control rev-parse HEAD
-          "CONTROL_SHA=$controlSha" >> $env:GITHUB_ENV
+          controlSha="$(git -C control rev-parse HEAD)"
+          printf 'CONTROL_SHA=%s\n' "$controlSha" >> "$GITHUB_ENV"
       - name: Verify authorization and bounded execution
+        shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CONTROL_READ_TOKEN: ${{ secrets.CONTROL_REPO_TOKEN }}
@@ -132,24 +144,22 @@ jobs:
           permission-issues: write
           permission-workflows: write
       - name: Verify worker GitHub authentication
-        shell: pwsh
+        shell: bash
         env:
           GH_TOKEN: ${{ steps.worker-token.outputs.token }}
         run: |
-          $repo = gh api "repos/$env:GH_REPO" --jq '.full_name'
-
-          if ($LASTEXITCODE -ne 0) {
-            throw 'GitHub CLI authentication failed'
-          }
-
-          if ($repo -cne $env:GH_REPO) {
-            throw "GitHub CLI authenticated against unexpected repository: $repo"
-          }
+          set -euo pipefail
+          repo="$(gh api "repos/$GH_REPO" --jq '.full_name')"
+          if [[ "$repo" != "$GH_REPO" ]]; then
+            echo "::error::GitHub CLI authenticated against unexpected repository: $repo" >&2
+            exit 1
+          fi
       - name: Wire App token into git
-        shell: pwsh
+        shell: bash
         env:
           GH_TOKEN: ${{ steps.worker-token.outputs.token }}
         run: |
+          set -euo pipefail
           # use_github_token mode skips OpenCode's own git credential setup, and
           # the checkouts use persist-credentials: false, so plain `git push`
           # would otherwise be unauthenticated. Configure gh as the git
@@ -157,7 +167,6 @@ jobs:
           # the model. No raw token is persisted: git invokes
           # `gh auth git-credential` on demand, which reads GH_TOKEN at runtime.
           gh auth setup-git --hostname github.com --force
-          if ($LASTEXITCODE -ne 0) { throw 'gh auth setup-git failed' }
       # The worker implements the task. Normal pull-request CI and review are the quality gates.
       - name: Run OpenCode worker
         timeout-minutes: 120
@@ -172,16 +181,16 @@ jobs:
           GH_TOKEN: ${{ steps.worker-token.outputs.token }}
           # Fail closed by default: unmatched external_directory would otherwise
           # fall back to OpenCode's interactive `ask`, which hangs an
-          # unattended worker (e.g. synthetic `C:\*` + `_temp` checks combine
-          # into one approval). `*` deny comes first; OpenCode uses the last
-          # matching rule, so the narrow Temp allows below still win.
-          # Edits under temp stay denied, as does shell redirection of runner
-          # command files.
+          # unattended worker. `*` deny comes first; OpenCode uses the last
+          # matching rule, so the narrow runner-temp allows below still win.
+          # Runner temporary files live under $RUNNER_TEMP (a `_temp`
+          # directory) and /tmp on Ubuntu. Edits under temp stay denied,
+          # as does shell redirection of runner command files.
           # Bash keeps a broad `*` allow first so ordinary `gh`/`git` work,
           # with narrower deny rules after it so credential-recovery patterns
           # win (OpenCode uses the last matching rule). The denies below cover
           # obvious token inspection without banning every `credential` string.
-          OPENCODE_CONFIG_CONTENT: '{"permission":{"external_directory":{"*":"deny","**/Temp/**":"allow","**/_temp/**":"allow","**/tmp/**":"allow"},"edit":{"**/Temp/**":"deny","**/_temp/**":"deny","**/tmp/**":"deny"},"bash":{"*":"allow","*GITHUB_ENV*":"deny","*GITHUB_PATH*":"deny","*GITHUB_OUTPUT*":"deny","*GITHUB_STATE*":"deny","*GH_TOKEN*":"deny","*GITHUB_TOKEN*":"deny","*gh auth token*":"deny","*extraheader*":"deny","*AUTHORIZATION*":"deny"},"doom_loop":"deny","question":"deny"}}'
+          OPENCODE_CONFIG_CONTENT: '{"permission":{"external_directory":{"*":"deny","**/_temp/**":"allow","**/tmp/**":"allow"},"edit":{"**/_temp/**":"deny","**/tmp/**":"deny"},"bash":{"*":"allow","*GITHUB_ENV*":"deny","*GITHUB_PATH*":"deny","*GITHUB_OUTPUT*":"deny","*GITHUB_STATE*":"deny","*GH_TOKEN*":"deny","*GITHUB_TOKEN*":"deny","*gh auth token*":"deny","*extraheader*":"deny","*AUTHORIZATION*":"deny"},"doom_loop":"deny","question":"deny"}}'
         with:
           model: ${{ inputs.model }}
           variant: ${{ inputs.variant }}
@@ -220,11 +229,12 @@ jobs:
             After all required verification has run and the task is genuinely ready, explicitly mark the PR ready for review
             (for example with gh pr ready <number>) before finishing. Do not report success while the PR remains draft.
             For correction: check out the existing autonomous/${{ inputs.task_id }} branch.
-            Read blocking-review.json in RUNNER_TEMP. Fix only blocking findings from that review.
+            Read blocking-review.json in "$RUNNER_TEMP". Fix only blocking findings from that review.
             The reviewed head is ${{ inputs.expected_head }}. Do not implement unrelated work.
             Required verification: dotnet build MandarinBotNet.sln and dotnet test MandarinBotNet.sln.
             Record real commands and results. Add tests for behavior changes.
             Open or update the same PR to main, titled [${{ inputs.task_id }}] <description>.
             Include a concise implementation summary and the real build/test results in the PR body.
             Never merge, force-push, or commit secrets.
-            Use PowerShell for Windows environment variables.
+            You are running on an Ubuntu (Linux) GitHub-hosted runner.
+            Use Bash for shell commands and Linux environment-variable syntax (for example "$VAR" and "$RUNNER_TEMP").
