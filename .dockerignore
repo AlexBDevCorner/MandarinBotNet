@@ -1,0 +1,20 @@
+# Keep host build outputs and local tooling out of the Docker context.
+# Docker restores inside the image; copying host obj/ assets over that restore
+# can make project.assets.json point at package paths that do not exist there.
+**/bin/
+**/obj/
+
+.git/
+.github/
+.vs/
+.vscode/
+.idea/
+.tools/
+
+.env
+.env.tools
+**/secrets.json
+
+*.user
+*.suo
+*.log
