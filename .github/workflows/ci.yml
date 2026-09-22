@@ -25,7 +25,6 @@ jobs:
     timeout-minutes: 5
     outputs:
       actions: ${{ steps.filter.outputs.actions }}
-      container: ${{ steps.filter.outputs.container }}
       terraform: ${{ steps.filter.outputs.terraform }}
 
     steps:
@@ -43,9 +42,6 @@ jobs:
             actions:
               - '.github/actionlint.yaml'
               - '.github/workflows/**'
-            container:
-              - 'Dockerfile'
-              - '.dockerignore'
             terraform:
               - 'infra/terraform/**/*.tf'
               - 'infra/terraform/**/*.tfvars'
@@ -53,7 +49,7 @@ jobs:
   dotnet:
     name: build-and-test
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
 
     steps:
       - name: Check out repository
@@ -86,6 +82,13 @@ jobs:
 
       - name: Verify formatting
         run: dotnet format MandarinBotNet.sln --verify-no-changes --no-restore
+
+      - name: Build production container image
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker build --tag mandarinbot:ci --file Dockerfile .
+          [[ "$(docker image inspect --format '{{.Config.User}}' mandarinbot:ci)" == "app" ]]
 
       - name: Report vulnerable packages
         run: >-
@@ -124,26 +127,6 @@ jobs:
 
       - name: Lint workflows
         run: '"$RUNNER_TEMP/actionlint" -color'
-
-  container:
-    name: Build hardened container image
-    needs: changes
-    if: needs.changes.outputs.container == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
-        with:
-          persist-credentials: false
-
-      - name: Build image and verify its runtime user
-        shell: bash
-        run: |
-          set -euo pipefail
-          docker build --tag mandarinbot:ci --file Dockerfile .
-          [[ "$(docker image inspect --format '{{.Config.User}}' mandarinbot:ci)" == "app" ]]
 
   terraform:
     name: Check Terraform formatting

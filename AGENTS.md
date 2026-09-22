@@ -22,6 +22,7 @@ MandarinBotNet.sln
 MandarinBotNet/                         Worker host / composition root / Quartz wiring
 DiscordBot.Common/                     Shared options, scheduling and common infrastructure
 DiscordBot/                            Core Discord bot behavior and shared bot services
+DiscordBot.EventWatch/                 Event/ticket monitoring integrations and jobs
 DiscordBot.FantasyPremierLeague/       FPL integrations and scheduled jobs
 DiscordBot.UclFantasy/                 UEFA fantasy integration and jobs
 DiscordBot.Tests/                      NUnit test suite
@@ -49,6 +50,16 @@ dotnet format MandarinBotNet.sln --verify-no-changes --no-restore
 
 For changes affecting deployment scripts, workflows, containers or Terraform,
 also run the relevant checks represented in `.github/workflows/ci.yml`.
+When a change adds/removes a project, project reference, package dependency, or
+other build-topology input used by the worker executable, also build the
+production container locally:
+
+```powershell
+docker build --tag mandarinbot:verify --file Dockerfile .
+```
+
+A successful solution build is not sufficient proof that the production
+container restore/publish path is still valid.
 
 The autonomous task may explicitly require additional verification. Run it in
 addition to these repository checks.
@@ -119,10 +130,17 @@ configuration model.
 
 Production runs as a container and has OCI/Terraform deployment support.
 
-Do not modify `Dockerfile`, `infra/`, deployment scripts, GitHub workflows,
-runtime identities, or package versions unless the dispatched task explicitly
-requires it. Infrastructure changes require focused verification and should not
-be incidental to an application task.
+Do not modify `infra/`, deployment scripts, GitHub workflows, runtime
+identities, or package versions unless the dispatched task explicitly requires
+it. Infrastructure changes require focused verification and should not be
+incidental to an application task.
+
+The production `Dockerfile` manually enumerates project files and lock files
+before its restore layer. If a task adds/removes a project or changes the
+worker's project-reference graph, synchronizing those Dockerfile copy inputs is
+required integration work for that task even when the task does not explicitly
+name the Dockerfile. Keep such Dockerfile edits minimal and limited to preserving
+the existing restore/publish topology.
 
 ## Autonomous worker rules
 
@@ -160,7 +178,9 @@ Unless the authoritative task explicitly requires otherwise:
 - `.github/` — workflow/bootstrap wiring is operator-owned.
 - `control/` — authoritative read-only task checkout.
 - `global.json`, central package versions, or target frameworks.
-- `Dockerfile`, `infra/`, or deployment scripts.
+- `infra/` or deployment scripts.
+- `Dockerfile`, except for the minimal project/lock-file synchronization
+  required when the task itself changes the worker's project-reference graph.
 - Anything explicitly listed under the task's `Out of scope`.
 
 If the task itself explicitly requires one of the normally protected
