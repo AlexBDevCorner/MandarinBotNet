@@ -1,4 +1,5 @@
 using DiscordBot;
+using DiscordBot.EventWatch;
 using DiscordBot.Health;
 using MandarinBotNet.Extensions;
 
@@ -27,6 +28,7 @@ builder.Services.AddMandarinBotConfiguration(
     builder.Configuration,
     builder.Environment);
 builder.Services.AddMandarinBotClients();
+builder.Services.AddEventWatch();
 builder.Logging.AddMandarinBotLogging();
 builder.Services.AddMandarinBotCoreServices();
 builder.Services.AddMandarinBotDiscordServices();

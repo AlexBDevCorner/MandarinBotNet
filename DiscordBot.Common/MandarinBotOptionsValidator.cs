@@ -71,6 +71,11 @@ public sealed class MandarinBotOptionsValidator(bool requireOperationalConfigura
             "Bot:Schedules:FplChipWatch",
             options.Schedules.FplChipWatch,
             failures);
+        ValidateSchedule(
+            "Bot:Schedules:EventWatch",
+            options.Schedules.EventWatch,
+            failures);
+        ValidateEventWatch(options, failures);
         ValidateAutonomousWorkDispatcher(options.AutonomousWorkDispatcher, failures);
 
         if (requireOperationalConfiguration && !options.Schedules.HasEnabledJobs)
@@ -299,6 +304,92 @@ public sealed class MandarinBotOptionsValidator(bool requireOperationalConfigura
         {
             failures.Add(
                 $"{path}:Token is required when the dispatcher is enabled. Supply it through Bot__AutonomousWorkDispatcher__Token in the environment or another secret provider.");
+        }
+    }
+
+    private static void ValidateEventWatch(
+        MandarinBotOptions options,
+        List<string> failures)
+    {
+        var schedule = options.Schedules.EventWatch;
+        var watches = options.EventWatch.Watches;
+
+        var seenIds = new HashSet<string>(StringComparer.Ordinal);
+        for (var index = 0; index < watches.Count; index++)
+        {
+            var watch = watches[index];
+            var path = $"Bot:EventWatch:Watches:{index}";
+
+            if (string.IsNullOrWhiteSpace(watch.Id))
+            {
+                failures.Add($"{path}:Id must be non-empty.");
+            }
+            else if (!seenIds.Add(watch.Id.Trim()))
+            {
+                failures.Add($"{path}:Id '{watch.Id}' duplicates an earlier watch ID.");
+            }
+        }
+
+        if (!schedule.Enabled)
+        {
+            return;
+        }
+
+        var enabledWatches = watches
+            .Select((watch, index) => (watch, index))
+            .Where(item => item.watch.Enabled)
+            .ToList();
+
+        if (enabledWatches.Count == 0)
+        {
+            failures.Add(
+                "Bot:EventWatch:Watches must contain at least one enabled watch when Bot:Schedules:EventWatch is enabled.");
+            return;
+        }
+
+        foreach (var (watch, index) in enabledWatches)
+        {
+            var path = $"Bot:EventWatch:Watches:{index}";
+
+            if (string.IsNullOrWhiteSpace(watch.Title))
+            {
+                failures.Add($"{path}:Title must be non-empty.");
+            }
+
+            if (watch.MatchTerms.Count == 0 ||
+                watch.MatchTerms.Any(term => string.IsNullOrWhiteSpace(term)))
+            {
+                failures.Add($"{path}:MatchTerms must contain at least one non-empty term.");
+            }
+
+            if (watch.Targets.Count == 0)
+            {
+                failures.Add(
+                    $"{path}:Targets must contain at least one dedicated Discord target.");
+                continue;
+            }
+
+            var configuredTargets = new HashSet<(ulong GuildId, ulong ChannelId)>();
+            for (var targetIndex = 0; targetIndex < watch.Targets.Count; targetIndex++)
+            {
+                var target = watch.Targets[targetIndex];
+                var targetPath = $"{path}:Targets:{targetIndex}";
+
+                if (target.GuildId == 0)
+                {
+                    failures.Add($"{targetPath}:GuildId must contain a Discord guild ID.");
+                }
+
+                if (target.ChannelId == 0)
+                {
+                    failures.Add($"{targetPath}:ChannelId must contain a Discord channel ID.");
+                }
+
+                if (!configuredTargets.Add((target.GuildId, target.ChannelId)))
+                {
+                    failures.Add($"{targetPath} duplicates an earlier guild/channel target.");
+                }
+            }
         }
     }
 

@@ -1,4 +1,5 @@
 using DiscordBot;
+using DiscordBot.EventWatch;
 using DiscordBot.Jobs;
 using DiscordBot.UclFantasy;
 using Microsoft.Extensions.DependencyInjection;
@@ -131,6 +132,16 @@ public static class MandarinBotQuartzExtensions
                 JobSchedules.FplChipWatchJobKey,
                 JobSchedules.FplChipWatchTriggerName,
                 schedules.FplChipWatch.Cron,
+                timeZone);
+        }
+
+        if (schedules.EventWatch.Enabled)
+        {
+            AddScheduledJob<EventWatchJob>(
+                quartzOptions,
+                JobSchedules.EventWatchJobKey,
+                JobSchedules.EventWatchTriggerName,
+                schedules.EventWatch.Cron,
                 timeZone);
         }
 
