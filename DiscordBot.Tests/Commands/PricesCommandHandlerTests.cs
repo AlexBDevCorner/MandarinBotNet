@@ -73,6 +73,92 @@ public sealed class PricesCommandHandlerTests
     }
 
     [Test]
+    public async Task HandleAsync_MixedOwnedAndUnowned_ReturnsCompleteList()
+    {
+        // Arrange: Saka unowned decrease, Salah owned increase.
+        var client = new TestFantasyPremierLeagueClient
+        {
+            Bootstrap = CreateMixedBootstrap(),
+            Managers = [new ClassicStanding { Entry = 1, EntryName = "Bobrov FC" }]
+        };
+        client.Picks[1] = new EntryEventPicksResponse
+        {
+            Picks = [new EntryEventPick { Element = 10 }]
+        };
+        var store = new InMemoryPriceStore();
+        store.SaveSnapshot(new Dictionary<int, int> { [10] = 100, [30] = 100 });
+        var handler = CreateHandler(client, store);
+        var interaction = new TestInteraction();
+
+        // Act
+        await handler.HandleAsync(interaction);
+
+        // Assert: same complete list as scheduled notifications.
+        interaction.Messages.Should().ContainSingle();
+        var message = interaction.Messages[0];
+        message.Should().Contain("Saka");
+        message.Should().Contain("Salah");
+        message.Should().Contain("📉 Saka");
+        message.Should().Contain("📈 Salah");
+        message.Should().Contain("В составах: Bobrov FC");
+        message.Should().Contain("💸 Общая стоимость составов: +0,1 млн £");
+        message.Should().Contain("📋 По командам:");
+    }
+
+    [Test]
+    public async Task HandleAsync_LargeBatch_SplitsAcrossMultipleDiscordMessages()
+    {
+        // Arrange: synthetic batch longer than a single Discord message.
+        const int playerCount = 150;
+        var elements = Enumerable.Range(1, playerCount)
+            .Select(id => new PremierLeagueElement
+            {
+                Id = id,
+                WebName = $"Player{id:D3}",
+                NowCost = 101
+            })
+            .ToList();
+        var client = new TestFantasyPremierLeagueClient
+        {
+            Bootstrap = new BootstrapStaticResponse
+            {
+                Events =
+                [
+                    new PremierLeagueEvent
+                    {
+                        Id = 3,
+                        IsCurrent = true
+                    }
+                ],
+                Elements = elements
+            },
+            Managers = [new ClassicStanding { Entry = 1, EntryName = "Bobrov FC" }]
+        };
+        client.Picks[1] = new EntryEventPicksResponse
+        {
+            Picks = [new EntryEventPick { Element = 1 }]
+        };
+        var store = new InMemoryPriceStore();
+        store.SaveSnapshot(elements.ToDictionary(element => element.Id, _ => 100));
+        var handler = CreateHandler(client, store);
+        var interaction = new TestInteraction();
+
+        // Act
+        await handler.HandleAsync(interaction);
+
+        // Assert: chunked delivery retains every player change.
+        interaction.Messages.Count.Should().BeGreaterThan(1);
+        interaction.Operations.Should().Contain("Followup");
+        var combined = string.Join('\n', interaction.Messages);
+        foreach (var element in elements)
+        {
+            combined.Should().Contain(element.WebName);
+        }
+
+        combined.Should().Contain("В составах: Bobrov FC");
+    }
+
+    [Test]
     public async Task HandleAsync_FplUnavailable_ReturnsRetryMessage()
     {
         // Arrange
@@ -133,6 +219,36 @@ public sealed class PricesCommandHandlerTests
                     Id = 10,
                     WebName = "Salah",
                     NowCost = cost
+                }
+            ]
+        };
+    }
+
+    private static BootstrapStaticResponse CreateMixedBootstrap()
+    {
+        return new BootstrapStaticResponse
+        {
+            Events =
+            [
+                new PremierLeagueEvent
+                {
+                    Id = 3,
+                    IsCurrent = true
+                }
+            ],
+            Elements =
+            [
+                new PremierLeagueElement
+                {
+                    Id = 10,
+                    WebName = "Salah",
+                    NowCost = 101
+                },
+                new PremierLeagueElement
+                {
+                    Id = 30,
+                    WebName = "Saka",
+                    NowCost = 99
                 }
             ]
         };

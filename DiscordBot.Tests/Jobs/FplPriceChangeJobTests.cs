@@ -62,10 +62,88 @@ public sealed class FplPriceChangeJobTests
         store.Prices.Should().BeEquivalentTo(new Dictionary<int, int> { [1] = 101 });
     }
 
+    [Test]
+    public async Task Execute_MixedOwnedAndUnowned_PublishesCompleteMessage()
+    {
+        // Arrange: Saka unowned decrease, Salah owned increase.
+        var client = new TestFantasyPremierLeagueClient
+        {
+            Bootstrap = CreateLeagueBootstrap(),
+            Managers = [new ClassicStanding { Entry = 1, EntryName = "Bobrov FC" }]
+        };
+        client.Picks[1] = new EntryEventPicksResponse
+        {
+            Picks = [new EntryEventPick { Element = 10 }]
+        };
+        var store = new InMemoryFplPriceSnapshotStore();
+        store.SaveSnapshot(new Dictionary<int, int> { [10] = 100, [30] = 100 });
+        var publisher = new TestNotificationPublisher();
+        var job = CreateJob(
+            client,
+            store,
+            publisher,
+            new FantasyPremierLeagueOptions { ClassicLeagueId = 123 });
+        var context = CreateContext();
+
+        // Act
+        await job.Execute(context);
+
+        // Assert: both changes visible, only owned annotated, totals exclude unowned.
+        publisher.Publications.Should().ContainSingle();
+        var message = publisher.Publications[0].Message;
+        message.Should().Contain("Saka");
+        message.Should().Contain("Salah");
+        message.Should().Contain("📉 Saka");
+        message.Should().Contain("📈 Salah");
+        message.Should().Contain("В составах: Bobrov FC");
+        message.Should().Contain("💸 Общая стоимость составов: +0,1 млн £");
+        message.Should().Contain("📋 По командам:");
+    }
+
+    [Test]
+    public async Task Execute_LargeBatch_PublishesCompleteMessageWithoutTruncation()
+    {
+        // Arrange: synthetic batch longer than a single Discord message.
+        const int playerCount = 150;
+        var elements = Enumerable.Range(1, playerCount)
+            .Select(id => new PremierLeagueElement
+            {
+                Id = id,
+                WebName = $"Player{id:D3}",
+                NowCost = 101
+            })
+            .ToList();
+        var client = new TestFantasyPremierLeagueClient
+        {
+            Bootstrap = new BootstrapStaticResponse { Elements = elements }
+        };
+        var store = new InMemoryFplPriceSnapshotStore();
+        store.SaveSnapshot(elements.ToDictionary(element => element.Id, _ => 100));
+        var publisher = new TestNotificationPublisher();
+        var job = CreateJob(client, store, publisher);
+        var context = CreateContext();
+
+        // Act
+        await job.Execute(context);
+
+        // Assert: full message retained and chunkable without dropping players.
+        publisher.Publications.Should().ContainSingle();
+        var message = publisher.Publications[0].Message;
+        message.Length.Should().BeGreaterThan(2_000);
+        var chunks = DiscordBot.Notifications.DiscordMessageChunker.Split(message, 2_000);
+        chunks.Should().HaveCountGreaterThan(1);
+        var combined = string.Join('\n', chunks);
+        foreach (var element in elements)
+        {
+            combined.Should().Contain(element.WebName);
+        }
+    }
+
     private static FplPriceChangeJob CreateJob(
         TestFantasyPremierLeagueClient client,
         InMemoryFplPriceSnapshotStore store,
-        TestNotificationPublisher publisher)
+        TestNotificationPublisher publisher,
+        FantasyPremierLeagueOptions? leagueOptions = null)
     {
         return new FplPriceChangeJob(
             new ReadyDiscordConnection(),
@@ -76,7 +154,7 @@ public sealed class FplPriceChangeJobTests
                 new RecordingLogger<FplPriceChangeService>()),
             new FplLeaguePriceChangeService(
                 client,
-                new FantasyPremierLeagueOptions(),
+                leagueOptions ?? new FantasyPremierLeagueOptions(),
                 new RecordingLogger<FplLeaguePriceChangeService>()),
             new FplPriceChangeMessageCompositionService(),
             publisher,
@@ -125,9 +203,43 @@ public sealed class FplPriceChangeJobTests
         };
     }
 
+    private static BootstrapStaticResponse CreateLeagueBootstrap()
+    {
+        return new BootstrapStaticResponse
+        {
+            Events =
+            [
+                new PremierLeagueEvent
+                {
+                    Id = 3,
+                    IsCurrent = true
+                }
+            ],
+            Elements =
+            [
+                new PremierLeagueElement
+                {
+                    Id = 10,
+                    WebName = "Salah",
+                    NowCost = 101
+                },
+                new PremierLeagueElement
+                {
+                    Id = 30,
+                    WebName = "Saka",
+                    NowCost = 99
+                }
+            ]
+        };
+    }
+
     private sealed class TestFantasyPremierLeagueClient : IFantasyPremierLeagueClient
     {
         public BootstrapStaticResponse Bootstrap { get; set; } = CreateBootstrap(100);
+
+        public List<ClassicStanding> Managers { get; init; } = [];
+
+        public Dictionary<int, EntryEventPicksResponse> Picks { get; } = [];
 
         public Task<BootstrapStaticResponse> GetBootstrapStaticAsync(
             CancellationToken cancellationToken)
@@ -139,7 +251,10 @@ public sealed class FplPriceChangeJobTests
             int leagueId,
             CancellationToken cancellationToken)
         {
-            throw new NotSupportedException();
+            return Task.FromResult(new ClassicStandingsResponse
+            {
+                Standings = new ClassicStandings { Results = Managers }
+            });
         }
 
         public Task<HeadToHeadStandingsResponse> GetHeadToHeadStandingsAsync(
@@ -154,7 +269,7 @@ public sealed class FplPriceChangeJobTests
             int eventId,
             CancellationToken cancellationToken)
         {
-            throw new NotSupportedException();
+            return Task.FromResult(Picks[entryId]);
         }
 
         public Task<EventLiveResponse> GetEventLiveAsync(

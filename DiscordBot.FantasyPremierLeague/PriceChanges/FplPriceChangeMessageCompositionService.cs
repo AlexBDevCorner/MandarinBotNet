@@ -37,13 +37,20 @@ public sealed class FplPriceChangeMessageCompositionService
             return summary.ToString();
         }
 
-        var ownedChanges = report.PlayerChanges
-            .Where(change => change.OwnerEntryNames.Count > 0)
-            .ToArray();
-        if (ownedChanges.Length == 0)
+        var hasAffectedSquads = report.PlayerChanges
+            .Any(change => change.OwnerEntryNames.Count > 0);
+        if (!hasAffectedSquads)
         {
             summary.Append(
                 "\n😌 Цены изменились, но составы нашей лиги это не затронуло.");
+
+            foreach (var playerChange in report.PlayerChanges)
+            {
+                AppendPlayerChange(
+                    summary,
+                    playerChange.Change,
+                    playerChange.OwnerEntryNames);
+            }
         }
         else
         {
@@ -51,7 +58,7 @@ public sealed class FplPriceChangeMessageCompositionService
             summary.Append("\n💸 Общая стоимость составов: ");
             summary.Append(FormatSignedPrice(leagueDifference));
 
-            foreach (var playerChange in ownedChanges)
+            foreach (var playerChange in report.PlayerChanges)
             {
                 AppendPlayerChange(
                     summary,

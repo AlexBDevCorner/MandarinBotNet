@@ -298,15 +298,19 @@ notifications. Configure the live thresholds explicitly when changing the defaul
 The optional `FplPriceChanges` job is disabled by default. When enabled, it checks
 the current price of every FPL player at the top of each hour from 12:00 through
 22:00 in `Europe/Riga`. It stores the latest successful snapshot in
-`data/fpl-price-snapshot.db` and publishes only the players whose prices changed
+`data/fpl-price-snapshot.db` and publishes every detected player price change
 since the previous notification. For the configured classic league, the job
-loads the current public squad for each manager, hides price changes that affect
-none of those squads, lists the teams that own each changed player, and totals
-the value change per team. Squad lookups run at most five at a time to avoid an
-API request burst in large leagues. If only some squads load, the message reports
-its coverage; if league data is unavailable, it falls back to the global changes
-instead of losing the notification. The first run establishes the baseline and
-does not publish a message.
+loads the current public squad for each manager, annotates players owned in the
+league with their owners, and totals the value change per team. League totals
+and per-team impacts are based only on players actually owned by those teams,
+while unowned players remain visible so managers can spot market opportunities.
+Squad lookups run at most five at a time to avoid an API request burst in large
+leagues. If none of the changed players are owned in the league, all market
+changes are still listed with a note that league squads were not affected. If
+only some squads load, the message reports its coverage; if league data is
+unavailable, it falls back to the global changes instead of losing the
+notification. The first run establishes the baseline and does not publish a
+message.
 
 The last successfully published change batch is stored alongside the current
 price baseline. `/prices` checks for newer changes without advancing that
