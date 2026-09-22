@@ -53,6 +53,11 @@ public static class MandarinBotConfigurationServiceCollectionExtensions
                 .GetRequiredService<IOptions<MandarinBotOptions>>()
                 .Value
                 .AutonomousWorkDispatcher);
+        services.AddSingleton(
+            services => services
+                .GetRequiredService<IOptions<MandarinBotOptions>>()
+                .Value
+                .EventWatch);
 
         return services;
     }

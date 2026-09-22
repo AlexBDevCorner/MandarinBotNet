@@ -25,6 +25,8 @@ public static class JobSchedules
         "FplPriceChangesTrigger";
     public const string FplChipWatchTriggerName =
         "FplChipWatchTrigger";
+    public const string EventWatchTriggerName =
+        "EventWatchTrigger";
     public const string AutonomousWorkDispatcherTriggerName =
         "AutonomousWorkDispatcherTrigger";
 
@@ -57,6 +59,9 @@ public static class JobSchedules
 
     public static readonly JobKey FplChipWatchJobKey =
         new("FplChipWatch");
+
+    public static readonly JobKey EventWatchJobKey =
+        new("EventWatch");
 
     public static readonly JobKey AutonomousWorkDispatcherJobKey =
         new("AutonomousWorkDispatcher");
@@ -146,6 +151,14 @@ public static class JobSchedules
             options.FplChipWatch.Cron,
             options.TimeZoneId);
 
+    public static ITrigger CreateEventWatchTrigger(
+        JobSchedulesOptions options) =>
+        CreateCronTrigger(
+            EventWatchJobKey,
+            EventWatchTriggerName,
+            options.EventWatch.Cron,
+            options.TimeZoneId);
+
     public static ITrigger CreateAutonomousWorkDispatcherTrigger(
         AutonomousWorkDispatcherOptions dispatcher,
         string timeZoneId) =>
@@ -167,7 +180,8 @@ public static class JobSchedules
         CreateFplGameweekRecapTrigger(options),
         CreateFplLiveInsightsTrigger(options),
         CreateFplPriceChangesTrigger(options),
-        CreateFplChipWatchTrigger(options)
+        CreateFplChipWatchTrigger(options),
+        CreateEventWatchTrigger(options)
     ];
 
     private static ITrigger CreateCronTrigger(

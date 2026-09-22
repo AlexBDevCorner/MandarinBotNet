@@ -13,13 +13,17 @@ namespace DiscordBot.Notifications
         public const string FplLiveInsights = "fpl-live-insights";
         public const string FplPriceChanges = "fpl-price-changes";
         public const string FplChipWatch = "fpl-chip-watch";
+        public const string EventWatchAnnouncement = "event-watch-announcement";
+        public const string EventWatchTicketLink = "event-watch-ticket-link";
 
         private static readonly HashSet<string> EveryoneMentionAllowedTypes =
         [
             Deadline24Hours,
             Deadline1Hour,
             UclDeadline24Hours,
-            UclDeadline1Hour
+            UclDeadline1Hour,
+            EventWatchAnnouncement,
+            EventWatchTicketLink
         ];
 
         public static bool AllowsEveryoneMention(string notificationType) =>

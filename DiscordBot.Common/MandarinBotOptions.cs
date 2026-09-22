@@ -14,6 +14,8 @@ public sealed class MandarinBotOptions
 
     public NotificationOptions Notifications { get; init; } = new();
 
+    public EventWatchOptions EventWatch { get; init; } = new();
+
     public WelcomeMessageOptions WelcomeMessages { get; init; } = new();
 
     public AutonomousWorkDispatcherOptions AutonomousWorkDispatcher { get; init; } = new();
@@ -130,6 +132,11 @@ public sealed class JobSchedulesOptions
         Cron = "0 0 6,12,18 * * ?"
     };
 
+    public ScheduledJobOptions EventWatch { get; init; } = new()
+    {
+        Cron = "0 0/10 * * * ?"
+    };
+
     public bool HasEnabledJobs =>
         PremierLeagueNotifications.Enabled ||
         UclFantasyNotifications.Enabled ||
@@ -140,7 +147,8 @@ public sealed class JobSchedulesOptions
         FplGameweekRecap.Enabled ||
         FplLiveInsights.Enabled ||
         FplPriceChanges.Enabled ||
-        FplChipWatch.Enabled;
+        FplChipWatch.Enabled ||
+        EventWatch.Enabled;
 
     public bool HasEnabledNotificationJobs =>
         PremierLeagueNotifications.Enabled ||

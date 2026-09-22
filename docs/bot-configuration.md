@@ -340,6 +340,81 @@ Bot__FantasyPremierLeague__ChipWatch__NotificationWindowEndHours=18
 
 Smart scoring in v1 covers Free Hit only; Bench Boost, Triple Captain and Wildcard expiry is tracked but their recommendation models are future work. All external FPL names are sanitized with `DiscordTextSafety.SanitizeExternalName`, and messages respect Discord's 2,000-character limit with bounded concurrency (5) for manager data.
 
+## EventWatch (Riga FC ticket monitoring)
+
+The optional `EventWatch` capability checks Riga FC's official website every
+10 minutes for ticket-sale evidence and sends Discord alerts exactly once.
+It is a separate domain from FPL/UCL (`DiscordBot.EventWatch`) and reuses the
+existing `IDiscordNotificationPublisher` checkpoints, so no new database table
+is required.
+
+Tracked `appsettings.json` keeps the feature disabled with safe defaults and
+no real Discord IDs:
+
+```json
+"Schedules": {
+  "EventWatch": {
+    "Enabled": false,
+    "Cron": "0 0/10 * * * ?"
+  }
+},
+"EventWatch": {
+  "Watches": [
+    {
+      "Enabled": false,
+      "Id": "riga-fc-atalanta-2026",
+      "Title": "Riga FC vs Atalanta tickets",
+      "MatchTerms": [ "Atalanta" ],
+      "Targets": [
+        {
+          "GuildId": 0,
+          "ChannelId": 0,
+          "MentionEveryone": true
+        }
+      ]
+    }
+  ]
+}
+```
+
+The initial watch `riga-fc-atalanta-2026` searches Riga FC's homepage
+(`https://rigafc.lv/`), calendar (`https://rigafc.lv/kalendars/`), and news
+(`https://rigafc.lv/jaunumi/`) for case-insensitive `Atalanta` mentions
+combined with ticket-sale wording (`biļete`, `biļetes`, `biļešu`, `ticket`,
+`tickets`, `pārdošanā`, `iegādāties`, `pirkt`) or an actionable ticket link in
+the same content block. A plain fixture, a historical mention, a generic
+site-wide `Biļetes` navigation link, or unrelated page changes do not notify.
+When the same block proves both, both `event-watch-announcement` and
+`event-watch-ticket-link` are delivered once per configured target; repeats
+are suppressed by the existing notification checkpoints.
+
+Each watch owns its dedicated Discord targets. EventWatch never publishes to
+the general `Bot:Notifications:Targets` list, so the ticket alert can use a
+different channel from normal bot notifications. `MentionEveryone` is
+configured independently per EventWatch target and is permitted for the two
+`event-watch-*` types.
+
+To enable in deployment, set the schedule plus the watch and its dedicated
+target (real IDs belong only in runtime configuration):
+
+```dotenv
+Bot__Schedules__EventWatch__Enabled=true
+Bot__Schedules__EventWatch__Cron=0 0/10 * * * ?
+Bot__EventWatch__Watches__0__Enabled=true
+Bot__EventWatch__Watches__0__Id=riga-fc-atalanta-2026
+Bot__EventWatch__Watches__0__Title=Riga FC vs Atalanta tickets
+Bot__EventWatch__Watches__0__MatchTerms__0=Atalanta
+Bot__EventWatch__Watches__0__Targets__0__GuildId=<EVENTWATCH-GUILD-ID>
+Bot__EventWatch__Watches__0__Targets__0__ChannelId=<EVENTWATCH-CHANNEL-ID>
+Bot__EventWatch__Watches__0__Targets__0__MentionEveryone=true
+```
+
+Disabling `Bot__Schedules__EventWatch__Enabled` removes the scheduled
+EventWatch job on the next process start and leaves all other jobs unchanged.
+Do not poll Biļešu Serviss directly; the detection path is the official Riga
+FC website, although a detected outbound ticket URL is included in the Discord
+message.
+
 ## Multiple targets and mentions
 
 Targets are addressed only by Discord snowflake IDs. Add another independently
@@ -356,6 +431,9 @@ where broadcasts are intentional and the bot has permission to mention
 everyone. When enabled, the `@everyone` mention is added **only** for
 notification types that are explicitly permitted to broadcast. Currently the
 permitted types are the FPL and UCL 24-hour and 1-hour deadline reminders
-(`fpl-deadline-*` and `ucl-deadline-*`); all other notification types are sent
-without a mention. Jobs never enumerate all guilds and never fall back to
-channel display names.
+(`fpl-deadline-*` and `ucl-deadline-*`) plus the EventWatch alerts
+(`event-watch-announcement` and `event-watch-ticket-link`); all other
+notification types are sent without a mention. Jobs never enumerate all
+guilds and never fall back to channel display names. EventWatch targets are
+configured per watch under `Bot:EventWatch:Watches`, not under
+`Bot:Notifications:Targets`.
