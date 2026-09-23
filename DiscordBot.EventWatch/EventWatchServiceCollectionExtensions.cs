@@ -1,3 +1,5 @@
+using DiscordBot.Commands;
+using DiscordBot.EventWatch.Commands;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Http.Resilience;
@@ -22,6 +24,10 @@ public static class EventWatchServiceCollectionExtensions
         services.TryAddSingleton<EventWatchMessageCompositionService>();
         services.TryAddSingleton<IEventWatchSource, RigaFcEventWatchSource>();
         services.TryAddSingleton<EventWatchService>();
+        services.TryAddSingleton<EventWatchStatusService>();
+        services.TryAddSingleton<EventWatchStatusMessageComposer>();
+        services.TryAddSingleton<EventWatchDeliveryTestService>();
+        services.TryAddSingleton<IEventWatchCommandHandler, EventWatchCommandHandler>();
 
         var clientBuilder = services.AddHttpClient<RigaFcClient>(client =>
         {

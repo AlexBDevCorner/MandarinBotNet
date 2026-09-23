@@ -140,8 +140,10 @@ full command guide.
 
 Application-command registration publishes `/help`, `/prices`, `/deadline`,
 `/live`, `/standings`, `/profile`, `/achievements`, `/benchleague`, `/chips`, `/chipwatch`,
-and `/hugme`. `/deadline` includes exact Riga civil time for both FPL and UCL
+`/eventwatch`, and `/hugme`. `/deadline` includes exact Riga civil time for both FPL and UCL
 plus a Discord relative timestamp that keeps counting down in the client.
+`/eventwatch` exposes the `status` and `test` subcommands for EventWatch
+diagnostics.
 
 `MaxStandingsPages` bounds the number of FPL standings pages fetched by each
 job. The default of 10 represents up to 500 league entries while preventing a
@@ -376,6 +378,19 @@ no real Discord IDs:
           "MentionEveryone": true
         }
       ]
+    },
+    {
+      "Enabled": false,
+      "Id": "riga-fc-smoke-kairat-2026",
+      "Title": "[SMOKE TEST] Riga FC vs Kairat tickets",
+      "MatchTerms": [ "Kairat" ],
+      "Targets": [
+        {
+          "GuildId": 0,
+          "ChannelId": 0,
+          "MentionEveryone": false
+        }
+      ]
     }
   ]
 }
@@ -418,6 +433,86 @@ EventWatch job on the next process start and leaves all other jobs unchanged.
 Do not poll Biļešu Serviss directly; the detection path is the official Riga
 FC website, although a detected outbound ticket URL is included in the Discord
 message.
+
+### EventWatch verification procedure
+
+Use this sequence to prove the production ticket monitoring works without
+risking the real Atalanta notification:
+
+1. configure the real EventWatch target (index `0`, `riga-fc-atalanta-2026`)
+   with its dedicated guild/channel IDs;
+2. run `/eventwatch test` and verify the expected Discord channel receives the
+   clearly labelled test message (no everyone mention, repeatable, no
+   checkpoints consumed);
+3. run `/eventwatch status` and verify the Riga FC homepage, calendar, and news
+   sources are reachable and parsed, including observation counts and any
+   currently detected signals with evidence links;
+4. temporarily enable the isolated live smoke watch (index `1`,
+   `riga-fc-smoke-kairat-2026`) with its dedicated target;
+5. verify the scheduled job sends the smoke notification through the normal
+   fetch → parser → detector → job → publisher → Discord → checkpoint path;
+6. disable the smoke watch again;
+7. leave the real Atalanta watch (`riga-fc-atalanta-2026`) enabled.
+
+> ⚠️ Never repurpose `riga-fc-atalanta-2026` with test match terms. Its
+> announcement (`event-watch-announcement`) and ticket-link
+> (`event-watch-ticket-link`) checkpoints are keyed by
+> `event-watch:riga-fc-atalanta-2026`; a test delivery under that identity
+> would consume the real notification and suppress the future Atalanta alert.
+
+`/eventwatch status` uses the real production fetch/parser/detector path and
+reports scheduling state, enabled watch IDs/titles, source pages, observation
+counts, per-watch match terms and detected signal kinds with evidence URLs,
+and a clear healthy/no-signal versus collection-failure result. It never
+publishes alerts and never marks checkpoints delivered. `/eventwatch test`
+resolves the real configured EventWatch targets and sends through the real
+Discord destination path with an everyone mention explicitly disabled, so it
+is safe to rerun and can never consume the production Atalanta checkpoints.
+
+### Temporary live smoke watch
+
+Tracked configuration ships a second, disabled-by-default watch for a
+known-positive Riga FC page condition:
+
+```json
+{
+  "Enabled": false,
+  "Id": "riga-fc-smoke-kairat-2026",
+  "Title": "[SMOKE TEST] Riga FC vs Kairat tickets",
+  "MatchTerms": [ "Kairat" ],
+  "Targets": [
+    {
+      "GuildId": 0,
+      "ChannelId": 0,
+      "MentionEveryone": false
+    }
+  ]
+}
+```
+
+The smoke watch uses the normal scheduled EventWatch path with
+`MentionEveryone=false` and a watch ID different from
+`riga-fc-atalanta-2026`, so its checkpoints
+(`event-watch:riga-fc-smoke-kairat-2026`) are fully isolated from the
+production Atalanta checkpoints. A checkout therefore cannot unexpectedly
+publish test messages. To enable it temporarily against the currently visible
+Riga vs Kairat Almaty calendar entry (Tickets action), set:
+
+```dotenv
+Bot__EventWatch__Watches__1__Enabled=true
+Bot__EventWatch__Watches__1__Id=riga-fc-smoke-kairat-2026
+Bot__EventWatch__Watches__1__Title=[SMOKE TEST] Riga FC vs Kairat tickets
+Bot__EventWatch__Watches__1__MatchTerms__0=Kairat
+Bot__EventWatch__Watches__1__Targets__0__GuildId=<SMOKE-GUILD-ID>
+Bot__EventWatch__Watches__1__Targets__0__ChannelId=<SMOKE-CHANNEL-ID>
+Bot__EventWatch__Watches__1__Targets__0__MentionEveryone=false
+```
+
+If the Kairat entry is no longer present, point the smoke watch at another
+currently visible Riga FC event that already shows ticket wording/action on
+the existing EventWatch source pages; do not weaken the detector or match
+arbitrary site-wide text. Disable the smoke watch (`...__1__Enabled=false`)
+immediately after verification and do not keep it enabled permanently.
 
 ## Multiple targets and mentions
 

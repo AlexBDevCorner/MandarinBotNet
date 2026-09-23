@@ -22,6 +22,8 @@ public sealed class BotHelpMessageCompositionService
             "`/deadline` — ближайшие дедлайны FPL и ЛЧ\n" +
             "`/chips` — справочник по фишкам FPL\n" +
             "`/chipwatch` — доступные фишки и умные подсказки по их использованию\n" +
+            "`/eventwatch status` — проверка источников Riga FC без уведомлений\n" +
+            "`/eventwatch test` — тестовое сообщение в каналы EventWatch\n" +
             "`/hugme` — священная функция обнимашек\n\n" +
             ComposeLeagueLinks();
     }

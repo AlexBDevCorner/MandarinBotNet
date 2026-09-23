@@ -21,6 +21,7 @@ namespace DiscordBot
         IChipsCommandHandler chipsCommandHandler,
         IPricesCommandHandler pricesCommandHandler,
         IChipWatchCommandHandler chipWatchCommandHandler,
+        IEventWatchCommandHandler eventWatchCommandHandler,
         IHelpCommandHandler helpCommandHandler,
         IWelcomeMessageHandler welcomeMessageHandler,
         DiscordNetLogHandler discordLogHandler,
@@ -53,6 +54,7 @@ namespace DiscordBot
                 { DiscordApplicationCommands.ChipsName, chipsCommandHandler.HandleAsync },
                 { DiscordApplicationCommands.PricesName, pricesCommandHandler.HandleAsync },
                 { DiscordApplicationCommands.ChipWatchName, chipWatchCommandHandler.HandleAsync },
+                { DiscordApplicationCommands.EventWatchName, eventWatchCommandHandler.HandleAsync },
                 { DiscordApplicationCommands.HelpName, helpCommandHandler.HandleAsync }
             };
 
