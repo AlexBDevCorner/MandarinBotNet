@@ -40,7 +40,7 @@ public static class JobExecutionLogging
         var startedTimestamp = timeProvider.GetTimestamp();
         var logContext = new JobExecutionLogContext(attempt);
 
-        using var scope = logger.BeginScope(new Dictionary<string, object?>
+        using var scope = logger.BeginScope(new Dictionary<string, object?>(StringComparer.Ordinal)
         {
             ["Job"] = job,
             ["FireInstanceId"] = context.FireInstanceId,

@@ -44,8 +44,8 @@ internal sealed class RecordingLogger<T> : ILogger<T>
         var properties = state is IEnumerable<KeyValuePair<string, object?>> values
             ? values
                 .Where(value => value.Key != "{OriginalFormat}")
-                .ToDictionary(value => value.Key, value => value.Value)
-            : new Dictionary<string, object?>();
+                .ToDictionary(value => value.Key, value => value.Value, StringComparer.Ordinal)
+            : new Dictionary<string, object?>(StringComparer.Ordinal);
 
         lock (_entries)
         {

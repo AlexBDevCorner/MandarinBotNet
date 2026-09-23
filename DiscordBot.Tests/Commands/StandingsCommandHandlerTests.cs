@@ -638,8 +638,8 @@ public sealed class StandingsCommandHandlerTests
     private sealed class TestSlashCommandInteraction(List<string> operations)
         : IDiscordSlashCommandInteraction
     {
-        private readonly Dictionary<string, string> _stringOptions = new();
-        private readonly Dictionary<string, long> _integerOptions = new();
+        private readonly Dictionary<string, string> _stringOptions = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, long> _integerOptions = new(StringComparer.Ordinal);
 
         public string Name => DiscordApplicationCommands.StandingsName;
 

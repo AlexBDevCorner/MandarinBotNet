@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace DiscordBot.BenchWarming;
 
 public class BenchWarmingQueryService(IBenchWarmingLeagueStore store)
@@ -252,7 +254,7 @@ public class BenchWarmingQueryService(IBenchWarmingLeagueStore store)
             })
             .ToArray();
 
-        if (int.TryParse(query, out var numericEntryId))
+        if (int.TryParse(query, NumberStyles.Integer, CultureInfo.InvariantCulture, out var numericEntryId))
         {
             var byId = entries.Where(entry => entry.EntryId == numericEntryId).ToArray();
             return byId.Length == 1

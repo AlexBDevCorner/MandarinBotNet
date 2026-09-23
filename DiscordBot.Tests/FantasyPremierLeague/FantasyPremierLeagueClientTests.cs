@@ -217,7 +217,7 @@ public sealed class FantasyPremierLeagueClientTests
 
         // Act
         var task = client.GetBootstrapStaticAsync(cancellationSource.Token);
-        await handlerStarted.Task.WaitAsync(TimeSpan.FromSeconds(1));
+        await handlerStarted.Task.WaitAsync(TimeSpan.FromSeconds(1), cancellationSource.Token);
         cancellationSource.Cancel();
         Func<Task> act = () => task;
 

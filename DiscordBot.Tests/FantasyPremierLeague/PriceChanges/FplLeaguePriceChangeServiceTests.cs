@@ -1,3 +1,4 @@
+using System.Globalization;
 using AwesomeAssertions;
 using DiscordBot.FantasyPremierLeague;
 using DiscordBot.FantasyPremierLeague.PriceChanges;
@@ -34,7 +35,7 @@ public sealed class FplLeaguePriceChangeServiceTests
         // Act
         var report = await service.CreateReportAsync(
             changes,
-            DateTimeOffset.Parse("2026-08-30T10:00:00Z"),
+            DateTimeOffset.Parse("2026-08-30T10:00:00Z", CultureInfo.InvariantCulture),
             eventId: 3,
             CancellationToken.None);
 

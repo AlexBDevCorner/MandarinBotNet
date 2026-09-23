@@ -77,7 +77,7 @@ public sealed class FplChipWatchService(
         var historyAvailableCount = 0;
         var squadAvailableCount = 0;
 
-        var countsLock = new object();
+        var countsLock = new Lock();
 
         await Parallel.ForEachAsync(
             managers,

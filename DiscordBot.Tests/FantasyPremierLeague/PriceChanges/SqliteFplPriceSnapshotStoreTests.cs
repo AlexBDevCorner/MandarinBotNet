@@ -1,3 +1,4 @@
+using System.Globalization;
 using AwesomeAssertions;
 using DiscordBot.FantasyPremierLeague.PriceChanges;
 using Microsoft.Data.Sqlite;
@@ -106,14 +107,14 @@ public sealed class SqliteFplPriceSnapshotStoreTests
             new Dictionary<int, int> { [1] = 101 },
             [new FplPlayerPriceChange(1, "Salah", 100, 101)],
             PreviousSnapshotVersion: 1,
-            CheckedAtUtc: DateTimeOffset.Parse("2026-08-30T10:00:00Z"),
+            CheckedAtUtc: DateTimeOffset.Parse("2026-08-30T10:00:00Z", CultureInfo.InvariantCulture),
             CurrentEventId: 3);
         store.SaveSnapshot(firstCheck);
         var quietCheck = new FplPriceChangeCheck(
             new Dictionary<int, int> { [1] = 101 },
             [],
             PreviousSnapshotVersion: 2,
-            CheckedAtUtc: DateTimeOffset.Parse("2026-08-30T11:00:00Z"),
+            CheckedAtUtc: DateTimeOffset.Parse("2026-08-30T11:00:00Z", CultureInfo.InvariantCulture),
             CurrentEventId: 3);
 
         // Act

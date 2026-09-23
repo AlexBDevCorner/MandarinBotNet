@@ -9,7 +9,7 @@ public interface IDiscordConnectionReadiness
 
 public sealed class DiscordConnectionReadiness : IDiscordConnectionReadiness
 {
-    private readonly object _sync = new();
+    private readonly Lock _sync = new();
     private readonly TimeSpan _timeout;
     private TaskCompletionSource _ready = CreateCompletionSource();
 

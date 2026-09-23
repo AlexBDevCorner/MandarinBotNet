@@ -55,7 +55,7 @@ public class FplRecognitionQueryService(
         var achievementCounts = awards
             .Where(award => award.EntryId == entryId &&
                 !RetiredFplAchievementKeys.IsRetired(award.AchievementKey))
-            .GroupBy(award => award.AchievementKey)
+            .GroupBy(award => award.AchievementKey, StringComparer.Ordinal)
             .Select(group => new FplAchievementCount(
                 group.Key,
                 FplAchievementDisplay.GetName(
@@ -63,7 +63,7 @@ public class FplRecognitionQueryService(
                     group.First().AchievementName),
                 group.Count()))
             .OrderByDescending(count => count.Count)
-            .ThenBy(count => count.AchievementKey)
+            .ThenBy(count => count.AchievementKey, StringComparer.Ordinal)
             .ToArray();
 
         var trackedSnapshots = orderedSnapshots

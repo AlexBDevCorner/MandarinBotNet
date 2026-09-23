@@ -49,7 +49,7 @@ public sealed class SqliteFplStatisticsStore : IFplStatisticsStore
         command.Parameters.AddWithValue("$season", season);
         command.Parameters.AddWithValue("$event_id", eventId);
 
-        return Convert.ToInt64(command.ExecuteScalar()) == 1;
+        return Convert.ToInt64(command.ExecuteScalar(), CultureInfo.InvariantCulture) == 1;
     }
 
     public void SaveSnapshot(FplGameweekSnapshot snapshot)
@@ -452,8 +452,8 @@ public sealed class SqliteFplStatisticsStore : IFplStatisticsStore
                 reader.GetString(2),
                 Convert.ToInt32(reader.GetInt64(3)),
                 Convert.ToInt32(reader.GetInt64(4)),
-                Convert.ToInt64(reader.GetValue(5)) == 1,
-                Convert.ToInt64(reader.GetValue(6)) == 1,
+                Convert.ToInt64(reader.GetValue(5), CultureInfo.InvariantCulture) == 1,
+                Convert.ToInt64(reader.GetValue(6), CultureInfo.InvariantCulture) == 1,
                 Convert.ToInt32(reader.GetInt64(7))));
         }
 

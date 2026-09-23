@@ -54,7 +54,7 @@ public sealed class MandarinBotOptionsTests
         var builder = Host.CreateApplicationBuilder();
         builder.Logging.ClearProviders();
         builder.Environment.EnvironmentName = Environments.Production;
-        builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+        builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>(StringComparer.Ordinal)
         {
             ["Bot:Schedules:TimeZoneId"] = "Europe/Riga",
             ["Bot:Schedules:PremierLeagueNotifications:Cron"] = "0 0 * * * ?",
@@ -397,7 +397,7 @@ public sealed class MandarinBotOptionsTests
     {
         // Arrange
         var configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
+            .AddInMemoryCollection(new Dictionary<string, string?>(StringComparer.Ordinal)
             {
                 ["Bot:Notifications:Targets:0:GuildId"] = "100",
                 ["Bot:Notifications:Targets:0:ChannelId"] = "101",

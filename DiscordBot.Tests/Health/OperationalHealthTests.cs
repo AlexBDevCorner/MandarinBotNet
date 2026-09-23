@@ -183,11 +183,11 @@ public sealed class OperationalHealthTests
             description: null,
             duration: TimeSpan.Zero,
             exception: null,
-            data: new Dictionary<string, object>(),
+            data: new Dictionary<string, object>(StringComparer.Ordinal),
             tags: ["ready"]);
 
         return new HealthReport(
-            new Dictionary<string, HealthReportEntry>
+            new Dictionary<string, HealthReportEntry>(StringComparer.Ordinal)
             {
                 ["discord_gateway"] = entry
             },
@@ -204,7 +204,7 @@ public sealed class OperationalHealthTests
             observedAtUtc,
             Live: true,
             Ready: ready,
-            Checks: new Dictionary<string, string>
+            Checks: new Dictionary<string, string>(StringComparer.Ordinal)
             {
                 ["discord_gateway"] = ready ? "Healthy" : "Unhealthy"
             });

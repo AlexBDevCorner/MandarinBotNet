@@ -56,7 +56,7 @@ public sealed class AutonomousWorkDispatcherClient(
 
         var endpoint = $"repos/{owner}/{repository}/actions/workflows/{workflow}/dispatches";
         var payload = JsonSerializer.Serialize(
-            new Dictionary<string, string> { ["ref"] = gitRef },
+            new Dictionary<string, string>(StringComparer.Ordinal) { ["ref"] = gitRef },
             SerializerOptions);
 
         using var request = new HttpRequestMessage(HttpMethod.Post, endpoint);

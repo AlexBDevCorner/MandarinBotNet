@@ -1,3 +1,4 @@
+using System.Globalization;
 using DiscordBot;
 using DiscordBot.EventWatch;
 using DiscordBot.Health;
@@ -6,7 +7,7 @@ using MandarinBotNet.Extensions;
 if (args.FirstOrDefault() == "--health-check")
 {
     if (args is not [_, var probeHealthStatePath, var maximumAgeSecondsText] ||
-        !int.TryParse(maximumAgeSecondsText, out var maximumAgeSeconds) ||
+        !int.TryParse(maximumAgeSecondsText, NumberStyles.Integer, CultureInfo.InvariantCulture, out var maximumAgeSeconds) ||
         maximumAgeSeconds <= 0)
     {
         await Console.Error.WriteLineAsync(

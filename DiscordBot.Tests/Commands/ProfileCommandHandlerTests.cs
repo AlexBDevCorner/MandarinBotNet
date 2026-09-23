@@ -28,7 +28,7 @@ public sealed class ProfileCommandHandlerTests
         var query = new FakeQueryService(
             FplManagerProfileLookupResult.ForNotFound());
         var handler = new ProfileCommandHandler(query, new FplRecognitionMessageCompositionService());
-        var interaction = new TestInteraction(new() { ["manager"] = "Bobrov" });
+        var interaction = new TestInteraction(new Dictionary<string, string>(StringComparer.Ordinal) { ["manager"] = "Bobrov" });
 
         await handler.HandleAsync(interaction);
 
@@ -42,7 +42,7 @@ public sealed class ProfileCommandHandlerTests
         var query = new FakeQueryService(
             FplManagerProfileLookupResult.ForAvailable(profile));
         var handler = new ProfileCommandHandler(query, new FplRecognitionMessageCompositionService());
-        var interaction = new TestInteraction(new() { ["manager"] = "Bobrov FC" });
+        var interaction = new TestInteraction(new Dictionary<string, string>(StringComparer.Ordinal) { ["manager"] = "Bobrov FC" });
 
         await handler.HandleAsync(interaction);
 
@@ -55,7 +55,7 @@ public sealed class ProfileCommandHandlerTests
     {
         var query = new FakeQueryService(FplManagerProfileLookupResult.ForNoData());
         var handler = new ProfileCommandHandler(query, new FplRecognitionMessageCompositionService());
-        var interaction = new TestInteraction(new() { ["manager"] = "Bobrov FC" });
+        var interaction = new TestInteraction(new Dictionary<string, string>(StringComparer.Ordinal) { ["manager"] = "Bobrov FC" });
 
         await handler.HandleAsync(interaction);
 
@@ -68,7 +68,7 @@ public sealed class ProfileCommandHandlerTests
     {
         var query = new FakeQueryService(FplManagerProfileLookupResult.ForNotFound());
         var handler = new ProfileCommandHandler(query, new FplRecognitionMessageCompositionService());
-        var interaction = new TestInteraction(new() { ["manager"] = "Ghost" });
+        var interaction = new TestInteraction(new Dictionary<string, string>(StringComparer.Ordinal) { ["manager"] = "Ghost" });
 
         await handler.HandleAsync(interaction);
 
@@ -86,7 +86,7 @@ public sealed class ProfileCommandHandlerTests
                 new FplManagerReference(20, "Bob United", "Bob Smith")
             ]));
         var handler = new ProfileCommandHandler(query, new FplRecognitionMessageCompositionService());
-        var interaction = new TestInteraction(new() { ["manager"] = "bob" });
+        var interaction = new TestInteraction(new Dictionary<string, string>(StringComparer.Ordinal) { ["manager"] = "bob" });
 
         await handler.HandleAsync(interaction);
 
@@ -114,7 +114,7 @@ public sealed class ProfileCommandHandlerTests
         var query = new FakeQueryService(
             FplManagerProfileLookupResult.ForAvailable(profile));
         var handler = new ProfileCommandHandler(query, new FplRecognitionMessageCompositionService());
-        var interaction = new TestInteraction(new() { ["manager"] = "Bobrov FC" });
+        var interaction = new TestInteraction(new Dictionary<string, string>(StringComparer.Ordinal) { ["manager"] = "Bobrov FC" });
 
         await handler.HandleAsync(interaction);
 

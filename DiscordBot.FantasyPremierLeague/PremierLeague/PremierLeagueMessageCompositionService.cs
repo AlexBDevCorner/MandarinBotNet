@@ -78,6 +78,7 @@ public sealed class PremierLeagueMessageCompositionService(
                 winners.Select(winner =>
                     DiscordTextSafety.SanitizeExternalName(winner.EntryName)));
             summary.Append(
+                CultureInfo.InvariantCulture,
                 $"\n\nВ этом туре максимум очков ({winners[0].EventTotal}) разделили команды: {winnerNames}. Обнимашки всем победителям! :people_hugging:");
         }
 
@@ -87,11 +88,11 @@ public sealed class PremierLeagueMessageCompositionService(
 
             if (change.Direction == StandingsChangeDirection.Up)
             {
-                summary.Append($"Команда {DiscordTextSafety.SanitizeExternalName(change.EntryName)} смогла взобраться на {change.PositionCount} позиции вверх :arrow_up:, поздравительные обнимашки! :people_hugging: Так держать!");
+                summary.Append(CultureInfo.InvariantCulture, $"Команда {DiscordTextSafety.SanitizeExternalName(change.EntryName)} смогла взобраться на {change.PositionCount} позиции вверх :arrow_up:, поздравительные обнимашки! :people_hugging: Так держать!");
             }
             else
             {
-                summary.Append($"Команда {DiscordTextSafety.SanitizeExternalName(change.EntryName)} упала на {change.PositionCount} позиции вниз :arrow_down:, обнимашки поддержки! :people_hugging: Всё наладится!");
+                summary.Append(CultureInfo.InvariantCulture, $"Команда {DiscordTextSafety.SanitizeExternalName(change.EntryName)} упала на {change.PositionCount} позиции вниз :arrow_down:, обнимашки поддержки! :people_hugging: Всё наладится!");
             }
         }
 
@@ -331,6 +332,7 @@ public sealed class PremierLeagueMessageCompositionService(
         {
             summary.Append('\n');
             summary.Append(
+                CultureInfo.InvariantCulture,
                 $"{GetRankLabel(rank(result))} {DiscordTextSafety.SanitizeExternalName(entryName(result))} {total(result)}");
             count++;
         }

@@ -69,6 +69,11 @@ addition to these repository checks.
 - Target .NET 10 and preserve the SDK/package pinning already present.
 - Nullable reference types and implicit usings are enabled; match existing
   project style.
+- Analyzer quality gates are mechanical and CI-enforced: `Meziantou.Analyzer`
+  (all projects) and `NUnit.Analyzers` (`DiscordBot.Tests`) are centrally
+  managed development-only dependencies; warnings fail the build via
+  `TreatWarningsAsErrors`. The curated severities in `.editorconfig` are
+  authoritative; keep `AnalysisLevel` pinned numeric.
 - Use Microsoft.Extensions dependency injection, configuration and logging.
 - Use `ILogger<T>`; do not introduce ad-hoc console logging in application
   services.

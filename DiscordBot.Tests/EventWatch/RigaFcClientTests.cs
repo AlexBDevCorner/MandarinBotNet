@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net;
 using AwesomeAssertions;
 using DiscordBot.EventWatch;
@@ -55,7 +56,7 @@ public sealed class RigaFcClientTests
     }
 
     [Test]
-    public void GetPageAsync_Cancelled_ThrowsCancellation()
+    public async Task GetPageAsync_Cancelled_ThrowsCancellation()
     {
         var handler = new RecordingHandler(
             new HttpResponseMessage(HttpStatusCode.OK)
@@ -74,7 +75,7 @@ public sealed class RigaFcClientTests
             new Uri("https://rigafc.lv/"),
             cts.Token);
 
-        act.Should().ThrowAsync<OperationCanceledException>();
+        await act.Should().ThrowAsync<OperationCanceledException>();
     }
 
     [Test]
@@ -85,7 +86,7 @@ public sealed class RigaFcClientTests
 
         first.Should().Be("event-watch:riga-fc-atalanta-2026");
         second.Should().Be(first);
-        first.Should().NotContain(DateTime.UtcNow.ToString("HH:mm:ss"));
+        first.Should().NotContain(DateTime.UtcNow.ToString("HH:mm:ss", CultureInfo.InvariantCulture));
         first.Should().NotContain("polling");
     }
 

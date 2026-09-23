@@ -8,6 +8,12 @@
         "resolved": "1.7.3",
         "contentHash": "I8TpSvgOPAVQHjVvXaROZOkIGZdX0tn+e9CUix6mv5pMqfyKO+/zm/dofsXgsxVTJl/sSTnEMFwrdnqxTt2axQ=="
       },
+      "Meziantou.Analyzer": {
+        "type": "Direct",
+        "requested": "[3.0.284, )",
+        "resolved": "3.0.284",
+        "contentHash": "K/zKazRLtuiOES4UQqfHzraALDhWKNdiNeUeP7WlCpiyZORS7yfUrT/FiY2Ui/eOcq3HdDXYmjYHvRfE8GUThA=="
+      },
       "Microsoft.Extensions.Http": {
         "type": "Direct",
         "requested": "[10.0.11, )",
