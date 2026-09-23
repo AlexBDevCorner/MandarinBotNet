@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.Data.Sqlite;
 
 namespace DiscordBot.Notifications
@@ -47,7 +48,7 @@ namespace DiscordBot.Notifications
                 """;
             AddKeyParameters(command, checkpoint);
 
-            return Convert.ToInt64(command.ExecuteScalar()) == 1;
+            return Convert.ToInt64(command.ExecuteScalar(), CultureInfo.InvariantCulture) == 1;
         }
 
         public void RecordDelivered(NotificationCheckpoint checkpoint, DateTimeOffset deliveredAtUtc)

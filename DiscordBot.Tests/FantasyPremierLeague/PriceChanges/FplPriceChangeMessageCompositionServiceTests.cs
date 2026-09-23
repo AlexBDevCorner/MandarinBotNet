@@ -1,3 +1,4 @@
+using System.Globalization;
 using AwesomeAssertions;
 using DiscordBot.FantasyPremierLeague.PriceChanges;
 using DiscordBot.Notifications;
@@ -14,7 +15,7 @@ public sealed class FplPriceChangeMessageCompositionServiceTests
         // Arrange
         var composer = new FplPriceChangeMessageCompositionService();
         var report = new FplLeaguePriceChangeReport(
-            DateTimeOffset.Parse("2026-08-30T10:00:00Z"),
+            DateTimeOffset.Parse("2026-08-30T10:00:00Z", CultureInfo.InvariantCulture),
             [
                 new(
                     new FplPlayerPriceChange(1, "Salah", 100, 105),

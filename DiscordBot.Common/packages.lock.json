@@ -16,6 +16,12 @@
           "Discord.Net.Webhook": "3.20.1"
         }
       },
+      "Meziantou.Analyzer": {
+        "type": "Direct",
+        "requested": "[3.0.284, )",
+        "resolved": "3.0.284",
+        "contentHash": "K/zKazRLtuiOES4UQqfHzraALDhWKNdiNeUeP7WlCpiyZORS7yfUrT/FiY2Ui/eOcq3HdDXYmjYHvRfE8GUThA=="
+      },
       "Microsoft.Data.Sqlite": {
         "type": "Direct",
         "requested": "[10.0.11, )",

@@ -100,7 +100,7 @@ public sealed class DiscordBotHostedServiceIntegrationTests
             message.Contains("outcome Ready"));
 
         await gateway.RaiseReadyAsync();
-        logMessages.Count(message => message.Contains("event Reconnected"))
+        logMessages.Count(message => message.Contains("event Reconnected", StringComparison.Ordinal))
             .Should().Be(1);
 
         await host.StopAsync();

@@ -19,6 +19,32 @@ csharp_new_line_before_open_brace = all
 csharp_preserve_single_line_blocks = true
 csharp_preserve_single_line_statements = true
 
+# MB-009: curated analyzer gates (Meziantou). Warnings fail the build via
+# TreatWarningsAsErrors, so only narrow, explainable severity adjustments live here.
+# Noisy or inappropriate rules are demoted to keep autonomous work practical.
+dotnet_diagnostic.MA0004.severity = none # Worker has no SynchronizationContext; ConfigureAwait(false) is churn.
+dotnet_diagnostic.MA0006.severity = suggestion # == on strings is already ordinal; string.Equals would be churn.
+dotnet_diagnostic.MA0015.severity = suggestion # Validation helpers check nested properties; CallerArgumentExpression is sufficient.
+dotnet_diagnostic.MA0016.severity = suggestion # Options binding requires concrete List<T>; abstraction would risk binding.
+dotnet_diagnostic.MA0046.severity = suggestion # Async Func<Task> events mirror Discord.Net; EventHandler<T> would be breaking.
+dotnet_diagnostic.MA0048.severity = suggestion # Multiple related options/types per file are intentional; splits would be churn.
+dotnet_diagnostic.MA0051.severity = suggestion # Method-length heuristic is subjective; refactor only when justified.
+
+# High-signal correctness rules enforced as build-breaking warnings.
+dotnet_diagnostic.MA0009.severity = warning # Require regex evaluation timeout.
+dotnet_diagnostic.MA0012.severity = warning # Do not raise reserved exception types.
+dotnet_diagnostic.MA0027.severity = warning # Rethrow implicitly to preserve stack traces.
+dotnet_diagnostic.MA0040.severity = warning # Forward CancellationToken parameters.
+dotnet_diagnostic.MA0042.severity = warning # Do not block in async methods.
+dotnet_diagnostic.MA0054.severity = warning # Embed caught exceptions as innerException.
+dotnet_diagnostic.MA0100.severity = warning # Await task before disposing resources.
+dotnet_diagnostic.MA0129.severity = warning # Await task in using statements.
+dotnet_diagnostic.MA0134.severity = warning # Observe results of async calls.
+
+# Tests intentionally use sync disposal/parsing helpers; async alternatives would be churn.
+[DiscordBot.Tests/**.cs]
+dotnet_diagnostic.MA0042.severity = suggestion
+
 [*.{json,yml,yaml}]
 indent_style = space
 indent_size = 2

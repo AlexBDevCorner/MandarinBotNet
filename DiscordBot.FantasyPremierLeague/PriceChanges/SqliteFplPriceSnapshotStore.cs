@@ -65,7 +65,7 @@ public sealed class SqliteFplPriceSnapshotStore : IFplPriceSnapshotStore
                 Convert.ToInt32(reader.GetInt64(1)));
         }
 
-        return new FplPriceSnapshot(Convert.ToInt64(versionValue), prices);
+        return new FplPriceSnapshot(Convert.ToInt64(versionValue, CultureInfo.InvariantCulture), prices);
     }
 
     public FplPriceChangeBatch? GetLatestChanges()
@@ -153,7 +153,7 @@ public sealed class SqliteFplPriceSnapshotStore : IFplPriceSnapshotStore
                 SELECT COALESCE(MAX(snapshot_version), 0)
                 FROM fpl_price_snapshot_metadata;
                 """;
-            var nextVersion = checked(Convert.ToInt64(versionCommand.ExecuteScalar()) + 1);
+            var nextVersion = checked(Convert.ToInt64(versionCommand.ExecuteScalar(), CultureInfo.InvariantCulture) + 1);
 
             using (var deleteCommand = connection.CreateCommand())
             {

@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.Data.Sqlite;
 
 namespace DiscordBot.BenchWarming;
@@ -49,7 +50,7 @@ public sealed class SqliteBenchWarmingLeagueStore : IBenchWarmingLeagueStore
         command.Parameters.AddWithValue("$season", season);
         command.Parameters.AddWithValue("$event_id", eventId);
 
-        return Convert.ToInt64(command.ExecuteScalar()) == 1;
+        return Convert.ToInt64(command.ExecuteScalar(), CultureInfo.InvariantCulture) == 1;
     }
 
     public void SaveRound(
@@ -511,7 +512,7 @@ public sealed class SqliteBenchWarmingLeagueStore : IBenchWarmingLeagueStore
         checkCommand.CommandText =
             "SELECT COUNT(*) FROM pragma_table_info('bench_warming_rounds') " +
             "WHERE name = 'entry_rounds_complete';";
-        if (Convert.ToInt64(checkCommand.ExecuteScalar()) == 1)
+        if (Convert.ToInt64(checkCommand.ExecuteScalar(), CultureInfo.InvariantCulture) == 1)
         {
             return;
         }

@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net;
 using AwesomeAssertions;
 using DiscordBot.Commands;
@@ -25,7 +26,7 @@ public sealed class DeadlineCommandHandlerTests
         string expectedMessage)
     {
         // Arrange
-        var deadline = DateTimeOffset.Parse(deadlineText);
+        var deadline = DateTimeOffset.Parse(deadlineText, CultureInfo.InvariantCulture);
         var operations = new List<string>();
         var provider = new TestDeadlineProvider(operations)
         {

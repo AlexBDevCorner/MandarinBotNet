@@ -29,7 +29,7 @@ namespace DiscordBot
     {
         private const string DeploymentReadyMessage = "Bot is connected and ready.";
         private Dictionary<string, Func<IDiscordSlashCommandInteraction, Task>>
-            _commandHandlers = [];
+            _commandHandlers = new(StringComparer.Ordinal);
         private int _initialReadyObserved;
 
         public async Task StartAsync(CancellationToken cancellationToken)
@@ -42,7 +42,7 @@ namespace DiscordBot
                     "Bot:Discord:Token must be configured by a secret provider.");
             }
 
-            _commandHandlers = new()
+            _commandHandlers = new(StringComparer.Ordinal)
             {
                 { DiscordApplicationCommands.DeadlineName, deadlineCommandHandler.HandleAsync },
                 { DiscordApplicationCommands.HugMeName, HandleHugMeCommand },

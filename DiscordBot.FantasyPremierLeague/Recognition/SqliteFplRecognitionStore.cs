@@ -110,7 +110,7 @@ public sealed class SqliteFplRecognitionStore : IFplRecognitionStore
                 reader.GetString(5),
                 reader.GetString(6),
                 reader.GetString(7),
-                Convert.ToInt64(reader.GetValue(8)) == 1,
+                Convert.ToInt64(reader.GetValue(8), CultureInfo.InvariantCulture) == 1,
                 reader.GetString(9),
                 ParseTimestamp(reader.GetString(10))));
         }
@@ -160,7 +160,7 @@ public sealed class SqliteFplRecognitionStore : IFplRecognitionStore
         var value = command.ExecuteScalar();
         return value is null or DBNull
             ? null
-            : Convert.ToInt32(value);
+            : Convert.ToInt32(value, CultureInfo.InvariantCulture);
     }
 
     public void Save(FplRecognitionRun run, FplRecognitionResult result)

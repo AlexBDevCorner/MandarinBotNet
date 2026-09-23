@@ -196,7 +196,7 @@ public sealed class AutonomousWorkDispatcherTests
     public void Bind_EnvironmentStyleKeys_PreservesDispatcherSettingsIncludingToken()
     {
         var configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
+            .AddInMemoryCollection(new Dictionary<string, string?>(StringComparer.Ordinal)
             {
                 ["Bot:AutonomousWorkDispatcher:Enabled"] = "true",
                 ["Bot:AutonomousWorkDispatcher:Cron"] = "0 0/10 * * * ?",
