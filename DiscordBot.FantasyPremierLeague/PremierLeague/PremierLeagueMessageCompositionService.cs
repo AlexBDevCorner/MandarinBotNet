@@ -26,18 +26,18 @@ public sealed class PremierLeagueMessageCompositionService(
         "⚠️ Эта лига сейчас недоступна.";
     private const string AroundTargetMarker = "👉 ";
 
-    private static readonly CultureInfo RussianCulture = new("ru-RU");
-
     public string ComposeDeadlineReminder(
         DateTimeOffset deadlineUtc,
         DateTimeOffset utcNow)
     {
-        var localDeadline = configuredTimeZone.FromUtc(deadlineUtc);
-        var remaining = deadlineUtc - utcNow;
+        _ = configuredTimeZone;
+        _ = utcNow;
+        var absoluteTimestamp = DiscordTimestamp.FormatAbsolute(deadlineUtc);
+        var relativeTimestamp = DiscordTimestamp.FormatRelative(deadlineUtc);
 
-        return "Привет мои любители АПЛ и обнимашек! :people_hugging: Следующий тур уже скоро -" +
-            $" {localDeadline.ToString("dd MMMM yyyy, HH:mm", RussianCulture)}, это {localDeadline.ToString("dddd", RussianCulture)}" +
-            $". До этого момента осталось всего {DateTimeUtility.GenerateRemainingDaysMessageInRussian(remaining)}.";
+        return "Привет мои любители АПЛ и обнимашек! :people_hugging: Следующий тур уже скоро!" +
+            $"\nДедлайн: {absoluteTimestamp}" +
+            $"\nОсталось: {relativeTimestamp}";
     }
 
     public string ComposeClassicStandings(
