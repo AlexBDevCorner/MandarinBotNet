@@ -279,7 +279,7 @@ public sealed class PremierLeagueMessageCompositionServiceTests
     }
 
     [Test]
-    public void ComposeDeadlineReminder_WinterDeadline_FormatsRigaTimeAndRussianDuration()
+    public void ComposeDeadlineReminder_KnownWinterDeadline_ContainsAbsoluteAndRelativeDiscordTimestamps()
     {
         // Arrange
         var deadline = new DateTimeOffset(
@@ -297,9 +297,100 @@ public sealed class PremierLeagueMessageCompositionServiceTests
             deadline.AddDays(-1));
 
         // Assert
-        result.Should().Contain("02 февраля 2027, 14:00");
-        result.Should().Contain("это вторник");
-        result.Should().EndWith("осталось всего 1 день, 0 часов, 0 минут.");
+        result.Should().Contain("<t:1801569600:F>");
+        result.Should().Contain("<t:1801569600:R>");
+        result.Should().Contain("Следующий тур");
+        result.Should().Contain("АПЛ");
+        result.Should().NotContain("Рига");
+        result.Should().NotContain("осталось всего");
+        result.Should().NotContain("02 февраля");
+    }
+
+    [Test]
+    public void ComposeDeadlineReminder_KnownSummerDeadline_UsesUtcInstantDespiteDst()
+    {
+        // Arrange
+        var deadline = new DateTimeOffset(
+            2027,
+            8,
+            2,
+            12,
+            0,
+            0,
+            TimeSpan.Zero);
+
+        // Act
+        var result = _service.ComposeDeadlineReminder(
+            deadline,
+            deadline.AddHours(-5));
+
+        // Assert
+        result.Should().Contain("<t:1817208000:F>");
+        result.Should().Contain("<t:1817208000:R>");
+        result.Should().NotContain("Рига");
+        result.Should().NotContain("осталось всего");
+    }
+
+    [Test]
+    public void ComposeDeadlineReminder_SameInstantDifferentOffsets_ProduceSameMarkup()
+    {
+        // Arrange
+        var utcDeadline = new DateTimeOffset(
+            2027,
+            2,
+            2,
+            12,
+            0,
+            0,
+            TimeSpan.Zero);
+        var rigaLocalSameInstant = new DateTimeOffset(
+            2027,
+            2,
+            2,
+            14,
+            0,
+            0,
+            TimeSpan.FromHours(2));
+
+        // Act
+        var fromUtc = _service.ComposeDeadlineReminder(
+            utcDeadline,
+            utcDeadline.AddHours(-1));
+        var fromLocal = _service.ComposeDeadlineReminder(
+            rigaLocalSameInstant,
+            utcDeadline.AddHours(-1));
+
+        // Assert
+        fromUtc.Should().Be(fromLocal);
+        fromUtc.Should().Contain("<t:1801569600:F>");
+        fromUtc.Should().Contain("<t:1801569600:R>");
+    }
+
+    [Test]
+    public void ComposeDeadlineReminder_DifferentUtcNow_DoesNotChangeMessage()
+    {
+        // Arrange
+        var deadline = new DateTimeOffset(
+            2027,
+            2,
+            2,
+            12,
+            0,
+            0,
+            TimeSpan.Zero);
+
+        // Act
+        var dayBefore = _service.ComposeDeadlineReminder(
+            deadline,
+            deadline.AddDays(-1));
+        var hourBefore = _service.ComposeDeadlineReminder(
+            deadline,
+            deadline.AddHours(-1));
+
+        // Assert
+        dayBefore.Should().Be(hourBefore);
+        dayBefore.Should().NotContain("1 день");
+        dayBefore.Should().NotContain(" ч ");
     }
 
     [Test]
