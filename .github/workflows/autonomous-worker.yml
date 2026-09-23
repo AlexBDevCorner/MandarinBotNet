@@ -53,6 +53,7 @@ permissions:
   pull-requests: write
   issues: write
   actions: read
+  checks: read
 jobs:
   worker:
     if: github.ref == 'refs/heads/main'
@@ -86,10 +87,13 @@ jobs:
             [[ -n "$CONTROL_COMMIT" ]] || fail 'Invalid claim'
           fi
           [[ "$WORK_MODE" == 'implementation' || "$WORK_MODE" == 'correction' ]] || fail 'Invalid mode'
+          if [[ -n "${EXPECTED_HEAD:-}" ]]; then
+            [[ "$EXPECTED_HEAD" =~ ^[a-f0-9]{40}$ ]] || fail 'Invalid expected head'
+          fi
           if [[ "$WORK_MODE" == 'correction' ]]; then
             [[ -n "${ATTEMPT_ID:-}" ]] || fail 'Invalid review claim'
             [[ "$REVIEW_ID" =~ ^[0-9]+$ ]] || fail 'Invalid review claim'
-            [[ "$EXPECTED_HEAD" =~ ^[a-f0-9]{40}$ ]] || fail 'Invalid review claim'
+            [[ -n "$EXPECTED_HEAD" ]] || fail 'Invalid review claim'
           fi
       - uses: actions/checkout@v6
         with:
@@ -143,6 +147,8 @@ jobs:
           permission-pull-requests: write
           permission-issues: write
           permission-workflows: write
+          permission-actions: read
+          permission-checks: read
       - name: Verify worker GitHub authentication
         shell: bash
         env:
@@ -212,6 +218,12 @@ jobs:
             If GitHub authentication fails, stop and report the failure rather
             than attempting to recover credentials from Git configuration.
             Execution mode: ${{ inputs.mode }}.
+            Expected existing PR head: ${{ inputs.expected_head }}.
+            If mode is implementation and expected_head is non-empty, this is a bounded CI repair of the existing task PR.
+            Check out autonomous/${{ inputs.task_id }}, read failed-ci.json from "$RUNNER_TEMP", and inspect the failed required
+            check and its GitHub Actions logs with gh. Fix only what is needed to make required CI pass; do not implement unrelated work.
+            Push the repair to the same branch and PR. The PR head must advance. If the failure is demonstrably flaky and no code
+            change is appropriate, push an explicit empty commit named "ci: retry failed required check" to retrigger CI.
             For implementation: use branch autonomous/${{ inputs.task_id }} from main.
             Push that branch to origin immediately after creating it.
             If its open PR exists, reuse that branch and PR. Never create a second branch or PR.
