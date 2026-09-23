@@ -22,6 +22,8 @@ public sealed class HelpCommandHandlerTests
         interaction.Message.Should().Contain("`/live`");
         interaction.Message.Should().Contain("`/prices`");
         interaction.Message.Should().Contain("`/deadline`");
+        interaction.Message.Should().Contain("`/eventwatch status`");
+        interaction.Message.Should().Contain("`/eventwatch test`");
         interaction.Message.Should().Contain(
             BotHelpMessageCompositionService.FplClassicLeagueUrl);
         interaction.Message.Should().Contain(

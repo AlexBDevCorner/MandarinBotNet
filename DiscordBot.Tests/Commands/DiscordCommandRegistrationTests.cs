@@ -69,7 +69,7 @@ public sealed class DiscordCommandRegistrationTests
         // Assert
         commandClient.GlobalCalls.Should().Be(1);
         commandClient.GuildCalls.Should().Be(0);
-        commandClient.Commands.Should().HaveCount(11);
+        commandClient.Commands.Should().HaveCount(12);
         commandClient.Commands!.Select(command => command.Name.Value).Should()
             .Equal(
                 DiscordApplicationCommands.HugMeName,
@@ -82,6 +82,7 @@ public sealed class DiscordCommandRegistrationTests
                 DiscordApplicationCommands.ChipsName,
                 DiscordApplicationCommands.PricesName,
                 DiscordApplicationCommands.ChipWatchName,
+                DiscordApplicationCommands.EventWatchName,
                 DiscordApplicationCommands.HelpName);
         commandClient.Commands.Cast<SlashCommandProperties>()
             .Select(command => command.Description.Value)
@@ -96,6 +97,7 @@ public sealed class DiscordCommandRegistrationTests
                 "Объясняет фишки FPL и подсказывает, когда их использовать. 🃏",
                 "Показывает изменения цен в составах нашей лиги FPL. 💰",
                 "Проверяет доступные фишки FPL и ищет хорошие моменты для их использования. 🧠",
+                "Проверяет мониторинг билетов Riga FC. 🎟️",
                 "Показывает команды, лиги и возможности бота. 🤖");
     }
 
@@ -196,6 +198,34 @@ public sealed class DiscordCommandRegistrationTests
     }
 
     [Test]
+    public async Task SynchronizeAsync_EventWatchCommand_HasStatusAndTestSubcommands()
+    {
+        // Arrange
+        var commandClient = new TestApplicationCommandClient();
+        var synchronizer = new DiscordCommandSynchronizer(
+            new DiscordCommandRegistrationOptions(
+                DiscordCommandRegistrationMode.Global,
+                GuildId: null),
+            commandClient,
+            new TestLogger<DiscordCommandSynchronizer>());
+
+        // Act
+        await synchronizer.SynchronizeAsync(CancellationToken.None);
+
+        // Assert
+        var eventWatch = commandClient.Commands!.Cast<SlashCommandProperties>()
+            .Single(command => command.Name.Value == DiscordApplicationCommands.EventWatchName);
+        eventWatch.Options.IsSpecified.Should().BeTrue();
+        var options = eventWatch.Options.Value;
+        options.Select(option => option.Name).Should()
+            .Equal(
+                DiscordApplicationCommands.EventWatchStatusSubcommand,
+                DiscordApplicationCommands.EventWatchTestSubcommand);
+        options.Should().OnlyContain(option =>
+            option.Type == ApplicationCommandOptionType.SubCommand);
+    }
+
+    [Test]
     public async Task SynchronizeAsync_GuildMode_BulkOverwritesConfiguredGuild()
     {
         // Arrange
@@ -215,7 +245,7 @@ public sealed class DiscordCommandRegistrationTests
         commandClient.GlobalCalls.Should().Be(0);
         commandClient.GuildCalls.Should().Be(1);
         commandClient.GuildId.Should().Be(guildId);
-        commandClient.Commands.Should().HaveCount(11);
+        commandClient.Commands.Should().HaveCount(12);
     }
 
     [Test]
