@@ -39,8 +39,8 @@ public sealed class FplGameweekRecapMessageCompositionTests
             [maguire, bobrov, fraud, pelmeni, bench],
             [
                 new FplAchievementAward(
-                    123, "2026/27", 5, 10, "Bobrov FC", "differential-merchant",
-                    "Differential Merchant", "Desc", IsRepeatable: true, "v1",
+                    123, "2026/27", 5, 10, "Bobrov FC", "first-blood",
+                    "First Blood", "Desc", IsRepeatable: false, "v1",
                     DateTimeOffset.UtcNow),
                 new FplAchievementAward(
                     123, "2026/27", 5, 30, "@everyone Fraud", "minus-eight-enjoyer",
@@ -66,7 +66,7 @@ public sealed class FplGameweekRecapMessageCompositionTests
         message.Should().Contain("4. Pelmeni United — 1 219 ↑4 — 28 до лидера");
         message.Should().Contain("5. Bench Masters — 1 197 — 50 до лидера");
         message.Should().Contain("🎖️ Достижения");
-        message.Should().Contain("Bobrov FC — 💎 Повелитель дифференциалов");
+        message.Should().Contain("Bobrov FC — 🩸 Первая кровь");
         message.Should().Contain("@\u200Beveryone Fraud — 💸 Любитель минус восьми");
 
         message.Should().NotContain("Лучший результат");
@@ -97,6 +97,61 @@ public sealed class FplGameweekRecapMessageCompositionTests
         message.Should().Contain("👑 Bobrov FC выиграл тур — 83 очка");
         message.Should().NotContain("📈 Сюжет сезона");
         message.Should().NotContain("🎖️ Достижения");
+    }
+
+    [Test]
+    public void ComposeGameweekRecap_RetiredDifferentialMerchant_IsIgnored()
+    {
+        var bobrov = CreateManager(10, "Bobrov FC", 83, 1241, 1, 1);
+
+        var recap = new FplGameweekRecap(
+            "2026/27",
+            5,
+            [new FplGameweekWinnerHighlight(83, [bobrov])],
+            [],
+            [bobrov],
+            [
+                new FplAchievementAward(
+                    123, "2026/27", 5, 10, "Bobrov FC",
+                    RetiredFplAchievementKeys.DifferentialMerchant,
+                    "Differential Merchant", "Desc", IsRepeatable: true, "v1",
+                    DateTimeOffset.UtcNow)
+            ]);
+
+        var message = CreateComposer().ComposeGameweekRecap(recap);
+
+        message.Should().NotContain("Повелитель дифференциалов");
+        message.Should().NotContain("🎖️ Достижения");
+    }
+
+    [Test]
+    public void ComposeGameweekRecap_MixedRetiredAndActive_RendersOnlyActive()
+    {
+        var bobrov = CreateManager(10, "Bobrov FC", 83, 1241, 1, 1);
+
+        var recap = new FplGameweekRecap(
+            "2026/27",
+            5,
+            [new FplGameweekWinnerHighlight(83, [bobrov])],
+            [],
+            [bobrov],
+            [
+                new FplAchievementAward(
+                    123, "2026/27", 5, 10, "Bobrov FC",
+                    RetiredFplAchievementKeys.DifferentialMerchant,
+                    "Differential Merchant", "Desc", IsRepeatable: true, "v1",
+                    DateTimeOffset.UtcNow),
+                new FplAchievementAward(
+                    123, "2026/27", 5, 10, "Bobrov FC", "bench-warmer",
+                    "Bench Warmer", "Desc", IsRepeatable: true, "v1",
+                    DateTimeOffset.UtcNow)
+            ]);
+
+        var message = CreateComposer().ComposeGameweekRecap(recap);
+
+        message.Should().Contain("🎖️ Достижения");
+        message.Should().Contain("🔥 Обогреватель скамейки");
+        message.Should().NotContain("Повелитель дифференциалов");
     }
 
     [Test]

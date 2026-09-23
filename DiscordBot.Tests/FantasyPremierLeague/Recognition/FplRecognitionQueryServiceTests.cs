@@ -131,11 +131,6 @@ public sealed class FplRecognitionQueryServiceTests
             awards.Add(Award(1 + i, 10, "Bobrov FC", FplAchievementKeys.BenchWarmer, true));
         }
 
-        for (var i = 0; i < 3; i++)
-        {
-            awards.Add(Award(1 + i, 10, "Bobrov FC", FplAchievementKeys.DifferentialMerchant, true));
-        }
-
         for (var i = 0; i < 2; i++)
         {
             awards.Add(Award(1 + i, 10, "Bobrov FC", FplAchievementKeys.CaptainDisaster, true));
@@ -153,13 +148,62 @@ public sealed class FplRecognitionQueryServiceTests
         var counts = result.Profile!.AchievementCounts;
         counts.Single(c => c.AchievementKey == FplAchievementKeys.BenchWarmer).Count
             .Should().Be(4);
-        counts.Single(c => c.AchievementKey == FplAchievementKeys.DifferentialMerchant).Count
-            .Should().Be(3);
         counts.Single(c => c.AchievementKey == FplAchievementKeys.CaptainDisaster).Count
             .Should().Be(2);
         counts.Single(c => c.AchievementKey == FplAchievementKeys.FirstBlood).Count
             .Should().Be(1);
-        result.Profile!.TotalAchievements.Should().Be(10);
+        result.Profile!.TotalAchievements.Should().Be(7);
+    }
+
+    [Test]
+    public void GetManagerProfile_RetiredDifferentialMerchant_IsIgnored()
+    {
+        var awards = new List<FplAchievementAward>
+        {
+            Award(1, 10, "Bobrov FC", FplAchievementKeys.BenchWarmer, true),
+            Award(1, 10, "Bobrov FC", RetiredFplAchievementKeys.DifferentialMerchant, true),
+            Award(2, 10, "Bobrov FC", RetiredFplAchievementKeys.DifferentialMerchant, true),
+            Award(3, 10, "Bobrov FC", RetiredFplAchievementKeys.DifferentialMerchant, true)
+        };
+        var (service, _) = CreateService(
+            latest: Snapshot(5, Manager(10, "Bobrov FC", "Aleksandrs Bobrovs")),
+            awards: awards);
+
+        var result = service.GetManagerProfile("Bobrov FC");
+
+        result.Outcome.Should().Be(FplManagerProfileLookupOutcome.Available);
+        result.Profile!.AchievementCounts.Should().ContainSingle()
+            .Which.AchievementKey.Should().Be(FplAchievementKeys.BenchWarmer);
+        result.Profile!.TotalAchievements.Should().Be(1);
+    }
+
+    [Test]
+    public void GetSeasonSummary_RetiredDifferentialMerchant_IsIgnored()
+    {
+        var awards = new[]
+        {
+            Award(1, 10, "Bobrov FC", FplAchievementKeys.BenchWarmer, true),
+            Award(1, 10, "Bobrov FC", RetiredFplAchievementKeys.DifferentialMerchant, true),
+            Award(2, 10, "Bobrov FC", RetiredFplAchievementKeys.DifferentialMerchant, true),
+            Award(1, 20, "Rival FC", RetiredFplAchievementKeys.DifferentialMerchant, true),
+            Award(2, 20, "Rival FC", RetiredFplAchievementKeys.DifferentialMerchant, true)
+        };
+        var (service, _) = CreateService(
+            latest: Snapshot(5,
+                Manager(10, "Bobrov FC", "A"),
+                Manager(20, "Rival FC", "B")),
+            awards: awards);
+
+        var summary = service.GetSeasonSummary();
+
+        summary.Should().NotBeNull();
+        summary!.TotalAwardRanking.Should().ContainSingle()
+            .Which.EntryId.Should().Be(10);
+        summary.TotalAwardRanking.Single().TotalAwards.Should().Be(1);
+        summary.PerAchievementLeaders
+            .Should().NotContain(c => RetiredFplAchievementKeys.IsRetired(c.AchievementKey));
+        summary.PerAchievementLeaders.Single(c => c.AchievementKey == FplAchievementKeys.BenchWarmer)
+            .Leaders.Single().EntryId.Should().Be(10);
     }
 
     [Test]

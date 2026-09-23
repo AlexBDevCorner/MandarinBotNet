@@ -67,7 +67,7 @@ public sealed class FplAchievementCalculationServiceTests
             DateTimeOffset.UtcNow);
 
         // Assert
-        awards.Should().HaveCount(9);
+        awards.Should().HaveCount(8);
         awards.Select(award => (award.EntryName, award.AchievementKey))
             .Should().BeEquivalentTo(
             [
@@ -76,7 +76,6 @@ public sealed class FplAchievementCalculationServiceTests
                 ("Alpha", "captain-disaster"),
                 ("Alpha", "minus-eight-enjoyer"),
                 ("Beta", "first-blood"),
-                ("Beta", "differential-merchant"),
                 ("Gamma", "bench-warmer"),
                 ("Gamma", "captain-disaster"),
                 ("Gamma", "minus-eight-enjoyer")
@@ -139,7 +138,7 @@ public sealed class FplAchievementCalculationServiceTests
 
         // Assert
         awards.Select(award => award.AchievementKey)
-            .Should().BeEquivalentTo("bench-warmer", "differential-merchant");
+            .Should().BeEquivalentTo("bench-warmer");
         awards.Should().NotContain(award => award.AchievementKey == "first-blood");
     }
 
@@ -176,6 +175,48 @@ public sealed class FplAchievementCalculationServiceTests
 
         // Assert
         act.Should().Throw<InvalidDataException>().WithMessage("*captain and vice-captain*");
+    }
+
+    [Test]
+    public void Calculate_UniqueCaptain_DoesNotAwardRetiredDifferentialMerchant()
+    {
+        // Arrange: each manager captains a different player, which previously
+        // awarded the retired differential-merchant achievement.
+        var options = new FantasyPremierLeagueOptions();
+        var snapshot = CreateSnapshot(
+            1,
+            CreateManager(
+                10,
+                "Alpha",
+                eventScore: 50,
+                rank: 1,
+                benchPoints: 0,
+                captainPlayerId: 1,
+                captainPoints: 5,
+                viceCaptainPlayerId: 2,
+                viceCaptainPoints: 5),
+            CreateManager(
+                20,
+                "Beta",
+                eventScore: 40,
+                rank: 2,
+                benchPoints: 0,
+                captainPlayerId: 3,
+                captainPoints: 5,
+                viceCaptainPlayerId: 4,
+                viceCaptainPoints: 5));
+
+        // Act
+        var awards = new FplAchievementCalculationService(options).Calculate(
+            123,
+            snapshot,
+            [snapshot],
+            [],
+            DateTimeOffset.UtcNow);
+
+        // Assert
+        awards.Should().NotContain(
+            award => award.AchievementKey == RetiredFplAchievementKeys.DifferentialMerchant);
     }
 
     private static FplGameweekSnapshot CreateSnapshot(

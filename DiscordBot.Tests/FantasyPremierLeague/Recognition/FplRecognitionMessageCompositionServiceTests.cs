@@ -23,7 +23,6 @@ public sealed class FplRecognitionMessageCompositionServiceTests
         AchievementCounts:
         [
             new FplAchievementCount(FplAchievementKeys.BenchWarmer, "bench", 4),
-            new FplAchievementCount(FplAchievementKeys.DifferentialMerchant, "diff", 3),
             new FplAchievementCount(FplAchievementKeys.CaptainDisaster, "cap", 2),
             new FplAchievementCount(FplAchievementKeys.FirstBlood, "fb", 1)
         ]);
@@ -63,8 +62,30 @@ public sealed class FplRecognitionMessageCompositionServiceTests
 
         message.Should().Contain("🩸 Первая кровь ×1");
         message.Should().Contain("🔥 Обогреватель скамейки ×4");
-        message.Should().Contain("💎 Повелитель дифференциалов ×3");
         message.Should().Contain("💥 Капитанская катастрофа ×2");
+        message.Should().NotContain("Повелитель дифференциалов");
+    }
+
+    [Test]
+    public void ComposeProfile_RetiredDifferentialMerchant_IsIgnored()
+    {
+        var profile = SampleProfile with
+        {
+            AchievementCounts =
+            [
+                new FplAchievementCount(FplAchievementKeys.BenchWarmer, "bench", 1),
+                new FplAchievementCount(
+                    RetiredFplAchievementKeys.DifferentialMerchant,
+                    "Differential Merchant",
+                    3)
+            ]
+        };
+
+        var message = _composer.ComposeProfile(profile);
+
+        message.Should().Contain("🎖️ Достижения: 1");
+        message.Should().Contain("🔥 Обогреватель скамейки ×1");
+        message.Should().NotContain("Повелитель дифференциалов");
     }
 
     [Test]
@@ -181,6 +202,32 @@ public sealed class FplRecognitionMessageCompositionServiceTests
 
         message.Should().NotContain("Fraud Rating");
         message.Should().NotContain("Maguire Index");
+    }
+
+    [Test]
+    public void ComposeSeasonSummary_RetiredDifferentialMerchant_IsIgnored()
+    {
+        var summary = new FplAchievementSeasonSummary(
+            "2026/27",
+            1,
+            [],
+            [
+                new FplAchievementCategoryRanking(
+                    RetiredFplAchievementKeys.DifferentialMerchant,
+                    3,
+                    [new FplManagerReference(10, "Bobrov FC", "A")]),
+                new FplAchievementCategoryRanking(
+                    FplAchievementKeys.BenchWarmer,
+                    2,
+                    [new FplManagerReference(10, "Bobrov FC", "A")])
+            ],
+            0,
+            []);
+
+        var message = _composer.ComposeSeasonSummary(summary);
+
+        message.Should().Contain("🔥 Обогреватель скамейки");
+        message.Should().NotContain("Повелитель дифференциалов");
     }
 
     [Test]
