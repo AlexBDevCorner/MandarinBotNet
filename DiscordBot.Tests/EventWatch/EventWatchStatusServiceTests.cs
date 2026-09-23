@@ -10,71 +10,74 @@ namespace DiscordBot.Tests.EventWatch;
 public sealed class EventWatchStatusServiceTests
 {
     private const string AtalantaWatchId = "riga-fc-atalanta-2026";
+    private const string KairatWatchId = "riga-fc-smoke-kairat-2026";
 
     [Test]
-    public async Task GetStatusAsync_NoSale_ReturnsHealthyNoSignal()
+    public async Task GetStatusAsync_NoOpponentProduct_ReturnsHealthyNoSignal()
     {
-        var html = """
-            <html><body>
-            <div><article><h2>Riga FC vs Atalanta</h2><p>Fixture on Saturday at Skonto Stadium at 17:00.</p></article></div>
-            </body></html>
-            """;
-        var observations = new RigaFcPageParser().Parse(html, new Uri("https://rigafc.lv/"));
-        var service = CreateService([CreateAtalantaWatch()], new FixedSource(observations), schedulingEnabled: true);
+        var observations = new RigaFcTicketCatalogueParser().Parse(
+            CatalogueFixtures.GenericPackage(),
+            RigaFcClient.TicketCatalogueApiUri);
+        var service = CreateService(
+            [CreateAtalantaWatch(), CreateKairatWatch()],
+            new FixedSource(observations),
+            schedulingEnabled: true);
 
         var report = await service.GetStatusAsync(CancellationToken.None);
 
         report.CollectionSucceeded.Should().BeTrue();
         report.SchedulingEnabled.Should().BeTrue();
-        report.ObservationCount.Should().BeGreaterThan(0);
-        report.EnabledWatches.Should().ContainSingle().Which.Id.Should().Be(AtalantaWatchId);
-        report.SourcePages.Should().HaveCount(3);
+        report.ObservationCount.Should().Be(2);
+        report.EnabledWatches.Should().HaveCount(2);
+        report.SourcePages.Should().ContainSingle()
+            .Which.Should().Be(RigaFcClient.TicketCatalogueApiUri.ToString());
+        report.SourcePages.Should().NotContain("https://rigafc.lv/kalendars/");
         report.HasSignals.Should().BeFalse();
-        var watchResult = report.WatchResults.Should().ContainSingle().Subject;
-        watchResult.AnnouncementCount.Should().Be(0);
-        watchResult.TicketLinkCount.Should().Be(0);
-        watchResult.MatchTerms.Should().Equal("Atalanta");
+        report.WatchResults.Should().HaveCount(2);
+        report.WatchResults.Should().OnlyContain(r => r.TicketAvailableCount == 0);
 
         var message = new EventWatchStatusMessageComposer().Compose(report);
         message.Should().Contain("Healthy");
-        message.Should().Contain("no qualifying signals");
-        message.Should().NotContain("<html>");
+        message.Should().Contain("catalogue reachable");
+        message.Should().Contain("no opponent tickets");
+        message.Should().Contain("0 ticket available");
+        message.Should().NotContain("{");
         message.Should().NotContain("@everyone");
     }
 
     [Test]
-    public async Task GetStatusAsync_MatchingFixture_ReportsDetectedSignalKinds()
+    public async Task GetStatusAsync_MatchingProduct_ReportsDetectedMatch()
     {
-        var html = """
-            <html><body>
-            <div><article><h2>Riga FC vs Atalanta</h2><p>Biļetes pārdošanā uz Riga FC vs Atalanta spēli.</p><a href="https://bilesuserviss.lv/riga-atalanta">Pirkt biļetes</a></article></div>
-            </body></html>
-            """;
-        var observations = new RigaFcPageParser().Parse(html, new Uri("https://rigafc.lv/"));
-        var service = CreateService([CreateAtalantaWatch()], new FixedSource(observations), schedulingEnabled: true);
+        var observations = new RigaFcTicketCatalogueParser().Parse(
+            CatalogueFixtures.WithKairat(),
+            RigaFcClient.TicketCatalogueApiUri);
+        var service = CreateService(
+            [CreateAtalantaWatch(), CreateKairatWatch()],
+            new FixedSource(observations),
+            schedulingEnabled: true);
 
         var report = await service.GetStatusAsync(CancellationToken.None);
 
         report.CollectionSucceeded.Should().BeTrue();
         report.HasSignals.Should().BeTrue();
-        var watchResult = report.WatchResults.Should().ContainSingle().Subject;
-        watchResult.AnnouncementCount.Should().Be(1);
-        watchResult.TicketLinkCount.Should().Be(1);
-        watchResult.EvidenceSourceUrls.Should().Contain("https://rigafc.lv/");
+        var kairat = report.WatchResults.Should().ContainSingle(r => r.WatchId == KairatWatchId).Subject;
+        kairat.TicketAvailableCount.Should().Be(1);
+        kairat.EvidenceSourceUrls.Should().Contain("https://www.bilesuserviss.lv/biletes/KAIRAT01/riga-fc-vs-kairat-almaty");
+        var atalanta = report.WatchResults.Should().ContainSingle(r => r.WatchId == AtalantaWatchId).Subject;
+        atalanta.TicketAvailableCount.Should().Be(0);
 
         var message = new EventWatchStatusMessageComposer().Compose(report);
-        message.Should().Contain("1 announcement");
-        message.Should().Contain("1 ticket-link");
-        message.Should().Contain("https://rigafc.lv/");
-        message.Should().NotContain("<html>");
+        message.Should().Contain("1 ticket available");
+        message.Should().Contain("KAIRAT01");
+        message.Should().Contain("Opponent tickets detected");
+        message.Should().NotContain("{");
         message.Should().NotContain("@everyone");
 
         // Status is read-only: a second unchanged evaluation reports the same
         // signals without any delivery side effect (no publisher involved).
         var second = await service.GetStatusAsync(CancellationToken.None);
         second.HasSignals.Should().BeTrue();
-        second.WatchResults[0].AnnouncementCount.Should().Be(1);
-        second.WatchResults[0].TicketLinkCount.Should().Be(1);
+        second.WatchResults.Single(r => r.WatchId == KairatWatchId).TicketAvailableCount.Should().Be(1);
     }
 
     [Test]
@@ -95,19 +98,16 @@ public sealed class EventWatchStatusServiceTests
 
         var message = new EventWatchStatusMessageComposer().Compose(report);
         message.Should().Contain("failed");
-        message.Should().Contain("Collection: failed");
-        message.Should().NotContain("<html>");
+        message.Should().Contain("Catalogue: failed");
+        message.Should().NotContain("{");
     }
 
     [Test]
     public async Task GetStatusAsync_SchedulingDisabled_StillReportsCollection()
     {
-        var html = """
-            <html><body>
-            <div><article><h2>Riga FC vs Atalanta</h2><p>Fixture on Saturday.</p></article></div>
-            </body></html>
-            """;
-        var observations = new RigaFcPageParser().Parse(html, new Uri("https://rigafc.lv/"));
+        var observations = new RigaFcTicketCatalogueParser().Parse(
+            CatalogueFixtures.GenericPackage(),
+            RigaFcClient.TicketCatalogueApiUri);
         var service = CreateService([CreateAtalantaWatch()], new FixedSource(observations), schedulingEnabled: false);
 
         var report = await service.GetStatusAsync(CancellationToken.None);
@@ -126,6 +126,18 @@ public sealed class EventWatchStatusServiceTests
             Id = AtalantaWatchId,
             Title = "Riga FC vs Atalanta tickets",
             MatchTerms = ["Atalanta"],
+            Targets = [new NotificationTargetOptions { GuildId = 10, ChannelId = 100 }]
+        };
+    }
+
+    private static EventWatchDefinition CreateKairatWatch()
+    {
+        return new EventWatchDefinition
+        {
+            Enabled = true,
+            Id = KairatWatchId,
+            Title = "Riga FC vs Kairat tickets",
+            MatchTerms = ["Kairat"],
             Targets = [new NotificationTargetOptions { GuildId = 10, ChannelId = 100 }]
         };
     }
@@ -168,6 +180,6 @@ public sealed class EventWatchStatusServiceTests
 
         public Task<IReadOnlyList<EventWatchObservation>> CollectAsync(CancellationToken cancellationToken) =>
             Task.FromException<IReadOnlyList<EventWatchObservation>>(
-                new InvalidOperationException("Riga FC fetch failed."));
+                new InvalidOperationException("Riga FC ticket catalogue fetch failed."));
     }
 }

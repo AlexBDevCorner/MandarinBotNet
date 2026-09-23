@@ -28,7 +28,7 @@ public sealed class EventWatchService(
 
         var observations = await source.CollectAsync(cancellationToken);
         logger.LogInformation(
-            "EventWatch collected {ObservationCount} observations from source {SourceName}.",
+            "EventWatch collected {ObservationCount} ticket-catalogue products from source {SourceName}.",
             observations.Count,
             source.SourceName);
 
@@ -37,10 +37,9 @@ public sealed class EventWatchService(
         {
             var signals = detector.Detect(watch, observations);
             logger.LogInformation(
-                "EventWatch watch {WatchId} detected {AnnouncementCount} announcement and {TicketLinkCount} ticket-link signals from {ObservationCount} observations.",
+                "EventWatch watch {WatchId} detected {TicketAvailableCount} ticket-available signals from {ObservationCount} catalogue products.",
                 watch.Id,
-                signals.Count(signal => signal.Kind == EventWatchSignalKind.Announcement),
-                signals.Count(signal => signal.Kind == EventWatchSignalKind.TicketLinkAvailable),
+                signals.Count,
                 observations.Count);
             results.Add(new EventWatchCheckResult(watch, signals));
         }

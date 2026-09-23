@@ -11,28 +11,48 @@ namespace DiscordBot.Tests.EventWatch;
 public sealed class RigaFcClientTests
 {
     [Test]
-    public async Task GetPageAsync_Success_SendsUserAgentAndAcceptAndReturnsHtml()
+    public async Task GetPageAsync_Success_SendsUserAgentAndAcceptAndReturnsPayload()
     {
         var handler = new RecordingHandler(
             new HttpResponseMessage(HttpStatusCode.OK)
             {
-                Content = new StringContent("<html><body>ok</body></html>")
+                Content = new StringContent("{\"status\":\"success\",\"items\":[]}")
             });
         var httpClient = new HttpClient(handler)
         {
-            BaseAddress = new Uri("https://rigafc.lv/")
+            BaseAddress = new Uri("https://www.bilesuserviss.lv/")
         };
         var client = new RigaFcClient(httpClient, new RecordingLogger<RigaFcClient>());
 
-        var html = await client.GetPageAsync(
-            new Uri("https://rigafc.lv/"),
+        var payload = await client.GetPageAsync(
+            RigaFcClient.TicketCatalogueApiUri,
             CancellationToken.None);
 
-        html.Should().Contain("ok");
+        payload.Should().Contain("success");
         handler.LastRequest.Should().NotBeNull();
         var userAgent = string.Join(" ", handler.LastRequest!.Headers.UserAgent.ToString());
         userAgent.Should().Contain("MandarinBotNet");
-        handler.LastRequest.Headers.Accept.Should().ContainSingle(a => a.MediaType == "text/html");
+        handler.LastRequest.Headers.Accept.Should().ContainSingle(a => a.MediaType == "application/json");
+    }
+
+    [Test]
+    public async Task GetTicketCatalogueAsync_RequestsCatalogueApi()
+    {
+        var handler = new RecordingHandler(
+            new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("{\"status\":\"success\",\"items\":[]}")
+            });
+        var httpClient = new HttpClient(handler)
+        {
+            BaseAddress = new Uri("https://www.bilesuserviss.lv/")
+        };
+        var client = new RigaFcClient(httpClient, new RecordingLogger<RigaFcClient>());
+
+        await client.GetTicketCatalogueAsync(CancellationToken.None);
+
+        handler.LastRequest.Should().NotBeNull();
+        handler.LastRequest!.RequestUri.Should().Be(RigaFcClient.TicketCatalogueApiUri);
     }
 
     [Test]
@@ -42,17 +62,17 @@ public sealed class RigaFcClientTests
             new HttpResponseMessage(HttpStatusCode.InternalServerError));
         var httpClient = new HttpClient(handler)
         {
-            BaseAddress = new Uri("https://rigafc.lv/")
+            BaseAddress = new Uri("https://www.bilesuserviss.lv/")
         };
         var client = new RigaFcClient(httpClient, new RecordingLogger<RigaFcClient>());
 
         Func<Task> act = () => client.GetPageAsync(
-            new Uri("https://rigafc.lv/kalendars/"),
+            RigaFcClient.TicketCatalogueApiUri,
             CancellationToken.None);
 
         var exception = await act.Should().ThrowAsync<RigaFcApiException>();
         exception.Which.StatusCode.Should().Be(HttpStatusCode.InternalServerError);
-        exception.Which.Message.Should().Contain("kalendars");
+        exception.Which.Message.Should().Contain("bilesuserviss.lv");
     }
 
     [Test]
@@ -61,18 +81,18 @@ public sealed class RigaFcClientTests
         var handler = new RecordingHandler(
             new HttpResponseMessage(HttpStatusCode.OK)
             {
-                Content = new StringContent("html")
+                Content = new StringContent("payload")
             });
         var httpClient = new HttpClient(handler)
         {
-            BaseAddress = new Uri("https://rigafc.lv/")
+            BaseAddress = new Uri("https://www.bilesuserviss.lv/")
         };
         var client = new RigaFcClient(httpClient, new RecordingLogger<RigaFcClient>());
         using var cts = new CancellationTokenSource();
         cts.Cancel();
 
         Func<Task> act = () => client.GetPageAsync(
-            new Uri("https://rigafc.lv/"),
+            RigaFcClient.TicketCatalogueApiUri,
             cts.Token);
 
         await act.Should().ThrowAsync<OperationCanceledException>();
@@ -91,13 +111,23 @@ public sealed class RigaFcClientTests
     }
 
     [Test]
-    public void PageUris_ContainsThreeOfficialPagesOnly()
+    public void PageUris_ContainsOnlyTicketCatalogue()
     {
-        RigaFcClient.PageUris.Should().HaveCount(3);
-        RigaFcClient.PageUris.Should().Contain(new Uri("https://rigafc.lv/"));
-        RigaFcClient.PageUris.Should().Contain(new Uri("https://rigafc.lv/kalendars/"));
-        RigaFcClient.PageUris.Should().Contain(new Uri("https://rigafc.lv/jaunumi/"));
-        RigaFcClient.PageUris.Should().OnlyContain(uri => uri.Host == "rigafc.lv");
+        // Calendar-style generic Tickets content cannot trigger because the
+        // homepage, calendar, and news pages are no longer EventWatch sources.
+        RigaFcClient.PageUris.Should().ContainSingle()
+            .Which.Should().Be(RigaFcClient.TicketCatalogueApiUri);
+        RigaFcClient.PageUris.Should().OnlyContain(uri => uri.Host == "www.bilesuserviss.lv");
+        RigaFcClient.PageUris.Should().NotContain(new Uri("https://rigafc.lv/"));
+        RigaFcClient.PageUris.Should().NotContain(new Uri("https://rigafc.lv/kalendars/"));
+        RigaFcClient.PageUris.Should().NotContain(new Uri("https://rigafc.lv/jaunumi/"));
+    }
+
+    [Test]
+    public void CatalogueUris_DocumentShopCatalogueAndPublicLandingPage()
+    {
+        RigaFcClient.TicketCatalogueUri.Should().Be(new Uri("https://shop.rigafc.lv/tickets"));
+        RigaFcClient.TicketLandingUri.Should().Be(new Uri("https://rigafc.lv/biletes/"));
     }
 
     private sealed class RecordingHandler(HttpResponseMessage response) : HttpMessageHandler

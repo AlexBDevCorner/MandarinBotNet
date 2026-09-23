@@ -4,69 +4,57 @@ namespace DiscordBot.EventWatch;
 
 public sealed class RigaFcEventWatchSource(
     RigaFcClient client,
-    RigaFcPageParser parser,
+    RigaFcTicketCatalogueParser parser,
     ILogger<RigaFcEventWatchSource> logger) : IEventWatchSource
 {
-    public string SourceName => "riga-fc";
+    public string SourceName => "riga-fc-ticket-catalogue";
 
     public async Task<IReadOnlyList<EventWatchObservation>> CollectAsync(
         CancellationToken cancellationToken)
     {
-        var observations = new List<EventWatchObservation>();
+        cancellationToken.ThrowIfCancellationRequested();
 
-        foreach (var pageUri in RigaFcClient.PageUris)
+        string payload;
+        try
         {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            string html;
-            try
-            {
-                html = await client.GetPageAsync(pageUri, cancellationToken);
-            }
-            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-            {
-                throw;
-            }
-            catch (Exception exception)
-            {
-                logger.LogWarning(
-                    exception,
-                    "Riga FC source {SourceUrl} fetch failed with outcome {Outcome}.",
-                    pageUri,
-                    "Failed");
-                continue;
-            }
-
-            IReadOnlyList<EventWatchObservation> pageObservations;
-            try
-            {
-                pageObservations = await parser.ParseAsync(
-                    pageUri,
-                    html,
-                    cancellationToken);
-            }
-            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-            {
-                throw;
-            }
-            catch (Exception exception)
-            {
-                logger.LogWarning(
-                    exception,
-                    "Riga FC source {SourceUrl} parse failed with outcome {Outcome}.",
-                    pageUri,
-                    "ParseFailed");
-                continue;
-            }
-
-            logger.LogInformation(
-                "Riga FC source {SourceUrl} fetch succeeded with outcome {Outcome}; observations {ObservationCount}.",
-                pageUri,
-                "Succeeded",
-                pageObservations.Count);
-            observations.AddRange(pageObservations);
+            payload = await client.GetTicketCatalogueAsync(cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            logger.LogWarning(
+                exception,
+                "Riga FC ticket catalogue {SourceUrl} fetch failed with outcome {Outcome}.",
+                RigaFcClient.TicketCatalogueApiUri,
+                "Failed");
+            throw;
         }
 
-        return observations;
+        try
+        {
+            var observations = parser.Parse(payload, RigaFcClient.TicketCatalogueApiUri);
+            logger.LogInformation(
+                "Riga FC ticket catalogue {SourceUrl} fetch succeeded with outcome {Outcome}; products {ObservationCount}.",
+                RigaFcClient.TicketCatalogueApiUri,
+                "Succeeded",
+                observations.Count);
+            return observations;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            logger.LogWarning(
+                exception,
+                "Riga FC ticket catalogue {SourceUrl} parse failed with outcome {Outcome}.",
+                RigaFcClient.TicketCatalogueApiUri,
+                "ParseFailed");
+            throw;
+        }
     }
 }

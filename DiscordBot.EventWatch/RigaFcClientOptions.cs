@@ -2,7 +2,7 @@ namespace DiscordBot.EventWatch;
 
 public sealed class RigaFcClientOptions
 {
-    public Uri BaseAddress { get; init; } = new("https://rigafc.lv/");
+    public Uri BaseAddress { get; init; } = new("https://www.bilesuserviss.lv/");
 
     public TimeSpan AttemptTimeout { get; init; } = TimeSpan.FromSeconds(10);
 

@@ -19,7 +19,7 @@ public static class EventWatchServiceCollectionExtensions
         Validate(clientOptions);
         services.TryAddSingleton(clientOptions);
 
-        services.TryAddSingleton<RigaFcPageParser>();
+        services.TryAddSingleton<RigaFcTicketCatalogueParser>();
         services.TryAddSingleton<EventWatchSignalDetector>();
         services.TryAddSingleton<EventWatchMessageCompositionService>();
         services.TryAddSingleton<IEventWatchSource, RigaFcEventWatchSource>();
@@ -33,7 +33,7 @@ public static class EventWatchServiceCollectionExtensions
         {
             client.BaseAddress = clientOptions.BaseAddress;
             client.Timeout = Timeout.InfiniteTimeSpan;
-            client.DefaultRequestHeaders.Accept.ParseAdd("text/html");
+            client.DefaultRequestHeaders.Accept.ParseAdd("application/json");
             client.DefaultRequestHeaders.UserAgent.ParseAdd(RigaFcUserAgent.Value);
         });
 

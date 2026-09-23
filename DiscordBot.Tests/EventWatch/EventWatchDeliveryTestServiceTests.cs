@@ -52,10 +52,7 @@ public sealed class EventWatchDeliveryTestServiceTests
 
         // The diagnostic path bypasses checkpoints entirely.
         checkpointStore.IsDelivered(
-            new NotificationCheckpoint(10, 100, $"event-watch:{AtalantaWatchId}", NotificationTypes.EventWatchAnnouncement))
-            .Should().BeFalse();
-        checkpointStore.IsDelivered(
-            new NotificationCheckpoint(10, 100, $"event-watch:{AtalantaWatchId}", NotificationTypes.EventWatchTicketLink))
+            new NotificationCheckpoint(10, 100, $"event-watch:{AtalantaWatchId}", NotificationTypes.EventWatchTicketAvailable))
             .Should().BeFalse();
     }
 

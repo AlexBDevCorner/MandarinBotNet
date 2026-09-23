@@ -30,7 +30,7 @@ public sealed class EventWatchCommandHandler(
                 break;
             default:
                 await interaction.ModifyOriginalResponseAsync(
-                    "ℹ️ Use `/eventwatch status` to check Riga FC sources or `/eventwatch test` to verify Discord delivery.");
+                    "ℹ️ Use `/eventwatch status` to check the Riga FC ticket catalogue or `/eventwatch test` to verify Discord delivery.");
                 break;
         }
     }
