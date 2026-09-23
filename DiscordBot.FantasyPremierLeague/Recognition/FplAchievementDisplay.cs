@@ -13,7 +13,6 @@ public static class FplAchievementDisplay
             FplAchievementKeys.FirstBlood => "🩸 Первая кровь",
             FplAchievementKeys.BenchWarmer => "🔥 Обогреватель скамейки",
             FplAchievementKeys.CaptainDisaster => "💥 Капитанская катастрофа",
-            FplAchievementKeys.DifferentialMerchant => "💎 Повелитель дифференциалов",
             FplAchievementKeys.MinusEightEnjoyer => "💸 Любитель минус восьми",
             _ => DiscordTextSafety.SanitizeExternalName(fallbackName)
         };

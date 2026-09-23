@@ -53,7 +53,8 @@ public class FplRecognitionQueryService(
 
         var awards = recognitionStore.GetAchievementAwards(leagueId, season);
         var achievementCounts = awards
-            .Where(award => award.EntryId == entryId)
+            .Where(award => award.EntryId == entryId &&
+                !RetiredFplAchievementKeys.IsRetired(award.AchievementKey))
             .GroupBy(award => award.AchievementKey)
             .Select(group => new FplAchievementCount(
                 group.Key,
@@ -124,7 +125,9 @@ public class FplRecognitionQueryService(
         var latestManagers = latestSnapshot.Managers.ToDictionary(
             manager => manager.EntryId);
 
-        var awards = recognitionStore.GetAchievementAwards(leagueId, season);
+        var awards = recognitionStore.GetAchievementAwards(leagueId, season)
+            .Where(award => !RetiredFplAchievementKeys.IsRetired(award.AchievementKey))
+            .ToArray();
 
         var totalAwardRanking = awards
             .GroupBy(award => award.EntryId)
@@ -282,7 +285,6 @@ public class FplRecognitionQueryService(
         {
             FplAchievementKeys.BenchWarmer,
             FplAchievementKeys.CaptainDisaster,
-            FplAchievementKeys.DifferentialMerchant,
             FplAchievementKeys.MinusEightEnjoyer
         };
 

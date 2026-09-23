@@ -31,8 +31,11 @@ public sealed class FplRecognitionMessageCompositionService
         summary.Append(profile.GameweekWins.ToString(CultureInfo.InvariantCulture));
 
         summary.Append("\n\n🎖️ Достижения: ");
-        summary.Append(profile.TotalAchievements.ToString(CultureInfo.InvariantCulture));
-        foreach (var achievement in profile.AchievementCounts)
+        var visibleAchievements = profile.AchievementCounts
+            .Where(achievement => !RetiredFplAchievementKeys.IsRetired(achievement.AchievementKey))
+            .ToArray();
+        summary.Append(visibleAchievements.Sum(count => count.Count).ToString(CultureInfo.InvariantCulture));
+        foreach (var achievement in visibleAchievements)
         {
             summary.Append('\n');
             summary.Append(FplAchievementDisplay.GetName(
@@ -80,6 +83,11 @@ public sealed class FplRecognitionMessageCompositionService
 
         foreach (var category in summary.PerAchievementLeaders)
         {
+            if (RetiredFplAchievementKeys.IsRetired(category.AchievementKey))
+            {
+                continue;
+            }
+
             builder.Append("\n\n");
             builder.Append(FplAchievementDisplay.GetName(
                 category.AchievementKey,

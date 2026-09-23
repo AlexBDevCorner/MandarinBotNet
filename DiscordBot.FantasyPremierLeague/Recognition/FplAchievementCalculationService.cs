@@ -22,9 +22,6 @@ public sealed class FplAchievementCalculationService(
         var captains = orderedManagers.ToDictionary(
             manager => manager.EntryId,
             GetCaptainData);
-        var captainCounts = captains.Values
-            .GroupBy(data => data.Captain.PlayerId)
-            .ToDictionary(group => group.Key, group => group.Count());
         var highestScore = orderedManagers.Max(manager => manager.EventScore);
         var firstSnapshot = seasonHistory
             .Where(item => item.Season == snapshot.Season)
@@ -43,7 +40,6 @@ public sealed class FplAchievementCalculationService(
                         definition.Key,
                         manager,
                         captainData,
-                        captainCounts,
                         highestScore,
                         isFirstRecordedGameweek))
                 {
@@ -99,11 +95,6 @@ public sealed class FplAchievementCalculationService(
                 $"{options.CaptainDisasterViceCaptainPointsThreshold}.",
                 IsRepeatable: true),
             new FplAchievementDefinition(
-                FplAchievementKeys.DifferentialMerchant,
-                "Differential Merchant",
-                "Was the only manager in the league to captain that player.",
-                IsRepeatable: true),
-            new FplAchievementDefinition(
                 FplAchievementKeys.MinusEightEnjoyer,
                 "-8 Enjoyer",
                 $"Took at least {options.TransferCostAchievementThreshold} points in " +
@@ -116,7 +107,6 @@ public sealed class FplAchievementCalculationService(
         string achievementKey,
         FplManagerGameweekStatistics manager,
         CaptainData captainData,
-        IReadOnlyDictionary<int, int> captainCounts,
         int highestScore,
         bool isFirstRecordedGameweek)
     {
@@ -130,7 +120,6 @@ public sealed class FplAchievementCalculationService(
                 captainData.ViceCaptain.Points >=
                     options.CaptainDisasterViceCaptainPointsThreshold &&
                 captainData.Captain.Points < captainData.ViceCaptain.Points,
-            FplAchievementKeys.DifferentialMerchant => captainCounts[captainData.Captain.PlayerId] == 1,
             FplAchievementKeys.MinusEightEnjoyer => manager.TransferCost >=
                 options.TransferCostAchievementThreshold,
             _ => throw new ArgumentOutOfRangeException(nameof(achievementKey))

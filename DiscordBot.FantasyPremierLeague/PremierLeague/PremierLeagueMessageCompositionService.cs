@@ -146,8 +146,14 @@ public sealed class PremierLeagueMessageCompositionService(
 
         if (recap.Achievements.Count > 0)
         {
-            summary.Append("\n\n🎖️ Достижения");
-            AppendAchievements(summary, recap.Achievements);
+            var visibleAchievements = recap.Achievements
+                .Where(award => !RetiredFplAchievementKeys.IsRetired(award.AchievementKey))
+                .ToArray();
+            if (visibleAchievements.Length > 0)
+            {
+                summary.Append("\n\n🎖️ Достижения");
+                AppendAchievements(summary, visibleAchievements);
+            }
         }
 
         return summary.ToString();
@@ -503,6 +509,11 @@ public sealed class PremierLeagueMessageCompositionService(
     {
         foreach (var award in achievements)
         {
+            if (RetiredFplAchievementKeys.IsRetired(award.AchievementKey))
+            {
+                continue;
+            }
+
             summary.Append("\n");
             summary.Append(DiscordTextSafety.SanitizeExternalName(award.EntryName));
             summary.Append(" — ");
