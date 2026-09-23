@@ -15,6 +15,7 @@ namespace DiscordBot.Notifications
         public const string FplChipWatch = "fpl-chip-watch";
         public const string EventWatchAnnouncement = "event-watch-announcement";
         public const string EventWatchTicketLink = "event-watch-ticket-link";
+        public const string EventWatchTicketAvailable = "event-watch-ticket-available";
 
         private static readonly HashSet<string> EveryoneMentionAllowedTypes =
         [
@@ -23,7 +24,8 @@ namespace DiscordBot.Notifications
             UclDeadline24Hours,
             UclDeadline1Hour,
             EventWatchAnnouncement,
-            EventWatchTicketLink
+            EventWatchTicketLink,
+            EventWatchTicketAvailable
         ];
 
         public static bool AllowsEveryoneMention(string notificationType) =>

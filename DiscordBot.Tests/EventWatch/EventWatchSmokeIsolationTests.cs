@@ -14,12 +14,12 @@ namespace DiscordBot.Tests.EventWatch;
 public sealed class EventWatchSmokeIsolationTests
 {
     private const string AtalantaWatchId = "riga-fc-atalanta-2026";
-    private const string SmokeWatchId = "riga-fc-smoke-kairat-2026";
+    private const string KairatWatchId = "riga-fc-smoke-kairat-2026";
 
     [Test]
     public void SmokeAndProductionCheckpoints_AreDifferentSourceIdentifiers()
     {
-        var smokeSourceId = EventWatchSourceIdentifier.Create(SmokeWatchId);
+        var smokeSourceId = EventWatchSourceIdentifier.Create(KairatWatchId);
         var productionSourceId = EventWatchSourceIdentifier.Create(AtalantaWatchId);
 
         smokeSourceId.Should().NotBe(productionSourceId);
@@ -30,38 +30,32 @@ public sealed class EventWatchSmokeIsolationTests
     [Test]
     public async Task SmokeDelivery_DoesNotConsumeProductionCheckpoints()
     {
-        var harness = CreateHarness(KairatTicketHtml());
-        var smokeSourceId = EventWatchSourceIdentifier.Create(SmokeWatchId);
+        var harness = CreateHarness(CatalogueFixtures.WithKairat());
+        var smokeSourceId = EventWatchSourceIdentifier.Create(KairatWatchId);
         var productionSourceId = EventWatchSourceIdentifier.Create(AtalantaWatchId);
 
         await harness.Job.Execute(CreateContext());
 
-        // Smoke watch delivered both signal kinds through the scheduled path.
-        harness.Channel.Sent.Should().HaveCount(2);
+        // Kairat watch delivered exactly one ticket-available signal.
+        harness.Channel.Sent.Should().ContainSingle();
         harness.Store.IsDelivered(
-            new NotificationCheckpoint(10, 100, smokeSourceId, NotificationTypes.EventWatchAnnouncement))
-            .Should().BeTrue();
-        harness.Store.IsDelivered(
-            new NotificationCheckpoint(10, 100, smokeSourceId, NotificationTypes.EventWatchTicketLink))
+            new NotificationCheckpoint(10, 100, smokeSourceId, NotificationTypes.EventWatchTicketAvailable))
             .Should().BeTrue();
 
         // Production Atalanta checkpoints remain independently deliverable.
         harness.Store.IsDelivered(
-            new NotificationCheckpoint(10, 100, productionSourceId, NotificationTypes.EventWatchAnnouncement))
-            .Should().BeFalse();
-        harness.Store.IsDelivered(
-            new NotificationCheckpoint(10, 100, productionSourceId, NotificationTypes.EventWatchTicketLink))
+            new NotificationCheckpoint(10, 100, productionSourceId, NotificationTypes.EventWatchTicketAvailable))
             .Should().BeFalse();
     }
 
     [Test]
     public async Task UnchangedSmokeSignal_IsDeliveredOnlyOnce()
     {
-        var harness = CreateHarness(KairatTicketHtml());
+        var harness = CreateHarness(CatalogueFixtures.WithKairat());
 
         await harness.Job.Execute(CreateContext());
         var afterFirst = harness.Channel.Sent.Count;
-        afterFirst.Should().Be(2);
+        afterFirst.Should().Be(1);
 
         await harness.Job.Execute(CreateContext());
 
@@ -71,36 +65,34 @@ public sealed class EventWatchSmokeIsolationTests
     [Test]
     public async Task AfterSmokeDelivery_AtalantaRemainsIndependentlyDeliverable()
     {
-        var kairatObservations = new RigaFcPageParser().Parse(
-            KairatTicketHtml(),
-            new Uri("https://rigafc.lv/kalendars/"));
-        var atalantaObservations = new RigaFcPageParser().Parse(
-            AtalantaTicketHtml(),
-            new Uri("https://rigafc.lv/kalendars/"));
+        var parser = new RigaFcTicketCatalogueParser();
+        var kairatObservations = parser.Parse(
+            CatalogueFixtures.WithKairat(),
+            RigaFcClient.TicketCatalogueApiUri);
+        var atalantaObservations = parser.Parse(
+            CatalogueFixtures.WithAtalanta(),
+            RigaFcClient.TicketCatalogueApiUri);
         var source = new MutableSource(kairatObservations);
         var harness = CreateHarness(source);
 
         await harness.Job.Execute(CreateContext());
-        harness.Channel.Sent.Should().HaveCount(2);
+        harness.Channel.Sent.Should().ContainSingle();
 
         source.SetObservations(atalantaObservations);
         await harness.Job.Execute(CreateContext());
 
-        // Atalanta announcement + ticket-link arrive in addition to smoke.
-        harness.Channel.Sent.Should().HaveCount(4);
+        // Atalanta ticket-available arrives in addition to the earlier Kairat one.
+        harness.Channel.Sent.Should().HaveCount(2);
         var productionSourceId = EventWatchSourceIdentifier.Create(AtalantaWatchId);
         harness.Store.IsDelivered(
-            new NotificationCheckpoint(10, 100, productionSourceId, NotificationTypes.EventWatchAnnouncement))
-            .Should().BeTrue();
-        harness.Store.IsDelivered(
-            new NotificationCheckpoint(10, 100, productionSourceId, NotificationTypes.EventWatchTicketLink))
+            new NotificationCheckpoint(10, 100, productionSourceId, NotificationTypes.EventWatchTicketAvailable))
             .Should().BeTrue();
     }
 
     [Test]
-    public async Task ScheduledSmokeWatch_WithKairatEntry_ProducesQualifyingNotification()
+    public async Task ScheduledKairatWatch_WithKairatProduct_ProducesQualifyingNotification()
     {
-        var harness = CreateHarness(KairatTicketHtml());
+        var harness = CreateHarness(CatalogueFixtures.WithKairat());
 
         await harness.Job.Execute(CreateContext());
 
@@ -108,21 +100,11 @@ public sealed class EventWatchSmokeIsolationTests
         harness.Channel.Sent.Should().OnlyContain(sent => sent.Content.Contains("Kairat"));
     }
 
-    private static string KairatTicketHtml() => """
-        <html><body>
-        <div><article><h2>Riga vs Kairat Almaty</h2><p>15 October 2026, 19:45, Skonto stadions. Biļetes pārdošanā uz šo spēli.</p><a href="https://bilesuserviss.lv/kairat-riga">Pirkt biļetes</a></article></div>
-        </body></html>
-        """;
-
-    private static string AtalantaTicketHtml() => """
-        <html><body>
-        <div><article><h2>Riga FC vs Atalanta</h2><p>Biļetes pārdošanā uz Riga FC vs Atalanta spēli.</p><a href="https://bilesuserviss.lv/riga-atalanta">Pirkt biļetes</a></article></div>
-        </body></html>
-        """;
-
-    private static Harness CreateHarness(string html)
+    private static Harness CreateHarness(string catalogueJson)
     {
-        var observations = new RigaFcPageParser().Parse(html, new Uri("https://rigafc.lv/kalendars/"));
+        var observations = new RigaFcTicketCatalogueParser().Parse(
+            catalogueJson,
+            RigaFcClient.TicketCatalogueApiUri);
         return CreateHarness(new MutableSource(observations));
     }
 
@@ -141,8 +123,8 @@ public sealed class EventWatchSmokeIsolationTests
             new()
             {
                 Enabled = true,
-                Id = SmokeWatchId,
-                Title = "[SMOKE TEST] Riga FC vs Kairat tickets",
+                Id = KairatWatchId,
+                Title = "Riga FC vs Kairat tickets",
                 MatchTerms = ["Kairat"],
                 Targets = [new NotificationTargetOptions { GuildId = 10, ChannelId = 100, MentionEveryone = false }]
             }

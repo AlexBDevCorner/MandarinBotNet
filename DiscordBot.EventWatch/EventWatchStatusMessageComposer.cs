@@ -33,27 +33,29 @@ public sealed class EventWatchStatusMessageComposer
             }
         }
 
-        builder.AppendLine("Sources:");
+        builder.AppendLine("Ticket catalogue:");
         foreach (var page in report.SourcePages)
         {
             builder.Append("• ");
             builder.AppendLine(page.Trim());
         }
 
+        builder.AppendLine("Calendar Tickets buttons are ignored: only catalogue products count.");
+
         if (!report.CollectionSucceeded)
         {
-            builder.AppendLine("Collection: failed");
+            builder.AppendLine("Catalogue: failed");
             builder.Append("Reason: ");
             builder.AppendLine(string.IsNullOrWhiteSpace(report.FailureReason)
-                ? "unknown collection error"
+                ? "unknown catalogue error"
                 : report.FailureReason.Trim());
-            builder.AppendLine("Result: ❌ Riga FC collection/parsing failed.");
+            builder.AppendLine("Result: ❌ Riga FC ticket catalogue fetch/parsing failed.");
             return builder.ToString().TrimEnd();
         }
 
-        builder.Append("Collection: succeeded, ");
+        builder.Append("Catalogue: reachable, ");
         builder.Append(report.ObservationCount);
-        builder.AppendLine(" observations");
+        builder.AppendLine(" products");
 
         foreach (var result in report.WatchResults)
         {
@@ -64,10 +66,8 @@ public sealed class EventWatchStatusMessageComposer
             builder.Append("`): match [");
             builder.Append(string.Join(", ", result.MatchTerms));
             builder.Append("], ");
-            builder.Append(result.AnnouncementCount);
-            builder.Append(" announcement, ");
-            builder.Append(result.TicketLinkCount);
-            builder.AppendLine(" ticket-link");
+            builder.Append(result.TicketAvailableCount);
+            builder.AppendLine(" ticket available");
             foreach (var evidenceUrl in result.EvidenceSourceUrls)
             {
                 builder.Append("  Evidence: ");
@@ -81,11 +81,11 @@ public sealed class EventWatchStatusMessageComposer
         }
         else if (report.HasSignals)
         {
-            builder.AppendLine("Result: 🎟️ Qualifying ticket signals detected (see evidence links).");
+            builder.AppendLine("Result: 🎟️ Opponent tickets detected in the catalogue (see evidence links).");
         }
         else
         {
-            builder.AppendLine("Result: ✅ Healthy, no qualifying signals right now.");
+            builder.AppendLine("Result: ✅ Healthy, catalogue reachable, no opponent tickets right now.");
         }
 
         return builder.ToString().TrimEnd();

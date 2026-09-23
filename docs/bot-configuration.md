@@ -348,11 +348,19 @@ Smart scoring in v1 covers Free Hit only; Bench Boost, Triple Captain and Wildca
 
 ## EventWatch (Riga FC ticket monitoring)
 
-The optional `EventWatch` capability checks Riga FC's official website every
-10 minutes for ticket-sale evidence and sends Discord alerts exactly once.
-It is a separate domain from FPL/UCL (`DiscordBot.EventWatch`) and reuses the
-existing `IDiscordNotificationPublisher` checkpoints, so no new database table
-is required.
+The optional `EventWatch` capability watches the actual Riga FC ticket
+catalogue every 10 minutes and sends one Discord alert per watch when a
+ticket for its opponent appears. It is a separate domain from FPL/UCL
+(`DiscordBot.EventWatch`) and reuses the existing
+`IDiscordNotificationPublisher` checkpoints, so no new database table is
+required.
+
+The public ticket landing page is `https://rigafc.lv/biletes/`, and the
+authoritative catalogue is `https://shop.rigafc.lv/tickets`. The shop page
+renders its products through a JavaScript ticket widget, so the bot reads
+the stable HTTP JSON source exposing those same products (Biļešu Serviss
+events for the Riga FC promoter) instead of driving a browser. Homepage,
+calendar, and news pages are not EventWatch sources.
 
 Tracked `appsettings.json` keeps the feature disabled with safe defaults and
 no real Discord IDs:
@@ -382,7 +390,7 @@ no real Discord IDs:
     {
       "Enabled": false,
       "Id": "riga-fc-smoke-kairat-2026",
-      "Title": "[SMOKE TEST] Riga FC vs Kairat tickets",
+      "Title": "Riga FC vs Kairat tickets",
       "MatchTerms": [ "Kairat" ],
       "Targets": [
         {
@@ -396,22 +404,34 @@ no real Discord IDs:
 }
 ```
 
-The initial watch `riga-fc-atalanta-2026` searches Riga FC's homepage
-(`https://rigafc.lv/`), calendar (`https://rigafc.lv/kalendars/`), and news
-(`https://rigafc.lv/jaunumi/`) for case-insensitive `Atalanta` mentions
-combined with ticket-sale wording (`biļete`, `biļetes`, `biļešu`, `ticket`,
-`tickets`, `pārdošanā`, `iegādāties`, `pirkt`) or an actionable ticket link in
-the same content block. A plain fixture, a historical mention, a generic
-site-wide `Biļetes` navigation link, or unrelated page changes do not notify.
-When the same block proves both, both `event-watch-announcement` and
-`event-watch-ticket-link` are delivered once per configured target; repeats
-are suppressed by the existing notification checkpoints.
+A watch notifies only when a catalogue ticket/product itself names its
+configured opponent (for example a product titled `Riga FC vs Kairat` for
+the Kairat watch, or `Riga FC vs Atalanta` for the Atalanta watch). Matching
+is scoped to the individual product entry, never to whole-page text. A
+generic multi-match package such as the UEFA Conference League three-home-
+match offer does not count as an individual Kairat or Atalanta ticket, and
+neither does a calendar fixture with a generic `Tickets` button, a news
+article, or a site-wide ticket link. Calendar `Tickets` buttons are
+intentionally ignored because they can point at package offers rather than
+individual match tickets. While the catalogue has no product for the
+configured opponent, the bot stays silent. When the product first appears,
+each watch sends exactly one `event-watch-ticket-available` notification per
+configured target; repeats are suppressed by the existing notification
+checkpoints.
+
+Kairat (`riga-fc-smoke-kairat-2026`) is the early real-world validation
+watch: it proves the exact production catalogue path Atalanta relies on,
+because the Kairat match happens first. Atalanta (`riga-fc-atalanta-2026`)
+is the later target watch. The two watches use independent watch/checkpoint
+identities, so a Kairat notification can never suppress the later Atalanta
+notification.
 
 Each watch owns its dedicated Discord targets. EventWatch never publishes to
 the general `Bot:Notifications:Targets` list, so the ticket alert can use a
 different channel from normal bot notifications. `MentionEveryone` is
-configured independently per EventWatch target and is permitted for the two
-`event-watch-*` types.
+configured independently per EventWatch target and is permitted for the
+`event-watch-ticket-available` type (the two legacy `event-watch-*` types
+remain permitted for previously recorded checkpoints).
 
 To enable in deployment, set the schedule plus the watch and its dedicated
 target (real IDs belong only in runtime configuration):
@@ -430,55 +450,57 @@ Bot__EventWatch__Watches__0__Targets__0__MentionEveryone=true
 
 Disabling `Bot__Schedules__EventWatch__Enabled` removes the scheduled
 EventWatch job on the next process start and leaves all other jobs unchanged.
-Do not poll Biļešu Serviss directly; the detection path is the official Riga
-FC website, although a detected outbound ticket URL is included in the Discord
-message.
+Do not poll Biļešu Serviss directly for purchases; the detection path reads
+the catalogue product list, and the detected per-product ticket URL is
+included in the Discord message.
 
 ### EventWatch verification procedure
 
-Use this sequence to prove the production ticket monitoring works without
-risking the real Atalanta notification:
+Use this sequence to prove the production ticket monitoring works:
 
 1. configure the real EventWatch target (index `0`, `riga-fc-atalanta-2026`)
    with its dedicated guild/channel IDs;
 2. run `/eventwatch test` and verify the expected Discord channel receives the
    clearly labelled test message (no everyone mention, repeatable, no
    checkpoints consumed);
-3. run `/eventwatch status` and verify the Riga FC homepage, calendar, and news
-   sources are reachable and parsed, including observation counts and any
-   currently detected signals with evidence links;
-4. temporarily enable the isolated live smoke watch (index `1`,
+3. run `/eventwatch status` and verify the ticket catalogue is reachable and
+   parsed, including product counts and any currently detected per-watch
+   matches with evidence links;
+4. configure and enable the Kairat validation watch (index `1`,
    `riga-fc-smoke-kairat-2026`) with its dedicated target;
-5. verify the scheduled job sends the smoke notification through the normal
-   fetch → parser → detector → job → publisher → Discord → checkpoint path;
-6. disable the smoke watch again;
-7. leave the real Atalanta watch (`riga-fc-atalanta-2026`) enabled.
+5. while no individual Kairat product exists, status should report
+   healthy/no match and Discord should remain silent;
+6. when an individual Kairat product appears in the real catalogue, the
+   normal scheduled job should send one Kairat notification through the
+   normal catalogue → detector → job → publisher → Discord → checkpoint path;
+7. keep the Atalanta watch (`riga-fc-atalanta-2026`) independently configured
+   for later detection.
 
 > ⚠️ Never repurpose `riga-fc-atalanta-2026` with test match terms. Its
-> announcement (`event-watch-announcement`) and ticket-link
-> (`event-watch-ticket-link`) checkpoints are keyed by
+> `event-watch-ticket-available` checkpoints are keyed by
 > `event-watch:riga-fc-atalanta-2026`; a test delivery under that identity
 > would consume the real notification and suppress the future Atalanta alert.
 
-`/eventwatch status` uses the real production fetch/parser/detector path and
-reports scheduling state, enabled watch IDs/titles, source pages, observation
-counts, per-watch match terms and detected signal kinds with evidence URLs,
-and a clear healthy/no-signal versus collection-failure result. It never
-publishes alerts and never marks checkpoints delivered. `/eventwatch test`
-resolves the real configured EventWatch targets and sends through the real
-Discord destination path with an everyone mention explicitly disabled, so it
-is safe to rerun and can never consume the production Atalanta checkpoints.
+`/eventwatch status` uses the real production catalogue fetch/detector path
+and reports scheduling state, enabled watch IDs/titles, the ticket catalogue
+source, product counts, per-watch match terms and detected matches with
+evidence URLs, and a clear healthy/no-match versus catalogue-failure result.
+It never publishes alerts and never marks checkpoints delivered.
+`/eventwatch test` resolves the real configured EventWatch targets and sends
+through the real Discord destination path with an everyone mention explicitly
+disabled, so it is safe to rerun and can never consume the production
+Kairat/Atalanta checkpoints.
 
-### Temporary live smoke watch
+### Kairat validation watch
 
-Tracked configuration ships a second, disabled-by-default watch for a
-known-positive Riga FC page condition:
+Tracked configuration ships a second, disabled-by-default watch for early
+real-world validation:
 
 ```json
 {
   "Enabled": false,
   "Id": "riga-fc-smoke-kairat-2026",
-  "Title": "[SMOKE TEST] Riga FC vs Kairat tickets",
+  "Title": "Riga FC vs Kairat tickets",
   "MatchTerms": [ "Kairat" ],
   "Targets": [
     {
@@ -490,29 +512,27 @@ known-positive Riga FC page condition:
 }
 ```
 
-The smoke watch uses the normal scheduled EventWatch path with
+The Kairat watch uses the normal scheduled EventWatch path with
 `MentionEveryone=false` and a watch ID different from
 `riga-fc-atalanta-2026`, so its checkpoints
 (`event-watch:riga-fc-smoke-kairat-2026`) are fully isolated from the
 production Atalanta checkpoints. A checkout therefore cannot unexpectedly
-publish test messages. To enable it temporarily against the currently visible
-Riga vs Kairat Almaty calendar entry (Tickets action), set:
+publish test messages. To enable it, set:
 
 ```dotenv
 Bot__EventWatch__Watches__1__Enabled=true
 Bot__EventWatch__Watches__1__Id=riga-fc-smoke-kairat-2026
-Bot__EventWatch__Watches__1__Title=[SMOKE TEST] Riga FC vs Kairat tickets
+Bot__EventWatch__Watches__1__Title=Riga FC vs Kairat tickets
 Bot__EventWatch__Watches__1__MatchTerms__0=Kairat
-Bot__EventWatch__Watches__1__Targets__0__GuildId=<SMOKE-GUILD-ID>
-Bot__EventWatch__Watches__1__Targets__0__ChannelId=<SMOKE-CHANNEL-ID>
+Bot__EventWatch__Watches__1__Targets__0__GuildId=<KAIRAT-GUILD-ID>
+Bot__EventWatch__Watches__1__Targets__0__ChannelId=<KAIRAT-CHANNEL-ID>
 Bot__EventWatch__Watches__1__Targets__0__MentionEveryone=false
 ```
 
-If the Kairat entry is no longer present, point the smoke watch at another
-currently visible Riga FC event that already shows ticket wording/action on
-the existing EventWatch source pages; do not weaken the detector or match
-arbitrary site-wide text. Disable the smoke watch (`...__1__Enabled=false`)
-immediately after verification and do not keep it enabled permanently.
+It stays silent while the catalogue has no individual Kairat ticket and
+sends exactly one notification when that product first appears. Disable it
+(`...__1__Enabled=false`) once its validation purpose is served, or keep it
+enabled until Kairat tickets appear; do not point it at unrelated events.
 
 ## Multiple targets and mentions
 
@@ -530,8 +550,9 @@ where broadcasts are intentional and the bot has permission to mention
 everyone. When enabled, the `@everyone` mention is added **only** for
 notification types that are explicitly permitted to broadcast. Currently the
 permitted types are the FPL and UCL 24-hour and 1-hour deadline reminders
-(`fpl-deadline-*` and `ucl-deadline-*`) plus the EventWatch alerts
-(`event-watch-announcement` and `event-watch-ticket-link`); all other
+(`fpl-deadline-*` and `ucl-deadline-*`) plus the EventWatch ticket alert
+(`event-watch-ticket-available`, alongside the legacy `event-watch-*`
+types); all other
 notification types are sent without a mention. Jobs never enumerate all
 guilds and never fall back to channel display names. EventWatch targets are
 configured per watch under `Bot:EventWatch:Watches`, not under

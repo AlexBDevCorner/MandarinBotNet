@@ -4,28 +4,6 @@ namespace DiscordBot.EventWatch;
 
 public sealed class EventWatchSignalDetector
 {
-    private static readonly string[] TicketSaleTerms =
-    [
-        "biļete",
-        "biļetes",
-        "biļešu",
-        "ticket",
-        "tickets",
-        "pārdošanā",
-        "iegādāties",
-        "pirkt"
-    ];
-
-    private static readonly string[] TicketUrlCues =
-    [
-        "ticket",
-        "bilet",
-        "bile",
-        "pirkt",
-        "shop",
-        "kase"
-    ];
-
     public IReadOnlyList<EventWatchSignal> Detect(
         EventWatchDefinition watch,
         IReadOnlyList<EventWatchObservation> observations)
@@ -43,10 +21,11 @@ public sealed class EventWatchSignalDetector
             return [];
         }
 
-        EventWatchObservation? announcementEvidence = null;
-        EventWatchObservation? ticketEvidence = null;
-        string? ticketUrl = null;
-
+        // Each observation is one scoped ticket-catalogue product. A watch
+        // produces at most one "ticket available" signal: the first product
+        // whose own title, link text, or venue context names the opponent.
+        // Generic packages, calendar buttons, news, or site-wide ticket links
+        // are never observations, so they cannot trigger a signal.
         foreach (var observation in observations)
         {
             var searchable = CombineSearchableText(observation);
@@ -55,64 +34,24 @@ public sealed class EventWatchSignalDetector
                 continue;
             }
 
-            if (announcementEvidence is null &&
-                ContainsAny(searchable, TicketSaleTerms))
-            {
-                announcementEvidence = observation;
-            }
-
-            if (ticketEvidence is null)
-            {
-                var actionable = FindActionableTicketLink(observation);
-                if (actionable is not null)
-                {
-                    ticketEvidence = observation;
-                    ticketUrl = actionable.Url;
-                }
-            }
-
-            if (announcementEvidence is not null && ticketEvidence is not null)
-            {
-                break;
-            }
+            var productUrl = SelectProductUrl(observation);
+            return
+            [
+                new EventWatchSignal(
+                    EventWatchSignalKind.TicketAvailable,
+                    watch.Id,
+                    watch.Title,
+                    productUrl,
+                    TicketUrl: productUrl,
+                    Evidence: TruncateEvidence(searchable))
+            ];
         }
 
-        var signals = new List<EventWatchSignal>(capacity: 2);
-
-        if (announcementEvidence is not null)
-        {
-            signals.Add(new EventWatchSignal(
-                EventWatchSignalKind.Announcement,
-                watch.Id,
-                watch.Title,
-                announcementEvidence.SourceUrl,
-                TicketUrl: null,
-                Evidence: TruncateEvidence(CombineSearchableText(announcementEvidence))));
-        }
-
-        if (ticketEvidence is not null && ticketUrl is not null)
-        {
-            signals.Add(new EventWatchSignal(
-                EventWatchSignalKind.TicketLinkAvailable,
-                watch.Id,
-                watch.Title,
-                ticketEvidence.SourceUrl,
-                TicketUrl: ticketUrl,
-                Evidence: TruncateEvidence(CombineSearchableText(ticketEvidence))));
-        }
-
-        return signals;
+        return [];
     }
 
     private static string CombineSearchableText(EventWatchObservation observation)
     {
-        if (observation.Anchors.Count == 0)
-        {
-            return string.IsNullOrEmpty(observation.Context)
-                ? observation.Text
-                : $"{observation.Text} {observation.Context}";
-        }
-
         var anchorText = string.Join(
             " ",
             observation.Anchors.Select(anchor => anchor.Text));
@@ -120,38 +59,18 @@ public sealed class EventWatchSignalDetector
         return combined.Trim();
     }
 
-    private static EventWatchAnchor? FindActionableTicketLink(
-        EventWatchObservation observation)
+    private static string SelectProductUrl(EventWatchObservation observation)
     {
         foreach (var anchor in observation.Anchors)
         {
-            if (string.IsNullOrWhiteSpace(anchor.Url))
+            if (Uri.TryCreate(anchor.Url, UriKind.Absolute, out var uri) &&
+                (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps))
             {
-                continue;
-            }
-
-            if (!Uri.TryCreate(anchor.Url, UriKind.Absolute, out var uri))
-            {
-                continue;
-            }
-
-            if (uri.Scheme != Uri.UriSchemeHttp &&
-                uri.Scheme != Uri.UriSchemeHttps)
-            {
-                continue;
-            }
-
-            var anchorMentionsSale = ContainsAny(anchor.Text, TicketSaleTerms);
-            var urlLooksLikeTicket = ContainsAny(anchor.Url, TicketUrlCues)
-                || ContainsAny(uri.Host + uri.PathAndQuery, TicketUrlCues);
-
-            if (anchorMentionsSale || urlLooksLikeTicket)
-            {
-                return anchor;
+                return anchor.Url;
             }
         }
 
-        return null;
+        return observation.SourceUrl;
     }
 
     private static bool ContainsAny(string text, IReadOnlyList<string> terms)

@@ -626,7 +626,6 @@
       "discordbot.eventwatch": {
         "type": "Project",
         "dependencies": {
-          "AngleSharp": "[1.7.3, )",
           "DiscordBot.Common": "[1.0.0, )",
           "Microsoft.Extensions.Http": "[10.0.11, )",
           "Microsoft.Extensions.Http.Resilience": "[10.9.0, )",
@@ -669,12 +668,6 @@
           "Quartz.Extensions.Hosting": "[3.19.1, )",
           "TimeZoneConverter": "[7.2.0, )"
         }
-      },
-      "AngleSharp": {
-        "type": "CentralTransitive",
-        "requested": "[1.7.3, )",
-        "resolved": "1.7.3",
-        "contentHash": "I8TpSvgOPAVQHjVvXaROZOkIGZdX0tn+e9CUix6mv5pMqfyKO+/zm/dofsXgsxVTJl/sSTnEMFwrdnqxTt2axQ=="
       },
       "Discord.Net": {
         "type": "CentralTransitive",

@@ -18,15 +18,15 @@ public sealed class EventWatchVerticalSliceTests
     private const string WatchId = "riga-fc-atalanta-2026";
 
     [Test]
-    public async Task Sequence_NoSale_Announcement_Unchanged_TicketLink_Unchanged_DeliversOnceEach()
+    public async Task Sequence_Empty_Package_Atalanta_Unchanged_KairatOnly_DeliversOnce()
     {
-        var responses = new MutableRigaFcHandler();
+        var responses = new MutableCatalogueHandler();
         var httpClient = new HttpClient(responses)
         {
-            BaseAddress = new Uri("https://rigafc.lv/")
+            BaseAddress = new Uri("https://www.bilesuserviss.lv/")
         };
         var rigaClient = new RigaFcClient(httpClient, new RecordingLogger<RigaFcClient>());
-        var parser = new RigaFcPageParser();
+        var parser = new RigaFcTicketCatalogueParser();
         var sourceLogger = new RecordingLogger<RigaFcEventWatchSource>();
         var source = new RigaFcEventWatchSource(rigaClient, parser, sourceLogger);
 
@@ -66,63 +66,35 @@ public sealed class EventWatchVerticalSliceTests
             TimeProvider.System,
             new RecordingLogger<EventWatchJob>());
 
-        // 1. No sale information -> no notification.
-        responses.SetAll(NoSaleHtml());
+        // 1. Empty catalogue -> no notification.
+        responses.SetPayload(CatalogueFixtures.Empty());
         await job.Execute(CreateContext());
         channel.Sent.Should().BeEmpty();
 
-        // 2. Sale announcement appears -> one Announcement.
-        responses.SetAll(AnnouncementHtml());
+        // 2. Generic Conference League package -> no opponent-specific signal.
+        responses.SetPayload(CatalogueFixtures.GenericPackage());
+        await job.Execute(CreateContext());
+        channel.Sent.Should().BeEmpty();
+
+        // 3. Atalanta product appears -> exactly one ticket-available notification.
+        responses.SetPayload(CatalogueFixtures.WithAtalanta());
         await job.Execute(CreateContext());
         channel.Sent.Should().ContainSingle();
         channel.Sent[0].Content.Should().Contain("Riga FC vs Atalanta tickets");
-        channel.Sent[0].Content.Should().Contain("https://rigafc.lv/");
-        var announcementType = NotificationTypes.EventWatchAnnouncement;
+        channel.Sent[0].Content.Should().Contain("https://www.bilesuserviss.lv/biletes/ATALANTA01/riga-fc-vs-atalanta");
         checkpointStore.IsDelivered(
-            new NotificationCheckpoint(10, 100, $"event-watch:{WatchId}", announcementType))
+            new NotificationCheckpoint(10, 100, $"event-watch:{WatchId}", NotificationTypes.EventWatchTicketAvailable))
             .Should().BeTrue();
 
-        // 3. Unchanged page -> no duplicate.
+        // 4. Unchanged catalogue -> no duplicate.
         await job.Execute(CreateContext());
         channel.Sent.Should().ContainSingle();
 
-        // 4. Direct ticket link appears -> one TicketLinkAvailable.
-        responses.SetAll(TicketLinkHtml());
+        // 5. Kairat-only catalogue product does not trigger the Atalanta watch.
+        responses.SetPayload(CatalogueFixtures.WithKairat());
         await job.Execute(CreateContext());
-        channel.Sent.Should().HaveCount(2);
-        channel.Sent[1].Content.Should().Contain("https://bilesuserviss.lv/riga-atalanta");
-        channel.Sent[1].Content.Should().Contain("https://rigafc.lv/");
-        var ticketType = NotificationTypes.EventWatchTicketLink;
-        checkpointStore.IsDelivered(
-            new NotificationCheckpoint(10, 100, $"event-watch:{WatchId}", ticketType))
-            .Should().BeTrue();
-
-        // 5. Unchanged page -> no duplicate.
-        await job.Execute(CreateContext());
-        channel.Sent.Should().HaveCount(2);
-
-        // No raw HTML should be logged.
-        sourceLogger.Entries.Should().OnlyContain(entry =>
-            entry.Message == null || !entry.Message.Contains("<html>"));
+        channel.Sent.Should().ContainSingle();
     }
-
-    private static string NoSaleHtml() => """
-        <html><body>
-        <div><article><h2>Riga FC vs Atalanta</h2><p>Fixture on Saturday at Skonto Stadium at 17:00.</p></article></div>
-        </body></html>
-        """;
-
-    private static string AnnouncementHtml() => """
-        <html><body>
-        <div><article><h2>Riga FC vs Atalanta</h2><p>Biļetes jau pārdošanā! Iegādāties biļetes uz šo spēli.</p></article></div>
-        </body></html>
-        """;
-
-    private static string TicketLinkHtml() => """
-        <html><body>
-        <div><article><h2>Riga FC vs Atalanta</h2><p>Biļetes pārdošanā uz Riga FC vs Atalanta spēli.</p><a href="https://bilesuserviss.lv/riga-atalanta">Pirkt biļetes</a></article></div>
-        </body></html>
-        """;
 
     private static IJobExecutionContext CreateContext()
     {
@@ -135,20 +107,22 @@ public sealed class EventWatchVerticalSliceTests
         return context;
     }
 
-    private sealed class MutableRigaFcHandler : HttpMessageHandler
+    private sealed class MutableCatalogueHandler : HttpMessageHandler
     {
-        private string _html = "<html></html>";
+        private string _payload = CatalogueFixtures.Empty();
 
-        public void SetAll(string html) => _html = html;
+        public void SetPayload(string payload) => _payload = payload;
 
         protected override Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request,
             CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            request.RequestUri.Should().NotBeNull();
+            request.RequestUri!.ToString().Should().Contain("bilesuserviss.lv");
             var response = new HttpResponseMessage(HttpStatusCode.OK)
             {
-                Content = new StringContent(_html, Encoding.UTF8, "text/html")
+                Content = new StringContent(_payload, Encoding.UTF8, "application/json")
             };
             return Task.FromResult(response);
         }

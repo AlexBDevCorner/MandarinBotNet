@@ -16,12 +16,9 @@ public sealed class EventWatchCommandHandlerTests
     [Test]
     public async Task HandleAsync_StatusSubcommand_RespondsWithoutPublishing()
     {
-        var html = """
-            <html><body>
-            <div><article><h2>Riga FC vs Atalanta</h2><p>Fixture on Saturday at Skonto Stadium.</p></article></div>
-            </body></html>
-            """;
-        var observations = new RigaFcPageParser().Parse(html, new Uri("https://rigafc.lv/"));
+        var observations = new RigaFcTicketCatalogueParser().Parse(
+            CatalogueFixtures.GenericPackage(),
+            RigaFcClient.TicketCatalogueApiUri);
         var botOptions = CreateOptions(schedulingEnabled: true);
         var statusService = new EventWatchStatusService(
             new FixedSource(observations),
@@ -46,22 +43,19 @@ public sealed class EventWatchCommandHandlerTests
         interaction.Deferred.Should().BeTrue();
         interaction.Response.Should().NotBeNullOrWhiteSpace();
         interaction.Response.Should().Contain("EventWatch status");
-        interaction.Response.Should().NotContain("<html>");
+        interaction.Response.Should().NotContain("{");
         channel.Sent.Should().BeEmpty();
         checkpointStore.IsDelivered(
-            new NotificationCheckpoint(10, 100, $"event-watch:{AtalantaWatchId}", NotificationTypes.EventWatchAnnouncement))
-            .Should().BeFalse();
-        checkpointStore.IsDelivered(
-            new NotificationCheckpoint(10, 100, $"event-watch:{AtalantaWatchId}", NotificationTypes.EventWatchTicketLink))
+            new NotificationCheckpoint(10, 100, $"event-watch:{AtalantaWatchId}", NotificationTypes.EventWatchTicketAvailable))
             .Should().BeFalse();
     }
 
     [Test]
     public async Task HandleAsync_TestSubcommand_SendsWithoutEveryoneAndWithoutCheckpoints()
     {
-        var observations = new RigaFcPageParser().Parse(
-            "<html><body><div><article><h2>News</h2><p>Nothing.</p></article></div></body></html>",
-            new Uri("https://rigafc.lv/"));
+        var observations = new RigaFcTicketCatalogueParser().Parse(
+            CatalogueFixtures.Empty(),
+            RigaFcClient.TicketCatalogueApiUri);
         var botOptions = CreateOptions(schedulingEnabled: true);
         var statusService = new EventWatchStatusService(
             new FixedSource(observations),
@@ -91,10 +85,7 @@ public sealed class EventWatchCommandHandlerTests
         interaction.Response.Should().Contain("delivery test");
         interaction.Response.Should().Contain("guild 10");
         checkpointStore.IsDelivered(
-            new NotificationCheckpoint(10, 100, $"event-watch:{AtalantaWatchId}", NotificationTypes.EventWatchAnnouncement))
-            .Should().BeFalse();
-        checkpointStore.IsDelivered(
-            new NotificationCheckpoint(10, 100, $"event-watch:{AtalantaWatchId}", NotificationTypes.EventWatchTicketLink))
+            new NotificationCheckpoint(10, 100, $"event-watch:{AtalantaWatchId}", NotificationTypes.EventWatchTicketAvailable))
             .Should().BeFalse();
     }
 

@@ -250,6 +250,7 @@ public sealed class EventWatchOptionsTests
 
     [TestCase(NotificationTypes.EventWatchAnnouncement, true)]
     [TestCase(NotificationTypes.EventWatchTicketLink, true)]
+    [TestCase(NotificationTypes.EventWatchTicketAvailable, true)]
     public void AllowsEveryoneMention_EventWatchTypes_ReturnsTrue(
         string notificationType,
         bool expected)

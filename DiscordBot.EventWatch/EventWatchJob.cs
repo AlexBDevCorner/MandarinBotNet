@@ -37,7 +37,7 @@ public sealed class EventWatchJob(
                 {
                     logger.LogError(
                         exception,
-                        "EventWatch collection failed with outcome {Outcome}.",
+                        "EventWatch ticket catalogue collection failed with outcome {Outcome}.",
                         "CollectionFailed");
                     throw;
                 }
@@ -65,21 +65,14 @@ public sealed class EventWatchJob(
                 {
                     var watch = result.Watch;
                     logger.LogInformation(
-                        "EventWatch watch {WatchId} evaluated {SignalCount} signals from {SourceCount} sources.",
+                        "EventWatch watch {WatchId} evaluated {SignalCount} ticket-available signals from catalogue {SourceName}.",
                         watch.Id,
                         result.Signals.Count,
-                        "riga-fc");
+                        "riga-fc-ticket-catalogue");
 
                     foreach (var signal in result.Signals)
                     {
-                        var notificationType = signal.Kind switch
-                        {
-                            EventWatchSignalKind.Announcement =>
-                                NotificationTypes.EventWatchAnnouncement,
-                            EventWatchSignalKind.TicketLinkAvailable =>
-                                NotificationTypes.EventWatchTicketLink,
-                            _ => NotificationTypes.EventWatchAnnouncement
-                        };
+                        const string notificationType = NotificationTypes.EventWatchTicketAvailable;
                         var sourceIdentifier = EventWatchSourceIdentifier.Create(watch.Id);
                         var message = messageComposer.Compose(signal);
 
@@ -140,7 +133,7 @@ public sealed class EventWatchJob(
                     if (result.Signals.Count == 0)
                     {
                         logger.LogInformation(
-                            "EventWatch watch {WatchId} found no qualifying signals with outcome {Outcome}.",
+                            "EventWatch watch {WatchId} found no catalogue product for its opponent with outcome {Outcome}.",
                             watch.Id,
                             "NoSignals");
                     }

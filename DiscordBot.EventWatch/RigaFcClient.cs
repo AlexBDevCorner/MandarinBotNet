@@ -9,27 +9,34 @@ public sealed class RigaFcClient(
     HttpClient httpClient,
     ILogger<RigaFcClient> logger)
 {
-    public static readonly Uri HomepageUri = new("https://rigafc.lv/");
+    /// <summary>
+    /// Public ticket landing page. Documented as the entry point for supporters,
+    /// but never used as detection evidence: it renders its products dynamically.
+    /// </summary>
+    public static readonly Uri TicketLandingUri = new("https://rigafc.lv/biletes/");
 
-    public static readonly Uri CalendarUri = new("https://rigafc.lv/kalendars/");
+    /// <summary>
+    /// Authoritative Riga FC ticket catalogue (shop).
+    /// </summary>
+    public static readonly Uri TicketCatalogueUri = new("https://shop.rigafc.lv/tickets");
 
-    public static readonly Uri NewsUri = new("https://rigafc.lv/jaunumi/");
+    /// <summary>
+    /// Stable HTTP JSON source exposing the same Riga FC ticket products listed
+    /// by the shop catalogue: Biļešu Serviss events for promoter
+    /// "Riga Football Club biedrība". The shop page itself renders these
+    /// products through a JavaScript widget, so detection reads this endpoint
+    /// instead of scraping homepage, calendar, or news pages.
+    /// </summary>
+    public static readonly Uri TicketCatalogueApiUri = new(
+        "https://www.bilesuserviss.lv/api/v1/events?language=lv&pageSize=50&promoters=21-69-7648");
 
     public static IReadOnlyList<Uri> PageUris { get; } =
     [
-        HomepageUri,
-        CalendarUri,
-        NewsUri
+        TicketCatalogueApiUri
     ];
 
-    public Task<string> GetHomepageAsync(CancellationToken cancellationToken) =>
-        GetPageAsync(HomepageUri, cancellationToken);
-
-    public Task<string> GetCalendarAsync(CancellationToken cancellationToken) =>
-        GetPageAsync(CalendarUri, cancellationToken);
-
-    public Task<string> GetNewsAsync(CancellationToken cancellationToken) =>
-        GetPageAsync(NewsUri, cancellationToken);
+    public Task<string> GetTicketCatalogueAsync(CancellationToken cancellationToken) =>
+        GetPageAsync(TicketCatalogueApiUri, cancellationToken);
 
     public async Task<string> GetPageAsync(
         Uri pageUri,
@@ -41,7 +48,7 @@ public sealed class RigaFcClient(
         try
         {
             using var request = new HttpRequestMessage(HttpMethod.Get, pageUri);
-            request.Headers.Accept.ParseAdd("text/html");
+            request.Headers.Accept.ParseAdd("application/json");
             if (!request.Headers.UserAgent.Any())
             {
                 request.Headers.UserAgent.ParseAdd(RigaFcUserAgent.Value);
@@ -57,15 +64,15 @@ public sealed class RigaFcClient(
                 throw CreateStatusException(pageUri, response.StatusCode);
             }
 
-            var html = await response.Content.ReadAsStringAsync(cancellationToken);
-            if (string.IsNullOrWhiteSpace(html))
+            var payload = await response.Content.ReadAsStringAsync(cancellationToken);
+            if (string.IsNullOrWhiteSpace(payload))
             {
                 throw new RigaFcApiException(
-                    $"The Riga FC request to '{pageUri}' returned an empty page.",
+                    $"The Riga FC ticket catalogue request to '{pageUri}' returned an empty response.",
                     response.StatusCode);
             }
 
-            return html;
+            return payload;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -79,40 +86,40 @@ public sealed class RigaFcClient(
         {
             logger.LogWarning(
                 exception,
-                "Riga FC request {PageUri} exhausted its timeout retries.",
+                "Riga FC ticket catalogue request {PageUri} exhausted its timeout retries.",
                 pageUri);
             throw new RigaFcApiException(
-                $"The Riga FC request to '{pageUri}' timed out.",
+                $"The Riga FC ticket catalogue request to '{pageUri}' timed out.",
                 innerException: exception);
         }
         catch (OperationCanceledException exception)
         {
             logger.LogWarning(
                 exception,
-                "Riga FC request {PageUri} timed out.",
+                "Riga FC ticket catalogue request {PageUri} timed out.",
                 pageUri);
             throw new RigaFcApiException(
-                $"The Riga FC request to '{pageUri}' timed out.",
+                $"The Riga FC ticket catalogue request to '{pageUri}' timed out.",
                 innerException: exception);
         }
         catch (BrokenCircuitException exception)
         {
             logger.LogWarning(
                 exception,
-                "Riga FC request {PageUri} was blocked by the open circuit.",
+                "Riga FC ticket catalogue request {PageUri} was blocked by the open circuit.",
                 pageUri);
             throw new RigaFcApiException(
-                $"The Riga FC request to '{pageUri}' was blocked by the open circuit.",
+                $"The Riga FC ticket catalogue request to '{pageUri}' was blocked by the open circuit.",
                 innerException: exception);
         }
         catch (HttpRequestException exception)
         {
             logger.LogWarning(
                 exception,
-                "Riga FC request {PageUri} failed after transient transport retries.",
+                "Riga FC ticket catalogue request {PageUri} failed after transient transport retries.",
                 pageUri);
             throw new RigaFcApiException(
-                $"The Riga FC request to '{pageUri}' failed.",
+                $"The Riga FC ticket catalogue request to '{pageUri}' failed.",
                 exception.StatusCode,
                 exception);
         }
@@ -123,12 +130,12 @@ public sealed class RigaFcClient(
         HttpStatusCode statusCode)
     {
         logger.LogWarning(
-            "Riga FC request {PageUri} failed with HTTP status {StatusCode}.",
+            "Riga FC ticket catalogue request {PageUri} failed with HTTP status {StatusCode}.",
             pageUri,
             (int)statusCode);
 
         return new RigaFcApiException(
-            $"The Riga FC request to '{pageUri}' failed with HTTP status {(int)statusCode}.",
+            $"The Riga FC ticket catalogue request to '{pageUri}' failed with HTTP status {(int)statusCode}.",
             statusCode);
     }
 }

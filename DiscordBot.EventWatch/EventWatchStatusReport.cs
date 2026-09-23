@@ -8,8 +8,7 @@ public sealed record EventWatchPerWatchStatus(
     string WatchId,
     string WatchTitle,
     IReadOnlyList<string> MatchTerms,
-    int AnnouncementCount,
-    int TicketLinkCount,
+    int TicketAvailableCount,
     IReadOnlyList<string> EvidenceSourceUrls);
 
 public sealed record EventWatchStatusReport(
@@ -22,6 +21,5 @@ public sealed record EventWatchStatusReport(
     IReadOnlyList<EventWatchPerWatchStatus> WatchResults)
 {
     public bool HasSignals =>
-        WatchResults.Any(static result =>
-            result.AnnouncementCount + result.TicketLinkCount > 0);
+        WatchResults.Any(static result => result.TicketAvailableCount > 0);
 }

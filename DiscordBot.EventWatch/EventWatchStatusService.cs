@@ -57,10 +57,6 @@ public sealed class EventWatchStatusService(
         foreach (var watch in watches)
         {
             var signals = detector.Detect(watch, observations);
-            var announcementCount = signals.Count(
-                static signal => signal.Kind == EventWatchSignalKind.Announcement);
-            var ticketLinkCount = signals.Count(
-                static signal => signal.Kind == EventWatchSignalKind.TicketLinkAvailable);
             var evidenceUrls = signals
                 .Select(static signal => signal.SourceUrl)
                 .Where(static url => !string.IsNullOrWhiteSpace(url))
@@ -69,10 +65,9 @@ public sealed class EventWatchStatusService(
                 .ToList();
 
             logger.LogInformation(
-                "EventWatch status evaluated watch {WatchId} with {AnnouncementCount} announcement and {TicketLinkCount} ticket-link signals from {ObservationCount} observations.",
+                "EventWatch status evaluated watch {WatchId} with {TicketAvailableCount} ticket-available signals from {ObservationCount} catalogue products.",
                 watch.Id,
-                announcementCount,
-                ticketLinkCount,
+                signals.Count,
                 observations.Count);
 
             results.Add(new EventWatchPerWatchStatus(
@@ -82,13 +77,12 @@ public sealed class EventWatchStatusService(
                     .Where(static term => !string.IsNullOrWhiteSpace(term))
                     .Select(static term => term.Trim())
                     .ToList(),
-                announcementCount,
-                ticketLinkCount,
+                signals.Count,
                 evidenceUrls));
         }
 
         logger.LogInformation(
-            "EventWatch status collected {ObservationCount} observations for {WatchCount} enabled watches with outcome {Outcome}.",
+            "EventWatch status collected {ObservationCount} catalogue products for {WatchCount} enabled watches with outcome {Outcome}.",
             observations.Count,
             watches.Count,
             "Succeeded");

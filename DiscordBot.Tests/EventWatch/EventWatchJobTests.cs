@@ -16,7 +16,7 @@ public sealed class EventWatchJobTests
     private const string WatchId = "riga-fc-atalanta-2026";
 
     [Test]
-    public async Task Execute_AnnouncementAndTicketLink_PublishesEachOnceWithStableSourceId()
+    public async Task Execute_TicketAvailable_PublishesOnceWithStableSourceId()
     {
         var watch = new EventWatchDefinition
         {
@@ -26,32 +26,18 @@ public sealed class EventWatchJobTests
             MatchTerms = ["Atalanta"],
             Targets = [new NotificationTargetOptions { GuildId = 10, ChannelId = 100 }]
         };
-        // Note: uses real Latvian wording through the parser path below.
-        var latvianHtml = """
-            <html><body>
-            <div><article><h2>Riga FC vs Atalanta</h2><p>Biļetes pārdošanā!</p><a href="https://bilesuserviss.lv/x">Pirkt biļetes</a></article></div>
-            </body></html>
-            """;
-        var source = new FixedSource(ParseAll(latvianHtml));
+        var source = new FixedSource(ParseCatalogue(CatalogueFixtures.WithAtalanta()));
         var job = CreateJob([watch], source, out var publisher, out _);
 
         await job.Execute(CreateContext());
         await job.Execute(CreateContext());
 
-        var announcementCalls = publisher.Calls
-            .Where(c => c.NotificationType == NotificationTypes.EventWatchAnnouncement)
-            .ToList();
-        var ticketCalls = publisher.Calls
-            .Where(c => c.NotificationType == NotificationTypes.EventWatchTicketLink)
-            .ToList();
-
         // Fake publisher records every attempt; the stable source identifier
         // lets the real checkpoint store deduplicate. Here we assert the job
         // uses stable IDs so that deduplication is possible.
-        announcementCalls.Should().HaveCount(2);
-        ticketCalls.Should().HaveCount(2);
-        announcementCalls.Should().OnlyContain(c => c.SourceIdentifier == $"event-watch:{WatchId}");
-        ticketCalls.Should().OnlyContain(c => c.SourceIdentifier == $"event-watch:{WatchId}");
+        publisher.Calls.Should().HaveCount(2);
+        publisher.Calls.Should().OnlyContain(c => c.SourceIdentifier == $"event-watch:{WatchId}");
+        publisher.Calls.Should().OnlyContain(c => c.NotificationType == NotificationTypes.EventWatchTicketAvailable);
         publisher.Calls.Should().OnlyContain(c => c.Target.GuildId == 10 && c.Target.ChannelId == 100);
     }
 
@@ -66,13 +52,7 @@ public sealed class EventWatchJobTests
             MatchTerms = ["Atalanta"],
             Targets = [new NotificationTargetOptions { GuildId = 10, ChannelId = 100 }]
         };
-        var html = """
-            <html><body>
-            <div><article><h2>Riga FC vs Atalanta</h2><p>Biļetes pārdošanā!</p><a href="https://bilesuserviss.lv/y">Pirkt biļetes</a></article></div>
-            </body></html>
-            """;
-        var observations = new RigaFcPageParser().Parse(html, new Uri("https://rigafc.lv/"));
-        var source = new FixedSource(observations);
+        var source = new FixedSource(ParseCatalogue(CatalogueFixtures.WithAtalanta()));
         var channel = new FakeChannel();
         var checkpointStore = new InMemoryCheckpointStore();
         var realPublisher = new DiscordNotificationPublisher(
@@ -86,7 +66,7 @@ public sealed class EventWatchJobTests
 
         await job.Execute(CreateContext());
         var afterFirst = channel.Sent.Count;
-        afterFirst.Should().Be(2);
+        afterFirst.Should().Be(1);
 
         await job.Execute(CreateContext());
         channel.Sent.Should().HaveCount(afterFirst);
@@ -108,12 +88,7 @@ public sealed class EventWatchJobTests
         {
             Targets = [new NotificationTargetOptions { GuildId = 999, ChannelId = 999 }]
         };
-        var html = """
-            <html><body>
-            <div><article><h2>Riga FC vs Atalanta</h2><p>Biļetes pārdošanā!</p></article></div>
-            </body></html>
-            """;
-        var source = new FixedSource(new RigaFcPageParser().Parse(html, new Uri("https://rigafc.lv/")));
+        var source = new FixedSource(ParseCatalogue(CatalogueFixtures.WithAtalanta()));
         var job = CreateJob([watch], source, out var publisher, out _);
 
         await job.Execute(CreateContext());
@@ -139,12 +114,7 @@ public sealed class EventWatchJobTests
                 new NotificationTargetOptions { GuildId = 20, ChannelId = 200 }
             ]
         };
-        var html = """
-            <html><body>
-            <div><article><h2>Riga FC vs Atalanta</h2><p>Biļetes pārdošanā!</p></article></div>
-            </body></html>
-            """;
-        var source = new FixedSource(new RigaFcPageParser().Parse(html, new Uri("https://rigafc.lv/")));
+        var source = new FixedSource(ParseCatalogue(CatalogueFixtures.WithAtalanta()));
         var publisher = new FailingPublisher(failGuildId: 10);
         var job = CreateJobWithPublisher([watch], source, publisher);
 
@@ -156,7 +126,7 @@ public sealed class EventWatchJobTests
     }
 
     [Test]
-    public async Task Execute_OneFailingPage_DoesNotPreventOtherPages()
+    public async Task Execute_CatalogueFailure_ThrowsWithoutPublishing()
     {
         var watch = new EventWatchDefinition
         {
@@ -166,51 +136,33 @@ public sealed class EventWatchJobTests
             MatchTerms = ["Atalanta"],
             Targets = [new NotificationTargetOptions { GuildId = 10, ChannelId = 100 }]
         };
-        var goodHtml = """
-            <html><body>
-            <div><article><h2>Riga FC vs Atalanta</h2><p>Biļetes pārdošanā!</p></article></div>
-            </body></html>
-            """;
-        var source = new PartiallyFailingSource(goodHtml);
-        var job = CreateJob([watch], source, out var publisher, out _);
+        var job = CreateJob([watch], new ThrowingSource(), out var publisher, out _);
 
-        await job.Execute(CreateContext());
+        Func<Task> act = () => job.Execute(CreateContext());
 
-        publisher.Calls.Should().NotBeEmpty();
-        publisher.Calls.Should().OnlyContain(c => c.NotificationType == NotificationTypes.EventWatchAnnouncement);
+        await act.Should().ThrowAsync<RigaFcApiException>();
+        publisher.Calls.Should().BeEmpty();
     }
 
     [Test]
-    public void Compose_Announcement_IdentifiesEventAndSource()
+    public void Compose_TicketAvailable_IdentifiesEventAndTicketUrl()
     {
         var composer = new EventWatchMessageCompositionService();
 
-        var message = composer.ComposeAnnouncement(
+        var message = composer.ComposeTicketAvailable(
             "Riga FC vs Atalanta tickets",
-            "https://rigafc.lv/jaunumi/");
+            "https://www.bilesuserviss.lv/biletes/ATALANTA01/riga-fc-vs-atalanta",
+            "https://www.bilesuserviss.lv/biletes/ATALANTA01/riga-fc-vs-atalanta");
 
         message.Should().Contain("Riga FC vs Atalanta tickets");
-        message.Should().Contain("https://rigafc.lv/jaunumi/");
+        message.Should().Contain("https://www.bilesuserviss.lv/biletes/ATALANTA01/riga-fc-vs-atalanta");
+        message.Should().Contain("tickets available");
+        message.Should().NotContain("@everyone");
     }
 
-    [Test]
-    public void Compose_TicketLink_IncludesTicketAndSourceUrls()
+    private static IReadOnlyList<EventWatchObservation> ParseCatalogue(string json)
     {
-        var composer = new EventWatchMessageCompositionService();
-
-        var message = composer.ComposeTicketLink(
-            "Riga FC vs Atalanta tickets",
-            "https://bilesuserviss.lv/riga-atalanta",
-            "https://rigafc.lv/");
-
-        message.Should().Contain("https://bilesuserviss.lv/riga-atalanta");
-        message.Should().Contain("https://rigafc.lv/");
-        message.Should().Contain("Riga FC vs Atalanta tickets");
-    }
-
-    private static IReadOnlyList<EventWatchObservation> ParseAll(string html)
-    {
-        return new RigaFcPageParser().Parse(html, new Uri("https://rigafc.lv/"));
+        return new RigaFcTicketCatalogueParser().Parse(json, RigaFcClient.TicketCatalogueApiUri);
     }
 
     private static EventWatchJob CreateJob(
@@ -269,30 +221,13 @@ public sealed class EventWatchJobTests
             Task.FromResult(observations);
     }
 
-    private sealed class PartiallyFailingSource(string goodHtml) : IEventWatchSource
+    private sealed class ThrowingSource : IEventWatchSource
     {
-        public string SourceName => "riga-fc";
+        public string SourceName => "test";
 
-        public async Task<IReadOnlyList<EventWatchObservation>> CollectAsync(CancellationToken cancellationToken)
-        {
-            // Simulate: homepage fails, calendar + news succeed via the real
-            // RigaFcEventWatchSource resilience pattern (one failure does not
-            // suppress the others).
-            var parser = new RigaFcPageParser();
-            var observations = new List<EventWatchObservation>();
-            try
-            {
-                throw new RigaFcApiException("homepage failed", System.Net.HttpStatusCode.InternalServerError);
-            }
-            catch (RigaFcApiException)
-            {
-                // Swallowed per-page, continue with remaining pages.
-            }
-
-            observations.AddRange(parser.Parse(goodHtml, new Uri("https://rigafc.lv/kalendars/")));
-            observations.AddRange(parser.Parse(goodHtml, new Uri("https://rigafc.lv/jaunumi/")));
-            return await Task.FromResult<IReadOnlyList<EventWatchObservation>>(observations);
-        }
+        public Task<IReadOnlyList<EventWatchObservation>> CollectAsync(CancellationToken cancellationToken) =>
+            Task.FromException<IReadOnlyList<EventWatchObservation>>(
+                new RigaFcApiException("ticket catalogue failed"));
     }
 
     private sealed class ReadyConnection : IDiscordConnectionReadiness
@@ -398,8 +333,8 @@ public sealed class EventWatchJobTests
             {
                 "get_JobDetail" => JobDetail,
                 "get_FireInstanceId" => FireInstanceId,
-                "get_RefireCount" => 0,
                 "get_CancellationToken" => CancellationToken.None,
+                "get_RefireCount" => 0,
                 _ => throw new NotSupportedException(targetMethod?.Name)
             };
         }
