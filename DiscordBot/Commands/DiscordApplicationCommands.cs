@@ -14,6 +14,9 @@ public static class DiscordApplicationCommands
     public const string ChipsName = "chips";
     public const string PricesName = "prices";
     public const string ChipWatchName = "chipwatch";
+    public const string EventWatchName = EventWatchCommandNames.CommandName;
+    public const string EventWatchStatusSubcommand = EventWatchCommandNames.StatusSubcommand;
+    public const string EventWatchTestSubcommand = EventWatchCommandNames.TestSubcommand;
     public const string HelpName = "help";
 
     public static ApplicationCommandProperties[] BuildDesiredSet()
@@ -103,6 +106,22 @@ public static class DiscordApplicationCommands
                         .WithType(ApplicationCommandOptionType.String)
                         .WithDescription(
                             "Показать подробности для конкретной команды"))
+                .Build(),
+            new SlashCommandBuilder()
+                .WithName(EventWatchName)
+                .WithDescription("Проверяет мониторинг билетов Riga FC. 🎟️")
+                .AddOption(
+                    new SlashCommandOptionBuilder()
+                        .WithName(EventWatchStatusSubcommand)
+                        .WithDescription(
+                            "Проверяет источники Riga FC без отправки уведомлений.")
+                        .WithType(ApplicationCommandOptionType.SubCommand))
+                .AddOption(
+                    new SlashCommandOptionBuilder()
+                        .WithName(EventWatchTestSubcommand)
+                        .WithDescription(
+                            "Отправляет тестовое сообщение в каналы EventWatch.")
+                        .WithType(ApplicationCommandOptionType.SubCommand))
                 .Build(),
             new SlashCommandBuilder()
                 .WithName(HelpName)

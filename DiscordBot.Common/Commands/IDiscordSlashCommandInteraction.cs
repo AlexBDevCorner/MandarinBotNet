@@ -17,4 +17,9 @@ public interface IDiscordSlashCommandInteraction
     Task ModifyOriginalResponseAsync(string content);
 
     Task FollowupAsync(string content);
+
+    string? GetSubcommandName()
+    {
+        return null;
+    }
 }

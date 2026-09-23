@@ -18,6 +18,17 @@ internal sealed class DiscordNetSlashCommandInteraction(
             .FirstOrDefault(option => option.Name == name);
         if (option is null)
         {
+            // Options may be nested under a subcommand (e.g. /eventwatch status).
+            var subcommand = command.Data.Options
+                .FirstOrDefault(option =>
+                    option.Type is ApplicationCommandOptionType.SubCommand
+                        or ApplicationCommandOptionType.SubCommandGroup);
+            option = subcommand?.Options
+                .FirstOrDefault(nested => nested.Name == name);
+        }
+
+        if (option is null)
+        {
             return null;
         }
 
@@ -32,10 +43,41 @@ internal sealed class DiscordNetSlashCommandInteraction(
             .FirstOrDefault(option => option.Name == name);
         if (option is null)
         {
+            var subcommand = command.Data.Options
+                .FirstOrDefault(option =>
+                    option.Type is ApplicationCommandOptionType.SubCommand
+                        or ApplicationCommandOptionType.SubCommandGroup);
+            option = subcommand?.Options
+                .FirstOrDefault(nested => nested.Name == name);
+        }
+
+        if (option is null)
+        {
             return null;
         }
 
         return (long?)option.Value;
+    }
+
+    public string? GetSubcommandName()
+    {
+        var first = command.Data.Options.FirstOrDefault();
+        if (first is null)
+        {
+            return null;
+        }
+
+        if (first.Type == ApplicationCommandOptionType.SubCommand)
+        {
+            return first.Name;
+        }
+
+        if (first.Type == ApplicationCommandOptionType.SubCommandGroup)
+        {
+            return first.Options.FirstOrDefault()?.Name;
+        }
+
+        return null;
     }
 
     public Task RespondAsync(string content)
