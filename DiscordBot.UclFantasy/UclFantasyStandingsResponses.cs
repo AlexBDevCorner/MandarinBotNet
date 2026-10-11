@@ -28,9 +28,6 @@ public sealed class UclFantasyLeagueStandingsValue
     [JsonPropertyName("leagueId")]
     public long? LeagueId { get; init; }
 
-    [JsonPropertyName("leagueID")]
-    public long? LeagueIdUpper { get; init; }
-
     [JsonPropertyName("id")]
     public long? Id { get; init; }
 
@@ -107,7 +104,7 @@ public sealed class UclFantasyLeagueStandingsValue
     public List<UclFantasyLeagueStandingsMemberPayload>? Rows { get; init; }
 
     public long ResolvedLeagueId =>
-        LeagueId ?? LeagueIdUpper ?? Id ?? 0;
+        LeagueId ?? Id ?? 0;
 
     public string? ResolvedLeagueName =>
         LeagueName ?? Name;

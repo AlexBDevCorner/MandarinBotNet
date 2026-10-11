@@ -3,6 +3,7 @@ using AwesomeAssertions;
 using DiscordBot.Commands;
 using DiscordBot.Jobs;
 using DiscordBot.Notifications;
+using DiscordBot.PremierLeague;
 using DiscordBot.Tests;
 using DiscordBot.Tests.PremierLeague;
 using DiscordBot.UclFantasy;
@@ -325,7 +326,11 @@ public sealed class UclStandingsNotificationJobTests
                 coordinator,
                 new RecordingLogger<DiscordNotificationPublisher>());
             JobLogger = new RecordingLogger<UclStandingsNotificationJob>();
-            var leagueOptions = new UclFantasyOptions { LeagueId = 25247707 };
+            var leagueOptions = new UclFantasyOptions
+            {
+                LeagueId = 25247707,
+                MatchdayId = 2
+            };
             var timeZone = new ConfiguredTimeZone(new JobSchedulesOptions { TimeZoneId = "Europe/Riga" });
             Provider = new UclLeagueStandingsProvider(
                 Client,

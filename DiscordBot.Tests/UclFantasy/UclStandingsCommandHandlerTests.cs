@@ -1,7 +1,7 @@
 using AwesomeAssertions;
 using DiscordBot.Commands;
-using DiscordBot.UclFantasy;
 using DiscordBot.Tests.PremierLeague;
+using DiscordBot.UclFantasy;
 using Microsoft.Extensions.Logging.Abstractions;
 using NUnit.Framework;
 
@@ -178,13 +178,12 @@ public sealed class UclStandingsCommandHandlerTests
             client,
             options,
             NullLogger<UclLeagueStandingsProvider>.Instance);
-        return new TestProvider(inner, client, standings);
+        return new TestProvider(inner, client);
     }
 
     private sealed class TestProvider(
         UclLeagueStandingsProvider inner,
-        StubClient client,
-        UclLeagueStandings initial)
+        StubClient client)
     {
         public UclLeagueStandingsProvider Provider => inner;
 
