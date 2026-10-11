@@ -111,10 +111,16 @@ public sealed class UclFantasyClient(
             foreach (var member in pageMembers)
             {
                 var standing = NormalizeMember(member, requestUri.OriginalString);
-                if (seenIds.Add(standing.StableId))
+                if (!seenIds.Add(standing.StableId))
                 {
-                    collected.Add(standing);
+                    // Overlapping stable IDs across (or within) pages mean the
+                    // paginated snapshot is inconsistent: silently dropping the
+                    // repeat would let a short final page masquerade as a
+                    // complete table when no authoritative total is present.
+                    throw CreateInvalidPayloadException(requestUri.OriginalString);
                 }
+
+                collected.Add(standing);
             }
 
             if (expectedTotal.HasValue)

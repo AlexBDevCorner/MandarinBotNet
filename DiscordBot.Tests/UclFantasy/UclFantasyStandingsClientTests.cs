@@ -189,6 +189,59 @@ public sealed class UclFantasyStandingsClientTests
     }
 
     [Test]
+    public async Task GetLeagueStandingsAsync_OverlappingIdsWithoutTotal_ThrowsInvalidPayload()
+    {
+        // Arrange: no authoritative total; page 1 is full (3 members) and
+        // page 2 is short (2 members) with one repeated stable ID. The
+        // overlap must be rejected rather than silently dropped and accepted
+        // as a complete table via the short final page.
+        var handler = new StubHttpMessageHandler((_, request) =>
+        {
+            var page = request.RequestUri!.Query.Contains("vPageNo=2", StringComparison.Ordinal) ? 2 : 1;
+            return Task.FromResult(page == 1
+                ? CreateJsonResponse(OverlapPageOneNoTotalJson())
+                : CreateJsonResponse(OverlapPageTwoNoTotalJson()));
+        });
+        using var provider = CreateProvider(handler);
+        var client = provider.GetRequiredService<IUclFantasyClient>();
+
+        // Act
+        Func<Task> act = () => client.GetLeagueStandingsAsync(
+            CreateQuery(pageSize: 3, maxPages: 10),
+            CancellationToken.None);
+
+        // Assert
+        var exception = await act.Should().ThrowAsync<UclFantasyApiException>();
+        exception.Which.FailureKind.Should().Be(UclFantasyFailureKind.InvalidPayload);
+    }
+
+    [Test]
+    public async Task GetLeagueStandingsAsync_OverlappingIdsWithTotal_ThrowsInvalidPayload()
+    {
+        // Arrange: even when the deduplicated count still matches the
+        // advertised total, a repeated stable ID signals overlapping or
+        // shifted pages and must not be silently accepted as complete.
+        var handler = new StubHttpMessageHandler((_, request) =>
+        {
+            var page = request.RequestUri!.Query.Contains("vPageNo=2", StringComparison.Ordinal) ? 2 : 1;
+            return Task.FromResult(page == 1
+                ? CreateJsonResponse(OverlapPageOneWithTotalJson())
+                : CreateJsonResponse(OverlapPageTwoWithTotalJson()));
+        });
+        using var provider = CreateProvider(handler);
+        var client = provider.GetRequiredService<IUclFantasyClient>();
+
+        // Act
+        Func<Task> act = () => client.GetLeagueStandingsAsync(
+            CreateQuery(pageSize: 2, maxPages: 10),
+            CancellationToken.None);
+
+        // Assert
+        var exception = await act.Should().ThrowAsync<UclFantasyApiException>();
+        exception.Which.FailureKind.Should().Be(UclFantasyFailureKind.InvalidPayload);
+    }
+
+    [Test]
     public async Task GetLeagueStandingsAsync_NotFound_ClassifiesPermanent()
     {
         // Arrange
@@ -438,6 +491,89 @@ public sealed class UclFantasyStandingsClientTests
                   "leaderboard": [
                     { "entryId": 101, "teamName": "Alpha FC", "rank": 1, "total": 200, "eventTotal": 60 },
                     { "entryId": 102, "teamName": "Beta United", "rank": 2, "total": 190, "eventTotal": 55 }
+                  ]
+                }
+              }
+            }
+            """;
+    }
+
+    private static string OverlapPageOneNoTotalJson()
+    {
+        return """
+            {
+              "data": {
+                "value": {
+                  "leagueId": 25247707,
+                  "leagueName": "Great Messi League",
+                  "phaseId": 1,
+                  "matchdayId": 2,
+                  "leaderboard": [
+                    { "entryId": 101, "teamName": "Alpha FC", "rank": 1, "total": 200, "eventTotal": 60 },
+                    { "entryId": 102, "teamName": "Beta United", "rank": 2, "total": 190, "eventTotal": 55 },
+                    { "entryId": 103, "teamName": "Gamma City", "rank": 3, "total": 180, "eventTotal": 40 }
+                  ]
+                }
+              }
+            }
+            """;
+    }
+
+    private static string OverlapPageTwoNoTotalJson()
+    {
+        return """
+            {
+              "data": {
+                "value": {
+                  "leagueId": 25247707,
+                  "leagueName": "Great Messi League",
+                  "phaseId": 1,
+                  "matchdayId": 2,
+                  "leaderboard": [
+                    { "entryId": 103, "teamName": "Gamma City", "rank": 3, "total": 180, "eventTotal": 40 },
+                    { "entryId": 104, "teamName": "Delta Rovers", "rank": 4, "total": 170, "eventTotal": 35 }
+                  ]
+                }
+              }
+            }
+            """;
+    }
+
+    private static string OverlapPageOneWithTotalJson()
+    {
+        return """
+            {
+              "data": {
+                "value": {
+                  "leagueId": 25247707,
+                  "leagueName": "Great Messi League",
+                  "phaseId": 1,
+                  "matchdayId": 2,
+                  "totalEntries": 3,
+                  "leaderboard": [
+                    { "entryId": 101, "teamName": "Alpha FC", "rank": 1, "total": 200, "eventTotal": 60 },
+                    { "entryId": 102, "teamName": "Beta United", "rank": 2, "total": 190, "eventTotal": 55 }
+                  ]
+                }
+              }
+            }
+            """;
+    }
+
+    private static string OverlapPageTwoWithTotalJson()
+    {
+        return """
+            {
+              "data": {
+                "value": {
+                  "leagueId": 25247707,
+                  "leagueName": "Great Messi League",
+                  "phaseId": 1,
+                  "matchdayId": 2,
+                  "totalEntries": 3,
+                  "leaderboard": [
+                    { "entryId": 102, "teamName": "Beta United", "rank": 2, "total": 190, "eventTotal": 55 },
+                    { "entryId": 103, "teamName": "Gamma City", "rank": 3, "total": 180, "eventTotal": 40 }
                   ]
                 }
               }
