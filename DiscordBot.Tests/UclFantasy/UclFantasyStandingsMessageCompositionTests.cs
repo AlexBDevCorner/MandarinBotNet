@@ -79,6 +79,38 @@ public sealed class UclFantasyStandingsMessageCompositionTests
     }
 
     [Test]
+    public void ComposeStandingsPage_LastPageOfDefaultFetchBound_ShowsTrailingMembers()
+    {
+        // Arrange: default fetch bound is 10 pages x 25 entries = 250 members,
+        // displayed 10 per page => 25 display pages. Page 25 must show ranks 241-250.
+        var members = Enumerable.Range(1, 250)
+            .Select(index => new UclLeagueStanding(
+                1000 + index,
+                $"Team {index:D3}",
+                $"Manager {index:D3}",
+                index,
+                index,
+                1000 - index,
+                10))
+            .ToList();
+        var standings = new UclLeagueStandings(
+            25247707,
+            "Great Messi League",
+            1,
+            2,
+            members);
+
+        // Act
+        var message = _service.ComposeStandingsPage(standings, 25);
+
+        // Assert
+        message.Should().Contain("Team 241");
+        message.Should().Contain("Team 250");
+        message.Should().NotContain("Team 001");
+        message.Should().Contain("Страница 25 из 25");
+    }
+
+    [Test]
     public void ComposeUnavailableStandings_ReturnsRetryMessage()
     {
         // Act

@@ -1,6 +1,7 @@
 using AwesomeAssertions;
 using Discord;
 using DiscordBot.Commands;
+using DiscordBot.UclFantasy;
 using Microsoft.Extensions.Logging;
 using NUnit.Framework;
 
@@ -192,7 +193,29 @@ public sealed class DiscordCommandRegistrationTests
         page.Type.Should().Be(ApplicationCommandOptionType.Integer);
         page.IsRequired.Should().NotBeTrue();
         page.MinValue.Should().Be(1d);
-        page.MaxValue.Should().Be(20d);
+        page.MaxValue.Should().Be((double)DiscordApplicationCommands.UclStandingsMaxPage);
+    }
+
+    [Test]
+    public void UclStandingsMaxPage_CoversFullFetchBound()
+    {
+        // Default fetch bound: 10 pages x 25 entries = 250 members,
+        // displayed 10 per page => 25 display pages must be reachable.
+        var defaultBoundPages =
+            (UclFantasyOptions.DefaultMaxStandingsPages * UclFantasyOptions.DefaultPageSize +
+                UclFantasyMessageCompositionService.StandingsPageSize - 1) /
+            UclFantasyMessageCompositionService.StandingsPageSize;
+
+        // Worst case with the maximum supported PageSize (50):
+        // 10 x 50 / 10 = 50 display pages.
+        const int maxPageSize = 50;
+        var worstCasePages =
+            (UclFantasyOptions.DefaultMaxStandingsPages * maxPageSize +
+                UclFantasyMessageCompositionService.StandingsPageSize - 1) /
+            UclFantasyMessageCompositionService.StandingsPageSize;
+
+        DiscordApplicationCommands.UclStandingsMaxPage.Should().BeGreaterThanOrEqualTo(defaultBoundPages);
+        DiscordApplicationCommands.UclStandingsMaxPage.Should().BeGreaterThanOrEqualTo(worstCasePages);
     }
 
     [Test]

@@ -20,6 +20,11 @@ public static class DiscordApplicationCommands
     public const string UclStandingsName = "uclstandings";
     public const string HelpName = "help";
 
+    // Display pages of 10 rows must cover the full fetch bound:
+    // 10 fetch pages x 50 max entries / 10 display rows = 50 display pages.
+    // Defaults (10 x 25 / 10 = 25) are therefore fully reachable.
+    public const int UclStandingsMaxPage = 50;
+
     public static ApplicationCommandProperties[] BuildDesiredSet()
     {
         return
@@ -133,7 +138,7 @@ public static class DiscordApplicationCommands
                         .WithType(ApplicationCommandOptionType.Integer)
                         .WithDescription("Страница таблицы (по 10 команд)")
                         .WithMinValue(1)
-                        .WithMaxValue(20))
+                        .WithMaxValue(UclStandingsMaxPage))
                 .Build(),
             new SlashCommandBuilder()
                 .WithName(HelpName)
