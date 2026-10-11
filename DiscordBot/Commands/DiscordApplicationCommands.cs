@@ -17,6 +17,7 @@ public static class DiscordApplicationCommands
     public const string EventWatchName = EventWatchCommandNames.CommandName;
     public const string EventWatchStatusSubcommand = EventWatchCommandNames.StatusSubcommand;
     public const string EventWatchTestSubcommand = EventWatchCommandNames.TestSubcommand;
+    public const string UclStandingsName = "uclstandings";
     public const string HelpName = "help";
 
     public static ApplicationCommandProperties[] BuildDesiredSet()
@@ -122,6 +123,17 @@ public static class DiscordApplicationCommands
                         .WithDescription(
                             "Отправляет тестовое сообщение в каналы EventWatch.")
                         .WithType(ApplicationCommandOptionType.SubCommand))
+                .Build(),
+            new SlashCommandBuilder()
+                .WithName(UclStandingsName)
+                .WithDescription("Показывает текущую таблицу лиги UCL Fantasy. 🏆")
+                .AddOption(
+                    new SlashCommandOptionBuilder()
+                        .WithName("page")
+                        .WithType(ApplicationCommandOptionType.Integer)
+                        .WithDescription("Страница таблицы (по 10 команд)")
+                        .WithMinValue(1)
+                        .WithMaxValue(20))
                 .Build(),
             new SlashCommandBuilder()
                 .WithName(HelpName)

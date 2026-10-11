@@ -15,6 +15,7 @@ public sealed class BotHelpMessageCompositionService
             "🤖 **Что умеет MandarinBot**\n" +
             "`/live` — живая таблица FPL во время матчей\n" +
             "`/standings` — классическая и H2H таблицы, топ и соседи\n" +
+            "`/uclstandings` — текущая таблица лиги UCL Fantasy\n" +
             "`/profile` — профиль менеджера, трофеи и рейтинги\n" +
             "`/achievements` — лидеры сезона по достижениям\n" +
             "`/benchleague` — Лига обогревателей скамейки\n" +

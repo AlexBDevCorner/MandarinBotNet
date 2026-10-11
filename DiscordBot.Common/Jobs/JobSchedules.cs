@@ -27,6 +27,8 @@ public static class JobSchedules
         "FplChipWatchTrigger";
     public const string EventWatchTriggerName =
         "EventWatchTrigger";
+    public const string UclStandingsTriggerName =
+        "UclStandingsTrigger";
     public const string AutonomousWorkDispatcherTriggerName =
         "AutonomousWorkDispatcherTrigger";
 
@@ -62,6 +64,9 @@ public static class JobSchedules
 
     public static readonly JobKey EventWatchJobKey =
         new("EventWatch");
+
+    public static readonly JobKey UclStandingsJobKey =
+        new("UclStandings");
 
     public static readonly JobKey AutonomousWorkDispatcherJobKey =
         new("AutonomousWorkDispatcher");
@@ -159,6 +164,14 @@ public static class JobSchedules
             options.EventWatch.Cron,
             options.TimeZoneId);
 
+    public static ITrigger CreateUclStandingsTrigger(
+        JobSchedulesOptions options) =>
+        CreateCronTrigger(
+            UclStandingsJobKey,
+            UclStandingsTriggerName,
+            options.UclStandings.Cron,
+            options.TimeZoneId);
+
     public static ITrigger CreateAutonomousWorkDispatcherTrigger(
         AutonomousWorkDispatcherOptions dispatcher,
         string timeZoneId) =>
@@ -181,7 +194,8 @@ public static class JobSchedules
         CreateFplLiveInsightsTrigger(options),
         CreateFplPriceChangesTrigger(options),
         CreateFplChipWatchTrigger(options),
-        CreateEventWatchTrigger(options)
+        CreateEventWatchTrigger(options),
+        CreateUclStandingsTrigger(options)
     ];
 
     private static ITrigger CreateCronTrigger(

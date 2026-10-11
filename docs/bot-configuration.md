@@ -67,6 +67,9 @@ Bot__Schedules__FplPriceChanges__Enabled=true
 Bot__Schedules__FplPriceChanges__Cron=0 0 12-22 * * ?
 Bot__Schedules__FplChipWatch__Enabled=true
 Bot__Schedules__FplChipWatch__Cron=0 0 6,12,18 * * ?
+Bot__UclFantasy__LeagueId=25247707
+Bot__Schedules__UclStandings__Enabled=true
+Bot__Schedules__UclStandings__Cron=0 0/15 * * * ?
 Bot__FantasyPremierLeague__ChipWatch__MinimumNotificationScore=60
 Bot__FantasyPremierLeague__ChipWatch__NotificationWindowStartHours=36
 Bot__FantasyPremierLeague__ChipWatch__NotificationWindowEndHours=18
@@ -139,7 +142,7 @@ short onboarding checklist, the three league join links, and `/help` for the
 full command guide.
 
 Application-command registration publishes `/help`, `/prices`, `/deadline`,
-`/live`, `/standings`, `/profile`, `/achievements`, `/benchleague`, `/chips`, `/chipwatch`,
+`/live`, `/standings`, `/uclstandings`, `/profile`, `/achievements`, `/benchleague`, `/chips`, `/chipwatch`,
 `/eventwatch`, and `/hugme`. `/deadline` includes exact Riga civil time for both FPL and UCL
 plus a Discord relative timestamp that keeps counting down in the client.
 `/eventwatch` exposes the `status` and `test` subcommands for EventWatch
@@ -345,6 +348,70 @@ Bot__FantasyPremierLeague__ChipWatch__NotificationWindowEndHours=18
 ```
 
 Smart scoring in v1 covers Free Hit only; Bench Boost, Triple Captain and Wildcard expiry is tracked but their recommendation models are future work. All external FPL names are sanitized with `DiscordTextSafety.SanitizeExternalName`, and messages respect Discord's 2,000-character limit with bounded concurrency (5) for manager data.
+
+## UCL Fantasy league standings
+
+`/uclstandings` shows the current UCL Fantasy classic league table on demand.
+It always fetches the latest data, renders league name/ID, ranks, team names,
+total and matchday points, plus movement arrows when the feed provides a
+previous rank. Large leagues are split into pages of 10 teams with
+`/uclstandings page:<n>`; a single page never exceeds Discord's 2,000-character
+limit and the footer reports `Страница X из Y • Всего N` so nothing is silently
+truncated. Manual requests never touch the scheduled notification baseline.
+
+The optional `UclStandings` Quartz job polls the same league about every
+15 minutes in `Europe/Riga` and posts only after a meaningful change. It is
+disabled by default.
+
+```dotenv
+Bot__UclFantasy__LeagueId=25247707
+Bot__UclFantasy__MaxStandingsPages=10
+Bot__UclFantasy__PageSize=25
+Bot__UclFantasy__OptType=1
+Bot__UclFantasy__PhaseId=1
+Bot__UclFantasy__MatchdayId=0
+Bot__Schedules__UclStandings__Enabled=false
+Bot__Schedules__UclStandings__Cron=0 0/15 * * * ?
+```
+
+- **Anonymous endpoint assumption.** The client uses the observed anonymously
+  accessible leaderboard
+  `services/api/Leagues/{leagueId}/leagueleaderboard?optType=…&phaseId=…&matchdayId=…&vPageChunk=…&vPageNo=…&vPageOneChunk=…&leagueID=…`
+  without Google/UEFA sign-in, cookies, or browser automation. The `buster`
+  cache-buster is intentionally omitted. This is an observed behavior, not a
+  documented guarantee; UEFA may restrict automated access in its terms, so the
+  job stays moderate (25 entries per request, at most 10 pages ≈ 250 members,
+  every 15 minutes) and never bypasses access controls.
+- **Current matchday handling.** `phaseId`/`optType` default to the observed
+  value `1` but remain configurable. `MatchdayId=0` (default) auto-detects the
+  current matchday from the public fixtures feed (`mdIsCurrent`, falling back
+  to the highest matchday with a warning); set a positive `MatchdayId` to pin
+  an override. Matchday 1 is never hard-coded as current forever.
+- **Complete-table guarantee.** All pages are followed using total/page
+  information where available. A partial, inconsistent (league/phase/matchday
+  or total mismatch across pages), empty, malformed, unauthorized, or
+  rate-limited fetch throws `UclFantasyApiException` and never replaces the
+  good baseline or produces a partial post.
+- **Change-only notifications.** Each poll computes a deterministic SHA-256
+  semantic snapshot of league/phase/matchday identity plus every member's
+  stable ID, team/manager names, rank, last rank, total and matchday points.
+  Timestamps, `buster`, response ordering, and message wording are ignored. The
+  first valid poll per Discord target records a silent baseline
+  (`SkippedInitialBaseline`) without an unsolicited post. Later polls send one
+  `ucl-standings` message per target only when the snapshot differs; an
+  unchanged top three does not excuse changes elsewhere, and A → B → A counts
+  as two genuine changes. Baselines advance only after successful delivery, so
+  a failed target retries while delivered targets stay silent. No `@everyone`
+  ping is sent for this type. Outcomes are logged as `SkippedUnchangedStandings`,
+  `SkippedInitialBaseline`, `SkippedSourceUnavailable`, `Completed`, or
+  `CompletedWithDeliveryFailures`.
+- **Query mapping and pagination.** `vPageChunk`/`vPageOneChunk` carry
+  `PageSize` (default 25, max 50); `vPageNo` is 1-based. `MaxStandingsPages`
+  (default 10) bounds requests; a full last page at the bound is treated as
+  incomplete rather than complete. Transport JSON accepts `leaderboard`,
+  `entries`, `results`, `standings`, `members`, `teams`, and `rows` arrays plus
+  common `entryId`/`teamName`/`rank`/`total` aliases, so a future UEFA rename is
+  diagnosable from focused tests and fixtures instead of silently truncating.
 
 ## EventWatch (Riga FC ticket monitoring)
 

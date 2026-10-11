@@ -57,6 +57,8 @@ public sealed class DiscordBotHostedServiceIntegrationTests
             TestChipWatchCommandHandler>();
         builder.Services.AddSingleton<IEventWatchCommandHandler,
             TestEventWatchCommandHandler>();
+        builder.Services.AddSingleton<IUclStandingsCommandHandler,
+            TestUclStandingsCommandHandler>();
         builder.Services.AddSingleton<IHelpCommandHandler,
             TestHelpCommandHandler>();
         builder.Services.AddSingleton<IWelcomeMessageHandler,
@@ -380,6 +382,36 @@ public sealed class DiscordBotHostedServiceIntegrationTests
     }
 
     [Test]
+    public async Task HandleSlashCommandAsync_UclStandingsCommand_RoutesToDedicatedHandler()
+    {
+        // Arrange
+        var options = new DiscordOptions
+        {
+            Token = "test-token",
+            ReadinessTimeout = TimeSpan.FromSeconds(5)
+        };
+        var readiness = new DiscordConnectionReadiness(options);
+        var gateway = new TestDiscordGatewayConnection();
+        using var provider = CreateServiceProvider(options, readiness, gateway);
+        var service = provider.GetRequiredService<DiscordBotHostedService>();
+        var handler = provider.GetRequiredService<IUclStandingsCommandHandler>();
+        var interaction = new TestSlashCommandInteraction(
+            DiscordApplicationCommands.UclStandingsName);
+        var startTask = service.StartAsync(CancellationToken.None);
+        await gateway.RaiseReadyAsync();
+        await startTask;
+
+        // Act
+        await service.HandleSlashCommandAsync(interaction);
+
+        // Assert
+        ((TestUclStandingsCommandHandler)handler).Interaction.Should()
+            .BeSameAs(interaction);
+
+        await service.StopAsync(CancellationToken.None);
+    }
+
+    [Test]
     public async Task HandleSlashCommandAsync_HelpCommand_RoutesToDedicatedHandler()
     {
         // Arrange
@@ -548,6 +580,8 @@ public sealed class DiscordBotHostedServiceIntegrationTests
             TestChipWatchCommandHandler>();
         services.AddSingleton<IEventWatchCommandHandler,
             TestEventWatchCommandHandler>();
+        services.AddSingleton<IUclStandingsCommandHandler,
+            TestUclStandingsCommandHandler>();
         services.AddSingleton<IHelpCommandHandler,
             TestHelpCommandHandler>();
         services.AddSingleton<IWelcomeMessageHandler,
@@ -838,6 +872,17 @@ public sealed class DiscordBotHostedServiceIntegrationTests
     }
 
     private sealed class TestEventWatchCommandHandler : IEventWatchCommandHandler
+    {
+        public IDiscordSlashCommandInteraction? Interaction { get; private set; }
+
+        public Task HandleAsync(IDiscordSlashCommandInteraction interaction)
+        {
+            Interaction = interaction;
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class TestUclStandingsCommandHandler : IUclStandingsCommandHandler
     {
         public IDiscordSlashCommandInteraction? Interaction { get; private set; }
 

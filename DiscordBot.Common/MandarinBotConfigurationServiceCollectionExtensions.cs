@@ -37,6 +37,11 @@ public static class MandarinBotConfigurationServiceCollectionExtensions
             services => services
                 .GetRequiredService<IOptions<MandarinBotOptions>>()
                 .Value
+                .UclFantasy);
+        services.AddSingleton(
+            services => services
+                .GetRequiredService<IOptions<MandarinBotOptions>>()
+                .Value
                 .Schedules);
         services.AddSingleton(
             services => services

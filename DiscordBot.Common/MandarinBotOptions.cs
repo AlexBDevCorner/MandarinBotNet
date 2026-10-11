@@ -10,6 +10,8 @@ public sealed class MandarinBotOptions
 
     public FantasyPremierLeagueOptions FantasyPremierLeague { get; init; } = new();
 
+    public UclFantasyOptions UclFantasy { get; init; } = new();
+
     public JobSchedulesOptions Schedules { get; init; } = new();
 
     public NotificationOptions Notifications { get; init; } = new();
@@ -102,6 +104,32 @@ public sealed class FplChipWatchOptions
         DefaultNotificationWindowEndHours;
 }
 
+public sealed class UclFantasyOptions
+{
+    public const int DefaultLeagueId = 25247707;
+    public const int DefaultMaxStandingsPages = 10;
+    public const int DefaultPageSize = 25;
+    public const int DefaultOptType = 1;
+    public const int DefaultPhaseId = 1;
+
+    public int LeagueId { get; init; } = DefaultLeagueId;
+
+    public int MaxStandingsPages { get; init; } = DefaultMaxStandingsPages;
+
+    public int PageSize { get; init; } = DefaultPageSize;
+
+    public int OptType { get; init; } = DefaultOptType;
+
+    public int PhaseId { get; init; } = DefaultPhaseId;
+
+    /// <summary>
+    /// Pinned UCL matchday for the standings request. Zero means
+    /// auto-detect the current matchday from the public fixtures feed so
+    /// standings stay current across matchdays without a config change.
+    /// </summary>
+    public int MatchdayId { get; init; }
+}
+
 public sealed class JobSchedulesOptions
 {
     public string TimeZoneId { get; init; } = string.Empty;
@@ -137,6 +165,11 @@ public sealed class JobSchedulesOptions
         Cron = "0 0/10 * * * ?"
     };
 
+    public ScheduledJobOptions UclStandings { get; init; } = new()
+    {
+        Cron = "0 0/15 * * * ?"
+    };
+
     public bool HasEnabledJobs =>
         PremierLeagueNotifications.Enabled ||
         UclFantasyNotifications.Enabled ||
@@ -148,7 +181,8 @@ public sealed class JobSchedulesOptions
         FplLiveInsights.Enabled ||
         FplPriceChanges.Enabled ||
         FplChipWatch.Enabled ||
-        EventWatch.Enabled;
+        EventWatch.Enabled ||
+        UclStandings.Enabled;
 
     public bool HasEnabledNotificationJobs =>
         PremierLeagueNotifications.Enabled ||
@@ -159,7 +193,8 @@ public sealed class JobSchedulesOptions
         FplGameweekRecap.Enabled ||
         FplLiveInsights.Enabled ||
         FplPriceChanges.Enabled ||
-        FplChipWatch.Enabled;
+        FplChipWatch.Enabled ||
+        UclStandings.Enabled;
 }
 
 public sealed class ScheduledJobOptions

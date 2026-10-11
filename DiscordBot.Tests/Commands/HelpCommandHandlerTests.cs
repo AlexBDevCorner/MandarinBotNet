@@ -20,6 +20,7 @@ public sealed class HelpCommandHandlerTests
 
         // Assert
         interaction.Message.Should().Contain("`/live`");
+        interaction.Message.Should().Contain("`/uclstandings`");
         interaction.Message.Should().Contain("`/prices`");
         interaction.Message.Should().Contain("`/deadline`");
         interaction.Message.Should().Contain("`/eventwatch status`");

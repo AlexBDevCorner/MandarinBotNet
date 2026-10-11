@@ -48,6 +48,8 @@ public static class MandarinBotServiceCollectionExtensions
         services.AddSingleton<ClassicStandingsSnapshotService>();
         services.AddSingleton<PremierLeagueMessageCompositionService>();
         services.AddSingleton<UclFantasyMessageCompositionService>();
+        services.AddSingleton<UclStandingsSnapshotService>();
+        services.AddSingleton<UclLeagueStandingsProvider>();
 
         return services;
     }
@@ -124,6 +126,7 @@ public static class MandarinBotServiceCollectionExtensions
         services.AddSingleton<FplChipWatchService>();
         services.AddSingleton<FplChipWatchMessageCompositionService>();
         services.AddSingleton<IChipWatchCommandHandler, ChipWatchCommandHandler>();
+        services.AddSingleton<IUclStandingsCommandHandler, UclStandingsCommandHandler>();
         services.AddSingleton<BotHelpMessageCompositionService>();
         services.AddSingleton<IHelpCommandHandler, HelpCommandHandler>();
         services.AddSingleton<WelcomeMessageTemplateRotator>();

@@ -7,6 +7,7 @@ namespace DiscordBot.Notifications
         public const string UclDeadline24Hours = "ucl-deadline-24-hours";
         public const string UclDeadline1Hour = "ucl-deadline-1-hour";
         public const string ClassicStandings = "fpl-classic-standings";
+        public const string UclStandings = "ucl-standings";
         public const string HeadToHeadStandings = "fpl-head-to-head-standings";
         public const string BenchWarmingStandings = "fpl-bench-warming-standings";
         public const string FplGameweekRecap = "fpl-gameweek-recap";
