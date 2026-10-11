@@ -75,6 +75,10 @@ public sealed class MandarinBotOptionsValidator(bool requireOperationalConfigura
             "Bot:Schedules:EventWatch",
             options.Schedules.EventWatch,
             failures);
+        ValidateSchedule(
+            "Bot:Schedules:UclStandings",
+            options.Schedules.UclStandings,
+            failures);
         ValidateEventWatch(options, failures);
         ValidateAutonomousWorkDispatcher(options.AutonomousWorkDispatcher, failures);
 
@@ -131,6 +135,44 @@ public sealed class MandarinBotOptionsValidator(bool requireOperationalConfigura
         {
             failures.Add(
                 "Bot:FantasyPremierLeague:ClassicLeagueId is required when the FPL chip watch job is enabled.");
+        }
+
+        if (options.Schedules.UclStandings.Enabled &&
+            options.UclFantasy.LeagueId <= 0)
+        {
+            failures.Add(
+                "Bot:UclFantasy:LeagueId is required when the UCL standings job is enabled.");
+        }
+
+        if (options.UclFantasy.MaxStandingsPages <= 0 ||
+            options.UclFantasy.MaxStandingsPages > UclFantasyOptions.MaxMaxStandingsPages)
+        {
+            failures.Add(
+                $"Bot:UclFantasy:MaxStandingsPages must be between 1 and {UclFantasyOptions.MaxMaxStandingsPages}.");
+        }
+
+        if (options.UclFantasy.PageSize <= 0 || options.UclFantasy.PageSize > UclFantasyOptions.MaxPageSize)
+        {
+            failures.Add(
+                $"Bot:UclFantasy:PageSize must be between 1 and {UclFantasyOptions.MaxPageSize}.");
+        }
+
+        if (options.UclFantasy.OptType <= 0)
+        {
+            failures.Add(
+                "Bot:UclFantasy:OptType must be greater than zero.");
+        }
+
+        if (options.UclFantasy.PhaseId <= 0)
+        {
+            failures.Add(
+                "Bot:UclFantasy:PhaseId must be greater than zero.");
+        }
+
+        if (options.UclFantasy.MatchdayId < 0)
+        {
+            failures.Add(
+                "Bot:UclFantasy:MatchdayId cannot be negative. Use zero for automatic current-matchday detection.");
         }
 
         if (options.FantasyPremierLeague.MaxStandingsPages <= 0)

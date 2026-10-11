@@ -61,6 +61,11 @@ namespace DiscordBot.Tests.Jobs
             {
                 Enabled = true,
                 Cron = "0 0 6,12,18 * * ?"
+            },
+            UclStandings = new ScheduledJobOptions
+            {
+                Enabled = true,
+                Cron = "0 0/15 * * * ?"
             }
         };
 
@@ -302,8 +307,25 @@ namespace DiscordBot.Tests.Jobs
                 trigger => trigger.MisfireInstruction == expectedInstruction);
         }
 
+        [Test]
+        public void CreateUclStandingsTrigger_DefaultSchedule_RunsEvery15MinutesInRiga()
+        {
+            // Arrange
+            var expectedTimeZone = JobSchedules.GetTimeZone(Options);
+
+            // Act
+            var trigger = JobSchedules.CreateUclStandingsTrigger(Options);
+
+            // Assert
+            var cronTrigger = trigger.Should().BeAssignableTo<ICronTrigger>().Subject;
+            cronTrigger.CronExpressionString.Should()
+                .Be(Options.UclStandings.Cron);
+            cronTrigger.TimeZone.Should().Be(expectedTimeZone);
+        }
+
         [TestCase(typeof(PremierLeagueNotificationJob))]
         [TestCase(typeof(UclDeadlineNotificationJob))]
+        [TestCase(typeof(UclStandingsNotificationJob))]
         [TestCase(typeof(PremierLeagueClassicStandingsInformationJob))]
         [TestCase(typeof(PremierLeagueH2hStandingsInformationJob))]
         [TestCase(typeof(BenchWarmingLeagueCalculationJob))]

@@ -145,6 +145,16 @@ public static class MandarinBotQuartzExtensions
                 timeZone);
         }
 
+        if (schedules.UclStandings.Enabled)
+        {
+            AddScheduledJob<UclStandingsNotificationJob>(
+                quartzOptions,
+                JobSchedules.UclStandingsJobKey,
+                JobSchedules.UclStandingsTriggerName,
+                schedules.UclStandings.Cron,
+                timeZone);
+        }
+
         if (options.AutonomousWorkDispatcher.Enabled)
         {
             AddScheduledJob<AutonomousWorkDispatcherJob>(

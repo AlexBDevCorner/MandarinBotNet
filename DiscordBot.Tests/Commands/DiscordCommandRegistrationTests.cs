@@ -1,6 +1,7 @@
 using AwesomeAssertions;
 using Discord;
 using DiscordBot.Commands;
+using DiscordBot.UclFantasy;
 using Microsoft.Extensions.Logging;
 using NUnit.Framework;
 
@@ -69,7 +70,7 @@ public sealed class DiscordCommandRegistrationTests
         // Assert
         commandClient.GlobalCalls.Should().Be(1);
         commandClient.GuildCalls.Should().Be(0);
-        commandClient.Commands.Should().HaveCount(12);
+        commandClient.Commands.Should().HaveCount(13);
         commandClient.Commands!.Select(command => command.Name.Value).Should()
             .Equal(
                 DiscordApplicationCommands.HugMeName,
@@ -83,6 +84,7 @@ public sealed class DiscordCommandRegistrationTests
                 DiscordApplicationCommands.PricesName,
                 DiscordApplicationCommands.ChipWatchName,
                 DiscordApplicationCommands.EventWatchName,
+                DiscordApplicationCommands.UclStandingsName,
                 DiscordApplicationCommands.HelpName);
         commandClient.Commands.Cast<SlashCommandProperties>()
             .Select(command => command.Description.Value)
@@ -98,6 +100,7 @@ public sealed class DiscordCommandRegistrationTests
                 "Показывает изменения цен в составах нашей лиги FPL. 💰",
                 "Проверяет доступные фишки FPL и ищет хорошие моменты для их использования. 🧠",
                 "Проверяет мониторинг билетов Riga FC. 🎟️",
+                "Показывает текущую таблицу лиги UCL Fantasy. 🏆",
                 "Показывает команды, лиги и возможности бота. 🤖");
     }
 
@@ -163,6 +166,73 @@ public sealed class DiscordCommandRegistrationTests
         var around = options.Single(option => option.Name == "around");
         around.Type.Should().Be(ApplicationCommandOptionType.String);
         around.IsRequired.Should().NotBeTrue();
+    }
+
+    [Test]
+    public async Task SynchronizeAsync_UclStandingsCommand_HasPageOption()
+    {
+        // Arrange
+        var commandClient = new TestApplicationCommandClient();
+        var synchronizer = new DiscordCommandSynchronizer(
+            new DiscordCommandRegistrationOptions(
+                DiscordCommandRegistrationMode.Global,
+                GuildId: null),
+            commandClient,
+            new TestLogger<DiscordCommandSynchronizer>());
+
+        // Act
+        await synchronizer.SynchronizeAsync(CancellationToken.None);
+
+        // Assert
+        var uclStandings = commandClient.Commands!.Cast<SlashCommandProperties>()
+            .Single(command => command.Name.Value == DiscordApplicationCommands.UclStandingsName);
+        uclStandings.Options.IsSpecified.Should().BeTrue();
+        var options = uclStandings.Options.Value;
+
+        var page = options.Single(option => option.Name == "page");
+        page.Type.Should().Be(ApplicationCommandOptionType.Integer);
+        page.IsRequired.Should().NotBeTrue();
+        page.MinValue.Should().Be(1d);
+        page.MaxValue.Should().Be((double)DiscordApplicationCommands.UclStandingsMaxPage);
+    }
+
+    [Test]
+    public void UclStandingsMaxPage_CoversFullFetchBound()
+    {
+        // Default fetch bound: 10 pages x 25 entries = 250 members,
+        // displayed 10 per page => 25 display pages must be reachable.
+        var defaultBoundPages =
+            (UclFantasyOptions.DefaultMaxStandingsPages * UclFantasyOptions.DefaultPageSize +
+                UclFantasyMessageCompositionService.StandingsPageSize - 1) /
+            UclFantasyMessageCompositionService.StandingsPageSize;
+
+        // Worst case with the maximum supported PageSize (50) at the default
+        // fetch bound: 10 x 50 / 10 = 50 display pages.
+        var worstCaseDefaultBoundPages =
+            (UclFantasyOptions.DefaultMaxStandingsPages * UclFantasyOptions.MaxPageSize +
+                UclFantasyMessageCompositionService.StandingsPageSize - 1) /
+            UclFantasyMessageCompositionService.StandingsPageSize;
+
+        // Supported larger configuration reported in review:
+        // MaxStandingsPages=11, PageSize=50 => 550 members => 55 display pages.
+        const int largerFetchPages = 11;
+        const int largerFetchBoundMembers = largerFetchPages * UclFantasyOptions.MaxPageSize;
+        var largerBoundPages =
+            (largerFetchBoundMembers +
+                UclFantasyMessageCompositionService.StandingsPageSize - 1) /
+            UclFantasyMessageCompositionService.StandingsPageSize;
+
+        // Absolute worst supported configuration:
+        // MaxMaxStandingsPages (20) x MaxPageSize (50) / 10 = 100 display pages.
+        var absoluteWorstCasePages =
+            (UclFantasyOptions.MaxMaxStandingsPages * UclFantasyOptions.MaxPageSize +
+                UclFantasyMessageCompositionService.StandingsPageSize - 1) /
+            UclFantasyMessageCompositionService.StandingsPageSize;
+
+        DiscordApplicationCommands.UclStandingsMaxPage.Should().BeGreaterThanOrEqualTo(defaultBoundPages);
+        DiscordApplicationCommands.UclStandingsMaxPage.Should().BeGreaterThanOrEqualTo(worstCaseDefaultBoundPages);
+        DiscordApplicationCommands.UclStandingsMaxPage.Should().BeGreaterThanOrEqualTo(largerBoundPages);
+        DiscordApplicationCommands.UclStandingsMaxPage.Should().BeGreaterThanOrEqualTo(absoluteWorstCasePages);
     }
 
     [Test]
@@ -245,7 +315,7 @@ public sealed class DiscordCommandRegistrationTests
         commandClient.GlobalCalls.Should().Be(0);
         commandClient.GuildCalls.Should().Be(1);
         commandClient.GuildId.Should().Be(guildId);
-        commandClient.Commands.Should().HaveCount(12);
+        commandClient.Commands.Should().HaveCount(13);
     }
 
     [Test]

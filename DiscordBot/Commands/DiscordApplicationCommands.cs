@@ -17,7 +17,15 @@ public static class DiscordApplicationCommands
     public const string EventWatchName = EventWatchCommandNames.CommandName;
     public const string EventWatchStatusSubcommand = EventWatchCommandNames.StatusSubcommand;
     public const string EventWatchTestSubcommand = EventWatchCommandNames.TestSubcommand;
+    public const string UclStandingsName = "uclstandings";
     public const string HelpName = "help";
+
+    // Display pages of 10 rows must cover the full fetch bound for every
+    // supported configuration: MaxMaxStandingsPages (20) x MaxPageSize (50)
+    // / 10 display rows = 100 display pages. The reviewer-reported case
+    // (MaxStandingsPages=11, PageSize=50 => 550 members => 55 pages) is
+    // therefore reachable, as are the defaults (10 x 25 / 10 = 25).
+    public const int UclStandingsMaxPage = 100;
 
     public static ApplicationCommandProperties[] BuildDesiredSet()
     {
@@ -122,6 +130,17 @@ public static class DiscordApplicationCommands
                         .WithDescription(
                             "Отправляет тестовое сообщение в каналы EventWatch.")
                         .WithType(ApplicationCommandOptionType.SubCommand))
+                .Build(),
+            new SlashCommandBuilder()
+                .WithName(UclStandingsName)
+                .WithDescription("Показывает текущую таблицу лиги UCL Fantasy. 🏆")
+                .AddOption(
+                    new SlashCommandOptionBuilder()
+                        .WithName("page")
+                        .WithType(ApplicationCommandOptionType.Integer)
+                        .WithDescription("Страница таблицы (по 10 команд)")
+                        .WithMinValue(1)
+                        .WithMaxValue(UclStandingsMaxPage))
                 .Build(),
             new SlashCommandBuilder()
                 .WithName(HelpName)

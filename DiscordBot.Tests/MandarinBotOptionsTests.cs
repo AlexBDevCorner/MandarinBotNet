@@ -426,11 +426,156 @@ public sealed class MandarinBotOptionsTests
             });
     }
 
+    [Test]
+    public void Defaults_UclStandingsJobDisabledWithQuarterHourCron()
+    {
+        // Arrange
+        var options = new MandarinBotOptions();
+
+        // Assert
+        options.Schedules.UclStandings.Enabled.Should().BeFalse();
+        options.Schedules.UclStandings.Cron.Should().Be("0 0/15 * * * ?");
+        options.UclFantasy.LeagueId.Should().Be(UclFantasyOptions.DefaultLeagueId);
+        options.UclFantasy.MaxStandingsPages.Should().Be(
+            UclFantasyOptions.DefaultMaxStandingsPages);
+        options.UclFantasy.PageSize.Should().Be(UclFantasyOptions.DefaultPageSize);
+        options.UclFantasy.OptType.Should().Be(UclFantasyOptions.DefaultOptType);
+        options.UclFantasy.PhaseId.Should().Be(UclFantasyOptions.DefaultPhaseId);
+        options.UclFantasy.MatchdayId.Should().Be(0);
+    }
+
+    [Test]
+    public void Validate_EnabledUclStandingsWithoutLeagueOrTarget_ReturnsBothFailures()
+    {
+        // Arrange
+        var options = CreateValidOptions(
+            uclFantasy: new UclFantasyOptions { LeagueId = 0 },
+            schedules: new JobSchedulesOptions
+            {
+                TimeZoneId = "Europe/Riga",
+                PremierLeagueNotifications = ValidSchedule(enabled: false, "0 0 * * * ?"),
+                UclFantasyNotifications = ValidSchedule(enabled: false, "0 0 * * * ?"),
+                ClassicStandings = ValidSchedule(enabled: false, "0 0 17 * * ?"),
+                HeadToHeadStandings = ValidSchedule(enabled: false, "0 0 17 * * ?"),
+                BenchWarmingLeague = ValidSchedule(enabled: false, "0 0 18 * * ?"),
+                FplStatisticsCollection = ValidSchedule(enabled: false, "0 0 19 * * ?"),
+                FplGameweekRecap = ValidSchedule(enabled: false, "0 0 20 * * ?"),
+                FplLiveInsights = ValidSchedule(enabled: false, "0 0/15 * * * ?"),
+                FplPriceChanges = ValidSchedule(enabled: false, "0 0 12-22 * * ?"),
+                UclStandings = ValidSchedule(enabled: true, "0 0/15 * * * ?")
+            },
+            targets: []);
+        var validator = new MandarinBotOptionsValidator(
+            requireOperationalConfiguration: true);
+
+        // Act
+        var result = validator.Validate(null, options);
+
+        // Assert
+        result.Failed.Should().BeTrue();
+        result.Failures.Should().Contain(failure =>
+            failure.Contains("UclFantasy:LeagueId"));
+        result.Failures.Should().Contain(failure =>
+            failure.Contains("Targets"));
+    }
+
+    [Test]
+    public void Validate_InvalidUclFantasyPageBounds_ReturnsFailures()
+    {
+        // Arrange
+        var options = CreateValidOptions(
+            uclFantasy: new UclFantasyOptions
+            {
+                LeagueId = 25247707,
+                MaxStandingsPages = 0,
+                PageSize = 100,
+                OptType = 0,
+                PhaseId = 0,
+                MatchdayId = -1
+            });
+        var validator = new MandarinBotOptionsValidator(
+            requireOperationalConfiguration: true);
+
+        // Act
+        var result = validator.Validate(null, options);
+
+        // Assert
+        result.Failed.Should().BeTrue();
+        result.Failures.Should().Contain(failure =>
+            failure.Contains("UclFantasy:MaxStandingsPages"));
+        result.Failures.Should().Contain(failure =>
+            failure.Contains("UclFantasy:PageSize"));
+        result.Failures.Should().Contain(failure =>
+            failure.Contains("UclFantasy:OptType"));
+        result.Failures.Should().Contain(failure =>
+            failure.Contains("UclFantasy:PhaseId"));
+        result.Failures.Should().Contain(failure =>
+            failure.Contains("UclFantasy:MatchdayId"));
+    }
+
+    [Test]
+    public void Validate_UclFantasyMaxStandingsPagesAboveMaximum_ReturnsFailure()
+    {
+        // Arrange: fetch bound must stay reachable from /uclstandings pages.
+        var options = CreateValidOptions(
+            uclFantasy: new UclFantasyOptions
+            {
+                LeagueId = 25247707,
+                MaxStandingsPages = UclFantasyOptions.MaxMaxStandingsPages + 1,
+                PageSize = UclFantasyOptions.MaxPageSize,
+                OptType = 1,
+                PhaseId = 1,
+                MatchdayId = 0
+            });
+        var validator = new MandarinBotOptionsValidator(
+            requireOperationalConfiguration: true);
+
+        // Act
+        var result = validator.Validate(null, options);
+
+        // Assert
+        result.Failed.Should().BeTrue();
+        result.Failures.Should().Contain(failure =>
+            failure.Contains("UclFantasy:MaxStandingsPages"));
+    }
+
+    [Test]
+    public void Validate_UclFantasyLargerSupportedFetchBound_ReturnsSuccess()
+    {
+        // Arrange: MaxStandingsPages=11 with PageSize=50 (550 members, 55
+        // display pages) is supported and must remain within the Discord cap.
+        var options = CreateValidOptions(
+            uclFantasy: new UclFantasyOptions
+            {
+                LeagueId = 25247707,
+                MaxStandingsPages = 11,
+                PageSize = 50,
+                OptType = 1,
+                PhaseId = 1,
+                MatchdayId = 0
+            });
+        var validator = new MandarinBotOptionsValidator(
+            requireOperationalConfiguration: true);
+
+        // Act
+        var result = validator.Validate(null, options);
+
+        // Assert
+        result.Succeeded.Should().BeTrue();
+        var displayPages = (11 * 50 +
+            DiscordBot.UclFantasy.UclFantasyMessageCompositionService.StandingsPageSize - 1) /
+            DiscordBot.UclFantasy.UclFantasyMessageCompositionService.StandingsPageSize;
+        displayPages.Should().Be(55);
+        displayPages.Should().BeLessThanOrEqualTo(
+            DiscordBot.Commands.DiscordApplicationCommands.UclStandingsMaxPage);
+    }
+
     [TestCase(NotificationTypes.Deadline24Hours, true)]
     [TestCase(NotificationTypes.Deadline1Hour, true)]
     [TestCase(NotificationTypes.UclDeadline24Hours, true)]
     [TestCase(NotificationTypes.UclDeadline1Hour, true)]
     [TestCase(NotificationTypes.ClassicStandings, false)]
+    [TestCase(NotificationTypes.UclStandings, false)]
     [TestCase(NotificationTypes.HeadToHeadStandings, false)]
     [TestCase(NotificationTypes.BenchWarmingStandings, false)]
     [TestCase(NotificationTypes.FplGameweekRecap, false)]
@@ -450,7 +595,8 @@ public sealed class MandarinBotOptionsTests
     private static MandarinBotOptions CreateValidOptions(
         FantasyPremierLeagueOptions? leagueOptions = null,
         JobSchedulesOptions? schedules = null,
-        List<NotificationTargetOptions>? targets = null)
+        List<NotificationTargetOptions>? targets = null,
+        UclFantasyOptions? uclFantasy = null)
     {
         return new MandarinBotOptions
         {
@@ -464,6 +610,11 @@ public sealed class MandarinBotOptionsTests
                 {
                     ClassicLeagueId = 123,
                     HeadToHeadLeagueId = 456
+                },
+            UclFantasy = uclFantasy ??
+                new UclFantasyOptions
+                {
+                    LeagueId = 25247707
                 },
             Schedules = schedules ?? new JobSchedulesOptions
             {

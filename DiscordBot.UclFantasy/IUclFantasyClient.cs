@@ -8,4 +8,9 @@ public interface IUclFantasyClient
     Task<UclFantasyFixturesResponse> GetFixturesAsync(
         UclFantasyWebConfigurationValue webConfiguration,
         CancellationToken cancellationToken);
+
+    Task<UclLeagueStandings> GetLeagueStandingsAsync(
+        UclLeagueStandingsQuery query,
+        CancellationToken cancellationToken) =>
+        throw new NotSupportedException("GetLeagueStandingsAsync is not implemented in this test double.");
 }
