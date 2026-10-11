@@ -106,6 +106,33 @@ public sealed class PremierLeagueClassicStandingsInformationJobTests
     }
 
     [Test]
+    public async Task Execute_GenuineChangeWithSameTimestamp_PublishesAgain()
+    {
+        // Arrange: a genuine table change arrives with an unchanged FPL
+        // LastUpdatedData timestamp. The timestamp-only delivery checkpoint
+        // must not suppress it, and the new fingerprint must be committed
+        // only because an actual delivery happened.
+        var fixture = CreateFixture();
+        var context = CreateContext();
+        await fixture.Job.Execute(context);
+        fixture.Channels[100].SentMessages.Should().ContainSingle();
+
+        // Act: change the table without advancing the API timestamp.
+        fixture.Client.Standings[1].Total++;
+        await fixture.Job.Execute(context);
+
+        // Assert: the changed snapshot is delivered despite the stale timestamp.
+        fixture.Channels[100].SentMessages.Should().HaveCount(2);
+
+        // Act: an identical retry with the same timestamp and content is now
+        // unchanged and must remain silent.
+        await fixture.Job.Execute(context);
+
+        // Assert
+        fixture.Channels[100].SentMessages.Should().HaveCount(2);
+    }
+
+    [Test]
     public async Task Execute_RankChange_PublishesAgain()
     {
         // Arrange

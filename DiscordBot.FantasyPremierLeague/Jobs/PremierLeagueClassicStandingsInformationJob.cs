@@ -36,10 +36,10 @@ public sealed class PremierLeagueClassicStandingsInformationJob(
                 var standings = await premierLeagueClient.GetClassicStandingsAsync(
                     leagueOptions.ClassicLeagueId,
                     context.CancellationToken);
-                var sourceIdentifier = standings.LastUpdatedData
+                var lastUpdatedIso = standings.LastUpdatedData
                     .ToUniversalTime()
                     .ToString("O");
-                execution.SetEvent(sourceIdentifier);
+                execution.SetEvent(lastUpdatedIso);
                 if (!publicationEligibility.IsUpdatedSinceYesterday(
                     standings.LastUpdatedData,
                     timeProvider.GetUtcNow()))
@@ -59,6 +59,16 @@ public sealed class PremierLeagueClassicStandingsInformationJob(
                 var fingerprint = snapshotService.ComputeFingerprint(
                     leagueOptions.ClassicLeagueId,
                     results);
+                // Key delivery checkpoints by both the FPL update timestamp
+                // and the semantic fingerprint. A timestamp-only key would
+                // suppress a genuine table change that arrives with an
+                // unchanged LastUpdatedData, while a fingerprint-only key
+                // would permanently suppress A -> B -> A in the ever-delivered
+                // checkpoint set. The fingerprint gate above remains the
+                // authoritative latest-snapshot comparison; the combined key
+                // only ensures the delivery checkpoint cannot block a
+                // fingerprint that differs from the last published state.
+                var sourceIdentifier = string.Concat(lastUpdatedIso, "|", fingerprint);
                 execution.SetEvent(fingerprint);
 
                 var message = messageComposer.ComposeClassicStandings(
