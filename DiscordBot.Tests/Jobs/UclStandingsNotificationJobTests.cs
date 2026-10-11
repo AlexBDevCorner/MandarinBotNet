@@ -262,6 +262,73 @@ public sealed class UclStandingsNotificationJobTests
         baselineAfter.Should().BeEquivalentTo(baselineBefore);
     }
 
+    [Test]
+    public async Task Execute_MultipartCrashBeforeBaseline_ReconcilesWithoutDuplicateAndPreservesAba()
+    {
+        // Regression: a multi-chunk delivery that crashes before the publication
+        // baseline is stored must reconcile on retry via per-part checkpoints.
+        var fixture = CreateFixture();
+        var context = CreateContext();
+        fixture.Client.Standings = LargeSnapshotA();
+        await fixture.Job.Execute(context);
+        var baselineA = fixture.CheckpointStore.GetPublicationState(10, 100, 25247707);
+        baselineA.Should().NotBeNull();
+        fixture.Channels[100].SentMessages.Should().BeEmpty();
+        var snapshotA = fixture.Client.Standings;
+
+        var membersB = snapshotA.Members.ToList();
+        var lastIndex = membersB.Count - 1;
+        membersB[lastIndex] = membersB[lastIndex] with
+        {
+            TotalPoints = membersB[lastIndex].TotalPoints + 25,
+            MatchdayPoints = membersB[lastIndex].MatchdayPoints + 10
+        };
+        var snapshotB = snapshotA with { Members = membersB };
+        fixture.Client.Standings = snapshotB;
+        await fixture.Job.Execute(context);
+        fixture.Channels[100].SentMessages.Count.Should().BeGreaterThan(
+            1,
+            "the standings update must span multiple Discord messages to cover the crash window");
+        var baselineB = fixture.CheckpointStore.GetPublicationState(10, 100, 25247707);
+        baselineB.Should().NotBeNull();
+        baselineB!.Fingerprint.Should().NotBe(baselineA!.Fingerprint);
+
+        // Simulate a crash after all parts were delivered but before the baseline
+        // advanced: revert the aggregate baseline while keeping per-part delivery
+        // checkpoints, then restart preserving SQLite.
+        fixture.CheckpointStore.SetPublicationState(
+            10,
+            100,
+            25247707,
+            baselineA.Fingerprint,
+            baselineA.Sequence,
+            DateTimeOffset.UtcNow);
+        SqliteConnection.ClearAllPools();
+        var restarted = CreateFixture(existingDatabasePath: _databasePath);
+        restarted.Client.Standings = snapshotB;
+        await restarted.Job.Execute(context);
+
+        // No duplicate sends, but the baseline must advance to the delivered snapshot.
+        restarted.Channels[100].SentMessages.Should().BeEmpty();
+        var reconciled = restarted.CheckpointStore.GetPublicationState(10, 100, 25247707);
+        reconciled.Should().NotBeNull();
+        reconciled!.Fingerprint.Should().Be(baselineB!.Fingerprint);
+        reconciled.Sequence.Should().Be(baselineB.Sequence);
+
+        // Repeating the same snapshot after reconciliation stays silent.
+        await restarted.Job.Execute(context);
+        restarted.Channels[100].SentMessages.Should().BeEmpty();
+
+        // Returning to A must still be a genuine change (A-B-A is not lost).
+        restarted.Client.Standings = snapshotA;
+        await restarted.Job.Execute(context);
+        restarted.Channels[100].SentMessages.Count.Should().BeGreaterThan(1);
+        var baselineA2 = restarted.CheckpointStore.GetPublicationState(10, 100, 25247707);
+        baselineA2.Should().NotBeNull();
+        baselineA2!.Fingerprint.Should().Be(baselineA.Fingerprint);
+        baselineA2.Sequence.Should().BeGreaterThan(reconciled.Sequence);
+    }
+
     internal static UclLeagueStandings SnapshotA()
     {
         return new UclLeagueStandings(
@@ -275,6 +342,26 @@ public sealed class UclStandingsNotificationJobTests
                 new UclLeagueStanding(103, "Gamma City", "Gita", 3, 3, 180, 40),
                 new UclLeagueStanding(104, "Delta Rovers", "Dana", 4, 4, 170, 35)
             ]);
+    }
+
+    private static UclLeagueStandings LargeSnapshotA()
+    {
+        var members = Enumerable.Range(1, 50)
+            .Select(index => new UclLeagueStanding(
+                100 + index,
+                $"Team {index:00} Long Name For Padding",
+                $"Manager {index:00}",
+                index,
+                index,
+                400 - index,
+                40 + (index % 10)))
+            .ToList();
+        return new UclLeagueStandings(
+            25247707,
+            "Great Messi League With Many Members For Multipart Delivery",
+            1,
+            2,
+            members);
     }
 
     private JobFixture CreateFixture(int targetCount = 1, string? existingDatabasePath = null)

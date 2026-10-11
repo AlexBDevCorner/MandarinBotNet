@@ -131,12 +131,10 @@ public sealed class UclStandingsNotificationJob(
                             NotificationTypes.UclStandings,
                             message,
                             context.CancellationToken);
-                        var checkpoint = new NotificationCheckpoint(
-                            target.GuildId,
-                            target.ChannelId,
+                        var checkpointExists = delivered || IsPublicationCheckpointed(
+                            target,
                             sourceIdentifier,
-                            NotificationTypes.UclStandings);
-                        var checkpointExists = delivered || checkpointStore.IsDelivered(checkpoint);
+                            message);
                         if (checkpointExists)
                         {
                             publicationStateStore.SetPublicationState(
@@ -210,5 +208,51 @@ public sealed class UclStandingsNotificationJob(
                     skippedCount,
                     failedCount);
             });
+    }
+
+    private bool IsPublicationCheckpointed(
+        NotificationTargetOptions target,
+        string sourceIdentifier,
+        string message)
+    {
+        // Mirror DiscordNotificationPublisher multipart checkpointing: a single-chunk
+        // send checkpoints the unsuffixed notification type, while a multi-chunk send
+        // checkpoints each part as "<type>:part-N-of-M". A crash after all parts were
+        // delivered but before the publication baseline advanced must still reconcile
+        // on retry; otherwise the baseline stalls and a later A-B-A reversal is lost.
+        const string everyonePrefix = "@everyone ";
+        const int discordMaxMessageSize = 2000; // Must match DiscordConfig.MaxMessageSize.
+        var mentionEveryone = target.MentionEveryone &&
+            NotificationTypes.AllowsEveryoneMention(NotificationTypes.UclStandings);
+        var contentLimit = discordMaxMessageSize - (mentionEveryone ? everyonePrefix.Length : 0);
+        var chunks = DiscordMessageChunker.Split(message, contentLimit);
+        if (chunks.Count == 1)
+        {
+            return checkpointStore.IsDelivered(new NotificationCheckpoint(
+                target.GuildId,
+                target.ChannelId,
+                sourceIdentifier,
+                NotificationTypes.UclStandings));
+        }
+
+        for (var index = 0; index < chunks.Count; index++)
+        {
+            var partCheckpoint = new NotificationCheckpoint(
+                target.GuildId,
+                target.ChannelId,
+                sourceIdentifier,
+                string.Concat(
+                    NotificationTypes.UclStandings,
+                    ":part-",
+                    (index + 1).ToString(CultureInfo.InvariantCulture),
+                    "-of-",
+                    chunks.Count.ToString(CultureInfo.InvariantCulture)));
+            if (!checkpointStore.IsDelivered(partCheckpoint))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 }
