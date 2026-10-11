@@ -33,77 +33,143 @@ public sealed class ClassicStandingsPublicationStateStoreTests
     }
 
     [Test]
-    public void GetLastPublishedFingerprint_NoState_ReturnsNull()
+    public void GetPublicationState_NoState_ReturnsNull()
     {
         // Arrange
         var store = CreateStore();
 
         // Act
-        var result = store.GetLastPublishedFingerprint(10, 100, 123);
+        var result = store.GetPublicationState(10, 100, 123);
 
         // Assert
         result.Should().BeNull();
     }
 
     [Test]
-    public void SetLastPublishedFingerprint_RestartedStoreUsingSameDatabase_RetainsValue()
+    public void SetPublicationState_RestartedStoreUsingSameDatabase_RetainsValue()
     {
         // Arrange
         var store = CreateStore();
-        store.SetLastPublishedFingerprint(10, 100, 123, "fp-a", DateTimeOffset.UtcNow);
+        var updatedAt = new DateTimeOffset(2026, 10, 8, 17, 0, 0, TimeSpan.Zero);
+        store.SetPublicationState(10, 100, 123, "fp-a", 1, updatedAt);
 
         // Act: simulate a restart preserving the SQLite volume.
         SqliteConnection.ClearAllPools();
         var restarted = CreateStore();
 
         // Assert
-        restarted.GetLastPublishedFingerprint(10, 100, 123).Should().Be("fp-a");
+        var state = restarted.GetPublicationState(10, 100, 123);
+        state!.Fingerprint.Should().Be("fp-a");
+        state.Sequence.Should().Be(1);
     }
 
     [Test]
-    public void SetLastPublishedFingerprint_DifferentChannels_RemainIndependent()
+    public void SetPublicationState_DifferentChannels_RemainIndependent()
     {
         // Arrange
         var store = CreateStore();
-        store.SetLastPublishedFingerprint(10, 100, 123, "fp-a", DateTimeOffset.UtcNow);
+        store.SetPublicationState(10, 100, 123, "fp-a", 1, DateTimeOffset.UtcNow);
 
         // Act
-        store.SetLastPublishedFingerprint(10, 200, 123, "fp-b", DateTimeOffset.UtcNow);
+        store.SetPublicationState(10, 200, 123, "fp-b", 1, DateTimeOffset.UtcNow);
 
         // Assert
-        store.GetLastPublishedFingerprint(10, 100, 123).Should().Be("fp-a");
-        store.GetLastPublishedFingerprint(10, 200, 123).Should().Be("fp-b");
+        store.GetPublicationState(10, 100, 123)!.Fingerprint.Should().Be("fp-a");
+        store.GetPublicationState(10, 200, 123)!.Fingerprint.Should().Be("fp-b");
     }
 
     [Test]
-    public void SetLastPublishedFingerprint_DifferentLeagues_RemainIndependent()
+    public void SetPublicationState_DifferentLeagues_RemainIndependent()
     {
         // Arrange
         var store = CreateStore();
 
         // Act
-        store.SetLastPublishedFingerprint(10, 100, 123, "fp-a", DateTimeOffset.UtcNow);
-        store.SetLastPublishedFingerprint(10, 100, 456, "fp-b", DateTimeOffset.UtcNow);
+        store.SetPublicationState(10, 100, 123, "fp-a", 1, DateTimeOffset.UtcNow);
+        store.SetPublicationState(10, 100, 456, "fp-b", 1, DateTimeOffset.UtcNow);
 
         // Assert
-        store.GetLastPublishedFingerprint(10, 100, 123).Should().Be("fp-a");
-        store.GetLastPublishedFingerprint(10, 100, 456).Should().Be("fp-b");
+        store.GetPublicationState(10, 100, 123)!.Fingerprint.Should().Be("fp-a");
+        store.GetPublicationState(10, 100, 456)!.Fingerprint.Should().Be("fp-b");
     }
 
     [Test]
-    public void SetLastPublishedFingerprint_Overwrite_TracksLatestOnly()
+    public void SetPublicationState_Overwrite_TracksLatestOnly()
     {
         // Arrange: A -> B -> A must recognize the final A as a change, so
-        // only the latest fingerprint is kept.
+        // only the latest snapshot is kept.
         var store = CreateStore();
-        store.SetLastPublishedFingerprint(10, 100, 123, "fp-a", DateTimeOffset.UtcNow);
-        store.SetLastPublishedFingerprint(10, 100, 123, "fp-b", DateTimeOffset.UtcNow);
+        store.SetPublicationState(10, 100, 123, "fp-a", 1, DateTimeOffset.UtcNow);
+        store.SetPublicationState(10, 100, 123, "fp-b", 2, DateTimeOffset.UtcNow);
 
         // Act
-        store.SetLastPublishedFingerprint(10, 100, 123, "fp-a", DateTimeOffset.UtcNow);
+        store.SetPublicationState(10, 100, 123, "fp-a", 3, DateTimeOffset.UtcNow);
 
         // Assert
-        store.GetLastPublishedFingerprint(10, 100, 123).Should().Be("fp-a");
+        store.GetPublicationState(10, 100, 123)!.Should().Match<ClassicStandingsPublicationState>(
+            state => state.Fingerprint == "fp-a" && state.Sequence == 3);
+    }
+
+    [Test]
+    public void SetPublicationState_SequenceRoundTrips()
+    {
+        // Arrange
+        var store = CreateStore();
+
+        // Act
+        store.SetPublicationState(10, 100, 123, "fp-a", 7, DateTimeOffset.UtcNow);
+
+        // Assert: the sequence survives so the next publication key is fresh.
+        store.GetPublicationState(10, 100, 123)!.Sequence.Should().Be(7);
+    }
+
+    [Test]
+    public void Constructor_DatabaseWithLegacyStateTable_MigratesSequenceColumn()
+    {
+        // Arrange: a database created before the publication sequence existed.
+        Directory.CreateDirectory(_testDirectory);
+        using (var connection = new SqliteConnection($"Data Source={_databasePath}"))
+        {
+            connection.Open();
+            using var command = connection.CreateCommand();
+            command.CommandText =
+                """
+                CREATE TABLE classic_standings_publication_state (
+                    guild_id TEXT NOT NULL,
+                    channel_id TEXT NOT NULL,
+                    league_id INTEGER NOT NULL,
+                    fingerprint TEXT NOT NULL,
+                    updated_at_utc TEXT NOT NULL,
+                    PRIMARY KEY (
+                        guild_id,
+                        channel_id,
+                        league_id
+                    )
+                ) WITHOUT ROWID;
+                INSERT INTO classic_standings_publication_state (
+                    guild_id,
+                    channel_id,
+                    league_id,
+                    fingerprint,
+                    updated_at_utc
+                )
+                VALUES ('10', '100', 123, 'fp-legacy', '2026-10-08T17:00:00.0000000Z');
+                """;
+            command.ExecuteNonQuery();
+        }
+
+        SqliteConnection.ClearAllPools();
+
+        // Act
+        var store = CreateStore();
+
+        // Assert: the legacy baseline is preserved with sequence 0, and new
+        // publications keep working.
+        store.GetPublicationState(10, 100, 123)!.Should().Match<ClassicStandingsPublicationState>(
+            state => state.Fingerprint == "fp-legacy" && state.Sequence == 0);
+        store.SetPublicationState(10, 100, 123, "fp-new", 1, DateTimeOffset.UtcNow);
+        store.GetPublicationState(10, 100, 123)!.Should().Match<ClassicStandingsPublicationState>(
+            state => state.Fingerprint == "fp-new" && state.Sequence == 1);
     }
 
     private SqliteNotificationCheckpointStore CreateStore()

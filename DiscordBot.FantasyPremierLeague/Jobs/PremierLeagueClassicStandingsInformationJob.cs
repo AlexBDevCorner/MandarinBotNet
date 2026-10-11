@@ -1,3 +1,4 @@
+using System.Globalization;
 using DiscordBot.FantasyPremierLeague;
 using DiscordBot.Notifications;
 using DiscordBot.PremierLeague;
@@ -59,16 +60,6 @@ public sealed class PremierLeagueClassicStandingsInformationJob(
                 var fingerprint = snapshotService.ComputeFingerprint(
                     leagueOptions.ClassicLeagueId,
                     results);
-                // Key delivery checkpoints by both the FPL update timestamp
-                // and the semantic fingerprint. A timestamp-only key would
-                // suppress a genuine table change that arrives with an
-                // unchanged LastUpdatedData, while a fingerprint-only key
-                // would permanently suppress A -> B -> A in the ever-delivered
-                // checkpoint set. The fingerprint gate above remains the
-                // authoritative latest-snapshot comparison; the combined key
-                // only ensures the delivery checkpoint cannot block a
-                // fingerprint that differs from the last published state.
-                var sourceIdentifier = string.Concat(lastUpdatedIso, "|", fingerprint);
                 execution.SetEvent(fingerprint);
 
                 var message = messageComposer.ComposeClassicStandings(
@@ -87,12 +78,12 @@ public sealed class PremierLeagueClassicStandingsInformationJob(
                     // Each guild/channel keeps its own last-delivered snapshot.
                     // A successful send to one target must not silence the same
                     // update for another target.
-                    var lastFingerprint = publicationStateStore.GetLastPublishedFingerprint(
+                    var publicationState = publicationStateStore.GetPublicationState(
                         target.GuildId,
                         target.ChannelId,
                         leagueOptions.ClassicLeagueId);
                     if (string.Equals(
-                            lastFingerprint,
+                            publicationState?.Fingerprint,
                             fingerprint,
                             StringComparison.Ordinal))
                     {
@@ -109,6 +100,24 @@ public sealed class PremierLeagueClassicStandingsInformationJob(
                             "SkippedUnchangedStandings");
                         continue;
                     }
+
+                    // Every successful publication consumes a fresh per-target
+                    // sequence number, so the delivery checkpoint key is
+                    // unique per publication. The "ever delivered" checkpoint
+                    // set therefore can never suppress a fingerprint that
+                    // differs from the latest published baseline — not for a
+                    // same-timestamp A -> B -> A, nor for longer repeated
+                    // cycles — while a crash-retry of the same publication
+                    // reuses the same sequence and key, keeping the existing
+                    // exactly-once recovery without a duplicate send.
+                    var sequence = checked((publicationState?.Sequence ?? 0) + 1);
+                    var sourceIdentifier = string.Concat(
+                        "classic-standings:league-",
+                        leagueOptions.ClassicLeagueId.ToString(CultureInfo.InvariantCulture),
+                        ":seq-",
+                        sequence.ToString(CultureInfo.InvariantCulture),
+                        ":",
+                        fingerprint);
 
                     try
                     {
@@ -127,15 +136,17 @@ public sealed class PremierLeagueClassicStandingsInformationJob(
                         if (checkpointExists)
                         {
                             // Advance the baseline only after actual successful
-                            // delivery (or a previous delivery of the same
-                            // source). Failures and unavailable targets keep
-                            // the previous baseline so the update stays
-                            // eligible for retry.
-                            publicationStateStore.SetLastPublishedFingerprint(
+                            // delivery (or a previous delivery of this exact
+                            // publication sequence, which can only be a
+                            // crash-retry of the same send). Failures and
+                            // unavailable targets keep the previous baseline
+                            // so the update stays eligible for retry.
+                            publicationStateStore.SetPublicationState(
                                 target.GuildId,
                                 target.ChannelId,
                                 leagueOptions.ClassicLeagueId,
                                 fingerprint,
+                                sequence,
                                 timeProvider.GetUtcNow());
                         }
 

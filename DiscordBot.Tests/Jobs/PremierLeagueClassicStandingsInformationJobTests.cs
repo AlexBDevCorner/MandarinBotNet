@@ -256,6 +256,55 @@ public sealed class PremierLeagueClassicStandingsInformationJobTests
     }
 
     [Test]
+    public async Task Execute_SameTimestampReturnToPreviousTable_PublishesAgain()
+    {
+        // Arrange: A -> B -> A where the FPL LastUpdatedData timestamp never
+        // advances. The return to A must still be announced; an
+        // ever-delivered delivery checkpoint must not suppress a fingerprint
+        // that differs from the latest published baseline.
+        var fixture = CreateFixture();
+        var context = CreateContext();
+        await fixture.Job.Execute(context);
+        var snapshotA = OctSnapshot();
+
+        fixture.Client.Standings[0].Total++;
+        await fixture.Job.Execute(context);
+
+        // Act: return to A without advancing the API timestamp.
+        fixture.Client.Standings = snapshotA;
+        await fixture.Job.Execute(context);
+
+        // Assert
+        fixture.Channels[100].SentMessages.Should().HaveCount(3);
+    }
+
+    [Test]
+    public async Task Execute_SameTimestampRepeatedCycle_PublishesEachChange()
+    {
+        // Arrange: A -> B -> A -> B with a frozen API timestamp. Every
+        // transition differs from the latest published baseline and must be
+        // announced exactly once.
+        var fixture = CreateFixture();
+        var context = CreateContext();
+        await fixture.Job.Execute(context);
+        var snapshotA = OctSnapshot();
+
+        fixture.Client.Standings[0].Total++;
+        await fixture.Job.Execute(context);
+        var snapshotB = OctSnapshot();
+        snapshotB[0].Total++;
+
+        // Act
+        fixture.Client.Standings = snapshotA;
+        await fixture.Job.Execute(context);
+        fixture.Client.Standings = snapshotB;
+        await fixture.Job.Execute(context);
+
+        // Assert
+        fixture.Channels[100].SentMessages.Should().HaveCount(4);
+    }
+
+    [Test]
     public async Task Execute_MultipleTargets_PublishesOncePerTarget()
     {
         // Arrange
