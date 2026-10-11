@@ -11,9 +11,12 @@ public sealed class PremierLeagueClassicStandingsInformationJob(
     IDiscordConnectionReadiness discordReadiness,
     IFantasyPremierLeagueClient premierLeagueClient,
     IDiscordNotificationPublisher notificationPublisher,
+    INotificationCheckpointStore checkpointStore,
+    IClassicStandingsPublicationStateStore publicationStateStore,
     FantasyPremierLeagueOptions leagueOptions,
     NotificationOptions notificationOptions,
     StandingsPublicationEligibilityService publicationEligibility,
+    ClassicStandingsSnapshotService snapshotService,
     StandingsChangeService standingsChangeService,
     WinnerSelectionService winnerSelection,
     PremierLeagueMessageCompositionService messageComposer,
@@ -45,6 +48,19 @@ public sealed class PremierLeagueClassicStandingsInformationJob(
                 }
 
                 var results = standings.Standings.Results;
+                if (results.Count == 0)
+                {
+                    return new JobExecutionResult("SkippedNoStandings");
+                }
+
+                // Compute the semantic change identity before composing or
+                // randomizing any text. Timestamps, scheduling time and the
+                // congratulations variant must not influence this comparison.
+                var fingerprint = snapshotService.ComputeFingerprint(
+                    leagueOptions.ClassicLeagueId,
+                    results);
+                execution.SetEvent(fingerprint);
+
                 var message = messageComposer.ComposeClassicStandings(
                     results,
                     winnerSelection.SelectEventWinners(results),
@@ -54,9 +70,36 @@ public sealed class PremierLeagueClassicStandingsInformationJob(
                 var deliveredCount = 0;
                 var skippedCount = 0;
                 var failedCount = 0;
+                var unchangedCount = 0;
 
                 foreach (var target in notificationOptions.Targets)
                 {
+                    // Each guild/channel keeps its own last-delivered snapshot.
+                    // A successful send to one target must not silence the same
+                    // update for another target.
+                    var lastFingerprint = publicationStateStore.GetLastPublishedFingerprint(
+                        target.GuildId,
+                        target.ChannelId,
+                        leagueOptions.ClassicLeagueId);
+                    if (string.Equals(
+                            lastFingerprint,
+                            fingerprint,
+                            StringComparison.Ordinal))
+                    {
+                        unchangedCount++;
+                        skippedCount++;
+                        logger.LogInformation(
+                            "Skipping unchanged classic standings {NotificationType} for event {Event} to Discord " +
+                            "guild {GuildId}, channel {ChannelId}, on job attempt {Attempt} with outcome {Outcome}",
+                            NotificationTypes.ClassicStandings,
+                            fingerprint,
+                            target.GuildId,
+                            target.ChannelId,
+                            execution.Attempt,
+                            "SkippedUnchangedStandings");
+                        continue;
+                    }
+
                     try
                     {
                         var delivered = await notificationPublisher.PublishOnceAsync(
@@ -65,6 +108,27 @@ public sealed class PremierLeagueClassicStandingsInformationJob(
                             NotificationTypes.ClassicStandings,
                             message,
                             context.CancellationToken);
+                        var checkpoint = new NotificationCheckpoint(
+                            target.GuildId,
+                            target.ChannelId,
+                            sourceIdentifier,
+                            NotificationTypes.ClassicStandings);
+                        var checkpointExists = delivered || checkpointStore.IsDelivered(checkpoint);
+                        if (checkpointExists)
+                        {
+                            // Advance the baseline only after actual successful
+                            // delivery (or a previous delivery of the same
+                            // source). Failures and unavailable targets keep
+                            // the previous baseline so the update stays
+                            // eligible for retry.
+                            publicationStateStore.SetLastPublishedFingerprint(
+                                target.GuildId,
+                                target.ChannelId,
+                                leagueOptions.ClassicLeagueId,
+                                fingerprint,
+                                timeProvider.GetUtcNow());
+                        }
+
                         if (delivered)
                         {
                             deliveredCount++;
@@ -92,6 +156,16 @@ public sealed class PremierLeagueClassicStandingsInformationJob(
                             execution.Attempt,
                             "Failed");
                     }
+                }
+
+                if (failedCount == 0 && deliveredCount == 0 && unchangedCount > 0 &&
+                    unchangedCount == notificationOptions.Targets.Count && notificationOptions.Targets.Count > 0)
+                {
+                    return new JobExecutionResult(
+                        "SkippedUnchangedStandings",
+                        deliveredCount,
+                        skippedCount,
+                        failedCount);
                 }
 
                 return new JobExecutionResult(

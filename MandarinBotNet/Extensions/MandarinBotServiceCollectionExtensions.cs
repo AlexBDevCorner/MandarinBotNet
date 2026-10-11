@@ -45,6 +45,7 @@ public static class MandarinBotServiceCollectionExtensions
         services.AddSingleton<StandingsPublicationEligibilityService>();
         services.AddSingleton<StandingsChangeService>();
         services.AddSingleton<WinnerSelectionService>();
+        services.AddSingleton<ClassicStandingsSnapshotService>();
         services.AddSingleton<PremierLeagueMessageCompositionService>();
         services.AddSingleton<UclFantasyMessageCompositionService>();
 
@@ -143,9 +144,12 @@ public static class MandarinBotServiceCollectionExtensions
     {
         ArgumentNullException.ThrowIfNull(services);
 
+        var notificationCheckpointStore = new SqliteNotificationCheckpointStore(
+            MandarinBotDataPaths.NotificationDatabasePath);
         services.AddSingleton<INotificationCheckpointStore>(
-            new SqliteNotificationCheckpointStore(
-                MandarinBotDataPaths.NotificationDatabasePath));
+            notificationCheckpointStore);
+        services.AddSingleton<IClassicStandingsPublicationStateStore>(
+            notificationCheckpointStore);
         services.AddSingleton<IBenchWarmingLeagueStore>(
             new SqliteBenchWarmingLeagueStore(
                 MandarinBotDataPaths.BenchWarmingDatabasePath));

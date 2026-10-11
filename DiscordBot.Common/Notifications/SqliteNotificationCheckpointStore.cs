@@ -3,7 +3,7 @@ using Microsoft.Data.Sqlite;
 
 namespace DiscordBot.Notifications
 {
-    public sealed class SqliteNotificationCheckpointStore : INotificationCheckpointStore
+    public sealed class SqliteNotificationCheckpointStore : INotificationCheckpointStore, IClassicStandingsPublicationStateStore
     {
         private const int CommandTimeoutSeconds = 30;
         private readonly string _connectionString;
@@ -80,6 +80,72 @@ namespace DiscordBot.Notifications
             command.ExecuteNonQuery();
         }
 
+        public string? GetLastPublishedFingerprint(
+            ulong guildId,
+            ulong channelId,
+            int leagueId)
+        {
+            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(leagueId);
+
+            using var connection = OpenConnection();
+            using var command = connection.CreateCommand();
+            command.CommandTimeout = CommandTimeoutSeconds;
+            command.CommandText =
+                """
+                SELECT fingerprint
+                FROM classic_standings_publication_state
+                WHERE guild_id = $guild_id
+                  AND channel_id = $channel_id
+                  AND league_id = $league_id;
+                """;
+            command.Parameters.AddWithValue("$guild_id", guildId.ToString(CultureInfo.InvariantCulture));
+            command.Parameters.AddWithValue("$channel_id", channelId.ToString(CultureInfo.InvariantCulture));
+            command.Parameters.AddWithValue("$league_id", leagueId);
+            var value = command.ExecuteScalar();
+            return value is null or DBNull ? null : Convert.ToString(value, CultureInfo.InvariantCulture);
+        }
+
+        public void SetLastPublishedFingerprint(
+            ulong guildId,
+            ulong channelId,
+            int leagueId,
+            string fingerprint,
+            DateTimeOffset updatedAtUtc)
+        {
+            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(leagueId);
+            ArgumentException.ThrowIfNullOrWhiteSpace(fingerprint);
+
+            using var connection = OpenConnection();
+            using var command = connection.CreateCommand();
+            command.CommandTimeout = CommandTimeoutSeconds;
+            command.CommandText =
+                """
+                INSERT INTO classic_standings_publication_state (
+                    guild_id,
+                    channel_id,
+                    league_id,
+                    fingerprint,
+                    updated_at_utc
+                )
+                VALUES (
+                    $guild_id,
+                    $channel_id,
+                    $league_id,
+                    $fingerprint,
+                    $updated_at_utc
+                )
+                ON CONFLICT (guild_id, channel_id, league_id) DO UPDATE SET
+                    fingerprint = excluded.fingerprint,
+                    updated_at_utc = excluded.updated_at_utc;
+                """;
+            command.Parameters.AddWithValue("$guild_id", guildId.ToString(CultureInfo.InvariantCulture));
+            command.Parameters.AddWithValue("$channel_id", channelId.ToString(CultureInfo.InvariantCulture));
+            command.Parameters.AddWithValue("$league_id", leagueId);
+            command.Parameters.AddWithValue("$fingerprint", fingerprint);
+            command.Parameters.AddWithValue("$updated_at_utc", updatedAtUtc.UtcDateTime.ToString("O", CultureInfo.InvariantCulture));
+            command.ExecuteNonQuery();
+        }
+
         private void InitializeDatabase()
         {
             using var connection = OpenConnection();
@@ -106,6 +172,19 @@ namespace DiscordBot.Notifications
                         channel_id,
                         source_identifier,
                         notification_type
+                    )
+                ) WITHOUT ROWID;
+
+                CREATE TABLE IF NOT EXISTS classic_standings_publication_state (
+                    guild_id TEXT NOT NULL,
+                    channel_id TEXT NOT NULL,
+                    league_id INTEGER NOT NULL,
+                    fingerprint TEXT NOT NULL,
+                    updated_at_utc TEXT NOT NULL,
+                    PRIMARY KEY (
+                        guild_id,
+                        channel_id,
+                        league_id
                     )
                 ) WITHOUT ROWID;
                 """;
