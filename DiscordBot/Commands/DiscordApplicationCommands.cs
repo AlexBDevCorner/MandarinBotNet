@@ -20,10 +20,12 @@ public static class DiscordApplicationCommands
     public const string UclStandingsName = "uclstandings";
     public const string HelpName = "help";
 
-    // Display pages of 10 rows must cover the full fetch bound:
-    // 10 fetch pages x 50 max entries / 10 display rows = 50 display pages.
-    // Defaults (10 x 25 / 10 = 25) are therefore fully reachable.
-    public const int UclStandingsMaxPage = 50;
+    // Display pages of 10 rows must cover the full fetch bound for every
+    // supported configuration: MaxMaxStandingsPages (20) x MaxPageSize (50)
+    // / 10 display rows = 100 display pages. The reviewer-reported case
+    // (MaxStandingsPages=11, PageSize=50 => 550 members => 55 pages) is
+    // therefore reachable, as are the defaults (10 x 25 / 10 = 25).
+    public const int UclStandingsMaxPage = 100;
 
     public static ApplicationCommandProperties[] BuildDesiredSet()
     {

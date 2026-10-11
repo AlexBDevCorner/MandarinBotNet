@@ -513,6 +513,63 @@ public sealed class MandarinBotOptionsTests
             failure.Contains("UclFantasy:MatchdayId"));
     }
 
+    [Test]
+    public void Validate_UclFantasyMaxStandingsPagesAboveMaximum_ReturnsFailure()
+    {
+        // Arrange: fetch bound must stay reachable from /uclstandings pages.
+        var options = CreateValidOptions(
+            uclFantasy: new UclFantasyOptions
+            {
+                LeagueId = 25247707,
+                MaxStandingsPages = UclFantasyOptions.MaxMaxStandingsPages + 1,
+                PageSize = UclFantasyOptions.MaxPageSize,
+                OptType = 1,
+                PhaseId = 1,
+                MatchdayId = 0
+            });
+        var validator = new MandarinBotOptionsValidator(
+            requireOperationalConfiguration: true);
+
+        // Act
+        var result = validator.Validate(null, options);
+
+        // Assert
+        result.Failed.Should().BeTrue();
+        result.Failures.Should().Contain(failure =>
+            failure.Contains("UclFantasy:MaxStandingsPages"));
+    }
+
+    [Test]
+    public void Validate_UclFantasyLargerSupportedFetchBound_ReturnsSuccess()
+    {
+        // Arrange: MaxStandingsPages=11 with PageSize=50 (550 members, 55
+        // display pages) is supported and must remain within the Discord cap.
+        var options = CreateValidOptions(
+            uclFantasy: new UclFantasyOptions
+            {
+                LeagueId = 25247707,
+                MaxStandingsPages = 11,
+                PageSize = 50,
+                OptType = 1,
+                PhaseId = 1,
+                MatchdayId = 0
+            });
+        var validator = new MandarinBotOptionsValidator(
+            requireOperationalConfiguration: true);
+
+        // Act
+        var result = validator.Validate(null, options);
+
+        // Assert
+        result.Succeeded.Should().BeTrue();
+        var displayPages = (11 * 50 +
+            DiscordBot.UclFantasy.UclFantasyMessageCompositionService.StandingsPageSize - 1) /
+            DiscordBot.UclFantasy.UclFantasyMessageCompositionService.StandingsPageSize;
+        displayPages.Should().Be(55);
+        displayPages.Should().BeLessThanOrEqualTo(
+            DiscordBot.Commands.DiscordApplicationCommands.UclStandingsMaxPage);
+    }
+
     [TestCase(NotificationTypes.Deadline24Hours, true)]
     [TestCase(NotificationTypes.Deadline1Hour, true)]
     [TestCase(NotificationTypes.UclDeadline24Hours, true)]

@@ -380,8 +380,9 @@ Bot__Schedules__UclStandings__Cron=0 0/15 * * * ?
   without Google/UEFA sign-in, cookies, or browser automation. The `buster`
   cache-buster is intentionally omitted. This is an observed behavior, not a
   documented guarantee; UEFA may restrict automated access in its terms, so the
-  job stays moderate (25 entries per request, at most 10 pages ≈ 250 members,
-  every 15 minutes) and never bypasses access controls.
+  job stays moderate (25 entries per request, at most 10 pages ≈ 250 members
+  by default and at most 20 pages ≈ 1,000 members when configured to the
+  maximum, every 15 minutes) and never bypasses access controls.
 - **Current matchday handling.** `phaseId`/`optType` default to the observed
   value `1` but remain configurable. `MatchdayId=0` (default) auto-detects the
   current matchday from the public fixtures feed (`mdIsCurrent`, falling back
@@ -406,9 +407,11 @@ Bot__Schedules__UclStandings__Cron=0 0/15 * * * ?
   `SkippedInitialBaseline`, `SkippedSourceUnavailable`, `Completed`, or
   `CompletedWithDeliveryFailures`.
 - **Query mapping and pagination.** `vPageChunk`/`vPageOneChunk` carry
-  `PageSize` (default 25, max 50); `vPageNo` is 1-based. `MaxStandingsPages`
-  (default 10) bounds requests; a full last page at the bound is treated as
-  incomplete rather than complete. Transport JSON accepts `leaderboard`,
+  `PageSize` (default 25, max 50); `MaxStandingsPages`
+  (default 10, max 20) bounds requests; a full last page at the bound is treated as
+  incomplete rather than complete. `/uclstandings page:<n>` accepts pages 1–100,
+  which covers every supported fetch bound (20 × 50 / 10 display rows = 100
+  pages, including 11 × 50 = 550 members → 55 pages). Transport JSON accepts `leaderboard`,
   `entries`, `results`, `standings`, `members`, `teams`, and `rows` arrays plus
   common `entryId`/`teamName`/`rank`/`total` aliases, so a future UEFA rename is
   diagnosable from focused tests and fixtures instead of silently truncating.

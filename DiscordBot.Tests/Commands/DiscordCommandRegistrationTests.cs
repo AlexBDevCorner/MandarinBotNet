@@ -206,16 +206,33 @@ public sealed class DiscordCommandRegistrationTests
                 UclFantasyMessageCompositionService.StandingsPageSize - 1) /
             UclFantasyMessageCompositionService.StandingsPageSize;
 
-        // Worst case with the maximum supported PageSize (50):
-        // 10 x 50 / 10 = 50 display pages.
-        const int maxPageSize = 50;
-        var worstCasePages =
-            (UclFantasyOptions.DefaultMaxStandingsPages * maxPageSize +
+        // Worst case with the maximum supported PageSize (50) at the default
+        // fetch bound: 10 x 50 / 10 = 50 display pages.
+        var worstCaseDefaultBoundPages =
+            (UclFantasyOptions.DefaultMaxStandingsPages * UclFantasyOptions.MaxPageSize +
+                UclFantasyMessageCompositionService.StandingsPageSize - 1) /
+            UclFantasyMessageCompositionService.StandingsPageSize;
+
+        // Supported larger configuration reported in review:
+        // MaxStandingsPages=11, PageSize=50 => 550 members => 55 display pages.
+        const int largerFetchPages = 11;
+        const int largerFetchBoundMembers = largerFetchPages * UclFantasyOptions.MaxPageSize;
+        var largerBoundPages =
+            (largerFetchBoundMembers +
+                UclFantasyMessageCompositionService.StandingsPageSize - 1) /
+            UclFantasyMessageCompositionService.StandingsPageSize;
+
+        // Absolute worst supported configuration:
+        // MaxMaxStandingsPages (20) x MaxPageSize (50) / 10 = 100 display pages.
+        var absoluteWorstCasePages =
+            (UclFantasyOptions.MaxMaxStandingsPages * UclFantasyOptions.MaxPageSize +
                 UclFantasyMessageCompositionService.StandingsPageSize - 1) /
             UclFantasyMessageCompositionService.StandingsPageSize;
 
         DiscordApplicationCommands.UclStandingsMaxPage.Should().BeGreaterThanOrEqualTo(defaultBoundPages);
-        DiscordApplicationCommands.UclStandingsMaxPage.Should().BeGreaterThanOrEqualTo(worstCasePages);
+        DiscordApplicationCommands.UclStandingsMaxPage.Should().BeGreaterThanOrEqualTo(worstCaseDefaultBoundPages);
+        DiscordApplicationCommands.UclStandingsMaxPage.Should().BeGreaterThanOrEqualTo(largerBoundPages);
+        DiscordApplicationCommands.UclStandingsMaxPage.Should().BeGreaterThanOrEqualTo(absoluteWorstCasePages);
     }
 
     [Test]

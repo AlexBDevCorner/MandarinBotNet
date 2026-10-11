@@ -144,16 +144,17 @@ public sealed class MandarinBotOptionsValidator(bool requireOperationalConfigura
                 "Bot:UclFantasy:LeagueId is required when the UCL standings job is enabled.");
         }
 
-        if (options.UclFantasy.MaxStandingsPages <= 0)
+        if (options.UclFantasy.MaxStandingsPages <= 0 ||
+            options.UclFantasy.MaxStandingsPages > UclFantasyOptions.MaxMaxStandingsPages)
         {
             failures.Add(
-                "Bot:UclFantasy:MaxStandingsPages must be greater than zero.");
+                $"Bot:UclFantasy:MaxStandingsPages must be between 1 and {UclFantasyOptions.MaxMaxStandingsPages}.");
         }
 
-        if (options.UclFantasy.PageSize <= 0 || options.UclFantasy.PageSize > 50)
+        if (options.UclFantasy.PageSize <= 0 || options.UclFantasy.PageSize > UclFantasyOptions.MaxPageSize)
         {
             failures.Add(
-                "Bot:UclFantasy:PageSize must be between 1 and 50.");
+                $"Bot:UclFantasy:PageSize must be between 1 and {UclFantasyOptions.MaxPageSize}.");
         }
 
         if (options.UclFantasy.OptType <= 0)

@@ -111,6 +111,40 @@ public sealed class UclFantasyStandingsMessageCompositionTests
     }
 
     [Test]
+    public void ComposeStandingsPage_LargerSupportedFetchBound_ShowsTrailingMembers()
+    {
+        // Arrange: supported larger configuration MaxStandingsPages=11,
+        // PageSize=50 => 550 members, displayed 10 per page => 55 pages.
+        // Page 55 must show ranks 541-550 and remain within the Discord page cap.
+        var members = Enumerable.Range(1, 550)
+            .Select(index => new UclLeagueStanding(
+                1000 + index,
+                $"Team {index:D3}",
+                $"Manager {index:D3}",
+                index,
+                index,
+                2000 - index,
+                10))
+            .ToList();
+        var standings = new UclLeagueStandings(
+            25247707,
+            "Great Messi League",
+            1,
+            2,
+            members);
+
+        // Act
+        var message = _service.ComposeStandingsPage(standings, 55);
+
+        // Assert
+        message.Should().Contain("Team 541");
+        message.Should().Contain("Team 550");
+        message.Should().NotContain("Team 001");
+        message.Should().Contain("Страница 55 из 55");
+        55.Should().BeLessThanOrEqualTo(DiscordBot.Commands.DiscordApplicationCommands.UclStandingsMaxPage);
+    }
+
+    [Test]
     public void ComposeUnavailableStandings_ReturnsRetryMessage()
     {
         // Act

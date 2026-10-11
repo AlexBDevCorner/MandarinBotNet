@@ -108,7 +108,9 @@ public sealed class UclFantasyOptions
 {
     public const int DefaultLeagueId = 25247707;
     public const int DefaultMaxStandingsPages = 10;
+    public const int MaxMaxStandingsPages = 20;
     public const int DefaultPageSize = 25;
+    public const int MaxPageSize = 50;
     public const int DefaultOptType = 1;
     public const int DefaultPhaseId = 1;
 
